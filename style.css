@@ -1,240 +1,234 @@
-/* style.css */
+/* Configurazioni Tailwind personalizzate e generali */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --color-primary: #10b981; /* Emerald Green */
+    --color-secondary: #3b82f6; /* Blue */
+    --color-danger: #ef4444; /* Red */
+}
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Inter', sans-serif;
+    background-color: #f3f4f6;
     margin: 0;
-    padding: 20px;
-    background-color: #f4f7f9;
-    color: #333;
-    line-height: 1.6;
+    padding: 0;
+    display: flex; /* Abilita flex per layout side-by-side */
+    min-height: 100vh;
 }
 
-/* Contenitori Principali */
-#login-area, #admin-dashboard, #worker-dashboard {
-    max-width: 900px;
-    margin: 40px auto;
-    padding: 30px;
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+/* CARD generica */
+.card {
+    background-color: white;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Ombra più profonda */
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+     /* Leggero sollevamento al passaggio del mouse per interazione */
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1); 
 }
 
-h1 {
-    color: #007bff;
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-h2 {
-    color: #333;
-    border-bottom: 2px solid #f0f0f0;
-    padding-bottom: 10px;
-    margin-top: 25px;
-    margin-bottom: 20px;
-}
-
-h3 {
-    color: #555;
-    margin-top: 20px;
-}
-
-/* Input e Bottoni */
-label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-input[type="email"],
-input[type="password"],
-input[type="text"],
-input[type="file"],
-select { /* Aggiunto select */
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 15px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box; /* Assicura che padding e border siano inclusi nella width */
-}
-
-button {
-    padding: 10px 20px;
-    margin: 5px 5px 5px 0; /* Spazio tra i bottoni */
-    cursor: pointer;
-    background-color: #007bff;
+/* HEADER & Sidebar */
+#sidebar {
+    width: 250px;
+    min-height: 100vh;
+    background-color: #1f2937; /* Dark Gray/Slate */
     color: white;
-    border: none;
-    border-radius: 4px;
-    transition: background-color 0.3s ease;
+    padding: 20px 15px;
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 10;
 }
 
-button:hover {
-    background-color: #0056b3;
+/* Contenitore principale del contenuto */
+#main-content {
+    margin-left: 250px; /* Spazio per la sidebar */
+    flex-grow: 1;
+    padding: 20px;
 }
 
-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
+/* Stili per Bottoni (Basati sulle utility di Tailwind) */
+.btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    border-radius: 8px;
+    padding: 10px 15px;
+    transition: background-color 0.2s;
 }
-
-/* Variazioni di Colore per i Bottoni */
-.btn-success {
-    background-color: #28a745; /* Verde per Accetta */
+.btn-primary:hover {
+    background-color: #059669; 
 }
-.btn-success:hover {
-    background-color: #1e7e34;
-}
-
 .btn-danger {
-    background-color: #dc3545; /* Rosso per Rifiuta */
+    background-color: var(--color-danger);
+    color: white;
+    border-radius: 8px;
+    padding: 10px 15px;
+    transition: background-color 0.2s;
 }
-.btn-danger:hover {
-    background-color: #c82333;
+.btn-danger:hover { 
+    background-color: #dc2626; 
 }
-
+.btn-success {
+    background-color: var(--color-primary); 
+    color: white;
+    border-radius: 8px;
+    padding: 10px 15px;
+    transition: background-color 0.2s;
+}
+.btn-success:hover { 
+    background-color: #059669; 
+}
+/* Stile per il bottone di importazione in Admin */
 .btn-warning {
-    background-color: #ffc107; /* Giallo per Ricomincia Foto */
-    color: #333;
+    background-color: #f59e0b; /* Amber */
+    color: white;
+    border-radius: 8px;
+    padding: 10px 15px;
+    transition: background-color 0.2s;
 }
 .btn-warning:hover {
-    background-color: #e0a800;
+    background-color: #d97706;
 }
-
 .btn-secondary {
-    background-color: #6c757d; /* Grigio per Annulla */
+    background-color: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px 15px;
+    transition: background-color 0.2s;
 }
 .btn-secondary:hover {
-    background-color: #5a6268;
+    background-color: #e5e7eb;
 }
 
-
-/* Status Messages */
-#login-status, #import-status, #scan-status, #loading-orders, #user-creation-status, #upload-status-message {
-    margin-top: 15px;
+/* Stili Input e Select */
+input[type="text"], input[type="password"], input[type="email"], select, input[type="file"] {
+    border: 1px solid #d1d5db;
     padding: 10px;
-    border-radius: 4px;
-    background-color: #e9ecef;
-    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%; /* Forza gli input a prendere tutta la larghezza del contenitore */
+    box-sizing: border-box;
+}
+input:focus, select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); /* Smeraldo light shadow */
+    outline: none;
 }
 
-/* Stili Tabella Ordini */
-#orders-table, #users-table { /* Applicato a entrambe le tabelle */
+/* Stili Tabella */
+table {
     width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
-    font-size: 0.9em;
+    border-collapse: separate;
+    border-spacing: 0;
 }
-
-#orders-table th, #orders-table td,
-#users-table th, #users-table td {
-    border: 1px solid #e0e0e0;
-    padding: 12px 15px;
+table thead tr th {
+    padding: 12px 16px;
     text-align: left;
 }
+table tbody tr td {
+    padding: 12px 16px;
+    vertical-align: middle;
+}
 
-#orders-table th, #users-table th {
-    background-color: #007bff;
-    color: white;
+table {
+    border-radius: 8px;
+    overflow: hidden; /* Per contenere i bordi arrotondati */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+th {
+    background-color: #e2e8f0; /* Light Slate */
+    color: #1f2937;
     font-weight: 600;
 }
-
-#orders-table tr:nth-child(even), #users-table tr:nth-child(even) {
-    background-color: #f8f9fa;
+tr:nth-child(even) {
+    background-color: #f9fafb;
 }
-
+td {
+    font-size: 0.875rem; /* Testo leggermente più piccolo nelle celle */
+}
 .action-cell {
-    /* Assicura che i bottoni in riga non si spezzino troppo */
-    white-space: nowrap; 
+    white-space: nowrap;
 }
 
-/* ------------------------------------------- */
-/* Stili per l'Area di Upload Foto */
-/* ------------------------------------------- */
-
-#photo-upload-area {
-    background-color: #f8f8ff; 
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s ease-in-out;
+/* Stili Messaggi di Stato (più visibili) */
+.status-message {
+    font-weight: 600;
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    opacity: 0.9;
 }
 
-/* Animazione di "scuotimento" per attirare l'attenzione */
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-    20%, 40%, 60%, 80% { transform: translateX(5px); }
-}
-
-.animate-shake {
-    animation: shake 0.5s ease-in-out;
-}
-
-#photo-upload-area h4 {
-    color: #007bff;
-    margin-top: 0;
-}
-
-#photo-files {
-    border: 2px solid #007bff;
-    padding: 15px;
-    background-color: #fff;
-    cursor: pointer;
-}
-
-/* ------------------------------------------- */
-/* Stili Modale (Visualizzazione Foto) */
-/* ------------------------------------------- */
-
+/* Stili Modale */
 .modal {
     display: none; 
     position: fixed; 
-    z-index: 1000; 
+    z-index: 20; 
     left: 0;
     top: 0;
     width: 100%; 
     height: 100%; 
     overflow: auto; 
-    background-color: rgba(0,0,0,0.7); 
+    background-color: rgba(0,0,0,0.4); 
+    padding-top: 50px;
 }
 
 .modal-content {
     background-color: #fefefe;
-    margin: 10% auto; 
-    padding: 20px;
+    margin: 5% auto; /* 5% dal top e centrato */
+    padding: 30px;
     border: 1px solid #888;
-    width: 80%; 
+    width: 90%; 
     max-width: 700px;
-    border-radius: 8px;
+    border-radius: 12px;
     position: relative;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
-.close-button {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
+/* Animazione per l'area di upload */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    20%, 60% {
+        transform: translateX(-5px);
+    }
+    40%, 80% {
+        transform: translateX(5px);
+    }
 }
-
-.close-button:hover,
-.close-button:focus {
-    color: #000;
-    text-decoration: none;
+.animate-shake {
+    animation: shake 0.4s ease-in-out;
 }
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
-    #orders-table thead, #users-table thead {
-        display: none; 
+    /* SIDEBAR: Stacked in mobile */
+    #sidebar {
+        width: 100%;
+        min-height: auto;
+        position: relative; 
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
-    
+    #main-content {
+        margin-left: 0;
+        padding-top: 20px;
+    }
+    /* TABELLE: Layout a schede in mobile */
+    #orders-table thead, #users-table thead {
+        display: none;
+    }
     #orders-table tr, #users-table tr {
         display: block;
         margin-bottom: 15px;
         border: 1px solid #e0e0e0;
-        border-radius: 4px;
+        border-radius: 8px;
+        padding: 10px;
     }
-    
     #orders-table td, #users-table td {
         display: block;
         text-align: right;
@@ -243,19 +237,27 @@ button:disabled {
         position: relative;
         padding-left: 50%;
     }
-    
-    /* Etichette per le celle della tabella in modalità mobile */
-    #orders-table td:nth-of-type(1)::before { content: "EAN Code:"; }
-    #orders-table td:nth-of-type(2)::before { content: "Cliente:"; }
-    #orders-table td:nth-of-type(3)::before { content: "Stato:"; }
-    #orders-table td:nth-of-type(4)::before { content: "Azioni:"; }
+    /* Simulazione di etichette per le celle in mobile (richiede JS o dati attributo) */
+    /* Esempio di come potresti fare l'etichettatura: */
+    /* #orders-table td:before { 
+        content: attr(data-label); 
+        position: absolute;
+        left: 0;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: 600;
+        color: #4b5563;
+    } */
 
-    #users-table td:nth-of-type(1)::before { content: "Email:"; }
-    #users-table td:nth-of-type(2)::before { content: "Ruolo:"; }
-    #users-table td:nth-of-type(3)::before { content: "Azioni:"; }
-
-    .modal-content {
-        width: 95%; 
-        margin: 5% auto;
+    /* Aggiustamento per le azioni (bottoni in colonna) */
+    .action-cell {
+        flex-direction: column !important;
+        align-items: flex-end;
+    }
+    .action-cell select, .action-cell button {
+        width: 100%;
+        margin-top: 5px;
     }
 }
