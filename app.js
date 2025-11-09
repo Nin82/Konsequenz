@@ -634,4 +634,3 @@ window.onload = function() {
             showLoginArea("Errore di connessione o sessione non recuperabile. Riprova.");
         });
 };
-
