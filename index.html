@@ -87,24 +87,36 @@
           </div>
         </div>
 
-        <!-- LISTA ORDINI -->
-        <div class="card lg:col-span-2">
-          <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">2. Ordini in Coda per <span id="worker-role-display-queue" class="text-indigo-600"></span></h3>
-          <p id="loading-orders" class="text-gray-500 p-4">In attesa di caricamento ordini...</p>
-          <div class="overflow-x-auto">
-            <table id="orders-table" class="min-w-full divide-y divide-gray-200">
-              <thead>
+ <!-- PANNELLO 2: LISTA ORDINI DA LAVORARE -->
+<div class="card lg:col-span-2">
+    <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
+        2. Ordini in Coda per <span id="worker-role-display-queue" class="text-indigo-600"></span>
+    </h3>
+    <p id="loading-orders" class="text-gray-500 p-4">In attesa di caricamento ordini...</p>
+    
+    <div class="overflow-x-auto">
+        <table id="orders-table" class="min-w-full divide-y divide-gray-200">
+            <thead>
                 <tr>
-                  <th>EAN</th>
-                  <th>Cliente</th>
-                  <th>Stato</th>
-                  <th>Azioni</th>
+                    <th>Codice Articolo</th>
+                    <th>EAN Code</th>
+                    <th>Style Name</th>
+                    <th>Style Group</th>
+                    <th>Brand</th>
+                    <th>Colore</th>
+                    <th>Taglia</th>
+                    <th>Categoria</th>
+                    <th>Genere</th>
+                    <th>Stato</th>
+                    <th>Azioni</th>
                 </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
+            </thead>
+            <tbody>
+                <!-- Le righe verranno inserite dinamicamente via JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
       </div>
     </div>
 
