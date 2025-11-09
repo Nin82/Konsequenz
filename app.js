@@ -569,52 +569,74 @@ function handleFileUpload() {
 }
 
 
-function confirmEanInput() {
-    const ean = document.getElementById('ean-input').value.trim();
-    if (!ean) {
-        alert("Inserisci un EAN valido!");
-        return;
-    }
-
-    // Mostra EAN nelle sezioni
-    document.getElementById('current-ean-display').textContent = ean;
-
-    // Mostra il blocco azioni operative
-    const actionsArea = document.getElementById('ean-actions-area');
-    actionsArea.classList.remove('hidden');
-
-    // Mostra anche l'area upload foto
-    const photoArea = document.getElementById('photo-upload-area');
-    photoArea.classList.remove('hidden');
-
-    // Aggiorna status scan
+async function confirmEanInput() {
+    const eanInput = document.getElementById('ean-input').value.trim();
     const scanStatus = document.getElementById('scan-status');
-    scanStatus.textContent = `EAN ${ean} confermato. Ora completa le azioni operative e/o carica le foto.`;
-    scanStatus.classList.remove('hidden');
-}
+    const actionsArea = document.getElementById('ean-actions-area');
+    const currentEanDisplay = document.querySelectorAll('#current-ean-display');
 
-function handlePhotoUploadAndCompletion() {
-    if (!currentEanInProcess) {
-        showStatusMessage('upload-status-message', 'Nessun EAN in lavorazione. Scannerizza prima il codice.', false);
-        return;
-    }
-    const files = document.getElementById('photo-files').files;
-    if (files.length === 0) {
-        showStatusMessage('upload-status-message', 'Seleziona almeno un file da caricare.', false);
+    if (!eanInput) {
+        scanStatus.textContent = "Inserisci un codice EAN o Codice Articolo!";
+        scanStatus.className = "status-message status-error";
+        scanStatus.classList.remove("hidden");
+        actionsArea.classList.add("hidden");
         return;
     }
 
-    showStatusMessage('upload-status-message', `Caricamento ${files.length} immagini per EAN ${currentEanInProcess}...`, true);
-    // Logica di upload Backendless e aggiornamento dello stato Ordine
+    try {
+        // ricerca su EAN Code O Codice Articolo
+        const orders = await Backendless.Data.of("Orders").find({ where: `eanCode='${eanInput}' OR codiceArticolo='${eanInput}'` });
 
-    // PLACEHOLDER: Simula il successo
-    setTimeout(() => {
-        showStatusMessage('upload-status-message', `Caricamento completato per EAN ${currentEanInProcess}. Ordine avanzato.`, true);
-        currentEanInProcess = null;
-        document.getElementById('photo-upload-area').style.display = 'none';
-        document.getElementById('ean-input').value = '';
-        document.getElementById('photo-files').value = null; // Resetta il campo file
-    }, 2000);
+        if (orders.length === 0) {
+            scanStatus.textContent = `Codice ${eanInput} non trovato in Backendless!`;
+            scanStatus.className = "status-message status-error";
+            scanStatus.classList.remove("hidden");
+            actionsArea.classList.add("hidden");
+            return;
+        }
+
+        // Se trovato, apri la maschera azioni
+        scanStatus.textContent = `EAN ${eanInput} confermato. Compila le azioni operative.`;
+        scanStatus.className = "status-message status-success";
+        scanStatus.classList.remove("hidden");
+
+        actionsArea.classList.remove("hidden");
+        currentEanDisplay.forEach(el => el.textContent = eanInput);
+
+        // Riempie i campi operativi con i dati esistenti (se presenti)
+        const order = orders[0];
+        document.getElementById('field-shots').value = order.shots || '';
+        document.getElementById('field-quantity').value = order.quantity || '';
+        document.getElementById('field-s1-prog').value = order.s1Prog || '';
+        document.getElementById('field-s2-prog').value = order.s2Prog || '';
+        document.getElementById('field-prog-on-model').value = order.progOnModel || '';
+        document.getElementById('field-still-shot').value = order.stillShot || '';
+        document.getElementById('field-onmodel-shot').value = order.onModelShot || '';
+        document.getElementById('field-priority').value = order.priority || '';
+        document.getElementById('field-s1-stylist').value = order.s1Stylist || '';
+        document.getElementById('field-s2-stylist').value = order.s2Stylist || '';
+        document.getElementById('field-provenienza').value = order.provenienza || '';
+        document.getElementById('field-tipologia').value = order.tipologia || '';
+        document.getElementById('field-ordine').value = order.ordine || '';
+        document.getElementById('field-data-ordine').value = order.dataOrdine || '';
+        document.getElementById('field-entry-date').value = order.entryDate || '';
+        document.getElementById('field-exit-date').value = order.exitDate || '';
+        document.getElementById('field-collo').value = order.collo || '';
+        document.getElementById('field-data-reso').value = order.dataReso || '';
+        document.getElementById('field-ddt').value = order.ddt || '';
+        document.getElementById('field-note-logistica').value = order.noteLogistica || '';
+        document.getElementById('field-data-presa-post').value = order.dataPresaPost || '';
+        document.getElementById('field-data-consegna-post').value = order.dataConsegnaPost || '';
+        document.getElementById('field-calendario').value = order.calendario || '';
+        document.getElementById('field-postpresa').value = order.postPresa || '';
+
+    } catch (err) {
+        console.error(err);
+        scanStatus.textContent = "Errore durante la verifica EAN.";
+        scanStatus.className = "status-message status-error";
+        scanStatus.classList.remove("hidden");
+        actionsArea.classList.add("hidden");
+    }
 }
 
 function cancelPhotoUpload() {
