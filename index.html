@@ -68,28 +68,19 @@
 
 <!-- SCANSIONE EAN -->
 <div class="card lg:col-span-1">
-  <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-    1. Lavorazione Attuale
-  </h3>
-  <p class="text-sm text-gray-500 mb-4">
-    Scannerizza il codice EAN o il Codice Articolo del prodotto da lavorare.
-  </p>
+  <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
+  <p class="text-sm text-gray-500 mb-4">Scannerizza o inserisci il codice EAN del prodotto da lavorare.</p>
 
-  <input 
-    type="text" 
-    id="ean-input" 
-    placeholder="Codice EAN o Codice Articolo" 
-    class="mb-4 w-full p-2 border border-gray-300 rounded-md"
-  />
-
-  <button 
-    id="confirm-ean-btn"
-    class="btn-primary w-full py-2 font-medium"
-    onclick="(async () => { await confirmEanInput(); })()"
-  >
+  <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4" />
+  <button id="confirm-ean-btn" onclick="confirmEanInput()" class="btn-primary w-full py-2 font-medium">
     Conferma EAN
   </button>
 
+  <p id="scan-status" class="status-message status-info hidden"></p>
+
+  <!-- 🔽 BLOCCO AZIONI OPERATIVE (mostrato solo se EAN valido) -->
+  <div id="ean-actions-area" class="hidden mt-6 border-t pt-4">
+    <h4 class="text-lg font-semibold mb-3 text-gray-700">Azioni operative</h4>
   <p id="scan-status" class="status-message status-info hidden mt-3"></p>
 
   <!-- BLOCCO AZIONI OPERATIVE -->
