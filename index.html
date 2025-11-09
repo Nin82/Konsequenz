@@ -3,159 +3,335 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PWA Photo Workflow Manager</title>
+    <title>Workflow Foto Prodotto PWA</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Backendless SDK (versione compatibile) -->
+    <script src="https://unpkg.com/backendless@6.7.0/dist/backendless.min.js"></script>
+    <!-- SheetJS per la lettura Excel (Admin) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Configurazione PWA -->
-    <link rel="manifest" href="/manifest.json">
-    
-    <!-- Inclusione Stili -->
-    <link rel="stylesheet" href="/style.css">
+    <style>
+        /* Configurazioni Tailwind personalizzate e generali */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --color-primary: #10b981; /* Emerald Green */
+            --color-secondary: #3b82f6; /* Blue */
+            --color-danger: #ef4444; /* Red */
+        }
 
-    <!-- Inclusione Librerie tramite CDN (per evitare download manuali) -->
-    
-    <!-- !!! CORREZIONE CRITICA: URL CDN BACKENDLESS AGGIORNATO !!! -->
-    <script src="https://api.backendless.com/sdk/js/latest/backendless.min.js"></script>
-    
-    <!-- XLSX (SheetJS) per la lettura di Excel (richiesto) -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.min.js"></script> 
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            display: flex; /* Abilita flex per layout side-by-side */
+            min-height: 100vh;
+        }
 
-    <!-- Logica della tua PWA -->
-    <script src="./app.js"></script> 
+        /* CARD generica */
+        .card {
+            background-color: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Ombra più profonda */
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+             /* Leggero sollevamento al passaggio del mouse per interazione */
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1); 
+        }
+
+        /* HEADER & Sidebar */
+        #sidebar {
+            width: 250px;
+            min-height: 100vh;
+            background-color: #1f2937; /* Dark Gray/Slate */
+            color: white;
+            padding: 20px 15px;
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 10;
+        }
+        
+        /* Contenitore principale del contenuto */
+        #main-content {
+            margin-left: 250px; /* Spazio per la sidebar */
+            flex-grow: 1;
+            padding: 20px;
+        }
+
+        /* Stili per Bottoni (Basati sulle utility di Tailwind) */
+        .btn-primary {
+            background-color: var(--color-primary);
+        }
+        .btn-primary:hover {
+            background-color: #059669; 
+        }
+        .btn-danger {
+            background-color: var(--color-danger);
+        }
+        .btn-danger:hover { 
+            background-color: #dc2626; 
+        }
+        .btn-success {
+            background-color: var(--color-primary); 
+        }
+        .btn-success:hover { 
+            background-color: #059669; 
+        }
+
+        /* Stili Input e Select */
+        input[type="text"], input[type="password"], input[type="email"], select, input[type="file"] {
+            border: 1px solid #d1d5db;
+            padding: 10px;
+            border-radius: 8px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input:focus, select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); /* Smeraldo light shadow */
+            outline: none;
+        }
+        
+        /* Stili Tabella */
+        table {
+            border-radius: 8px;
+            overflow: hidden; /* Per contenere i bordi arrotondati */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        th {
+            background-color: #e2e8f0; /* Light Slate */
+            color: #1f2937;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        td {
+            font-size: 0.875rem; /* Testo leggermente più piccolo nelle celle */
+        }
+        .action-cell {
+            white-space: nowrap;
+        }
+
+        /* Stili Messaggi di Stato (più visibili) */
+        .status-message {
+            font-weight: 600;
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 8px;
+            opacity: 0.9;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            #sidebar {
+                width: 100%;
+                min-height: auto;
+                position: relative; /* Rimuove fixed */
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            }
+            #main-content {
+                margin-left: 0;
+                padding-top: 20px;
+            }
+            /* Rimuovi l'intestazione della tabella in mobile per layout responsive */
+            #orders-table thead, #users-table thead {
+                display: none;
+            }
+            #orders-table tr, #users-table tr {
+                display: block;
+                margin-bottom: 15px;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 10px;
+            }
+            #orders-table td, #users-table td {
+                display: block;
+                text-align: right;
+                border: none;
+                border-bottom: 1px dotted #e0e0e0;
+                position: relative;
+                padding-left: 50%;
+            }
+            /* Etichette per le celle della tabella in modalità mobile (da popolare in JS se necessario) */
+        }
+    </style>
 </head>
-<body>
-
-    <!-- Area Login (Inizialmente Visibile) -->
-    <div id="login-area">
-        <h1>Accesso al Workflow Manager</h1>
-        <label for="user-email">Email:</label>
-        <input type="email" id="user-email" placeholder="nome@azienda.it">
-        <br>
-        <label for="user-password">Password:</label>
-        <input type="password" id="user-password" placeholder="********">
-        <br><br>
-        <button onclick="
-            const email = document.getElementById('user-email').value;
-            const password = document.getElementById('user-password').value;
-            handleStandardLogin(email, password);
-        ">Accedi</button>
-        <p><a href="#" onclick="handlePasswordRecovery(); return false;">Hai dimenticato la password?</a></p>
-        <p id="login-status">Inserisci le credenziali.</p>
-    </div>
-
-    <!-- --------------------------------------- -->
-    <!-- DASHBOARD AMMINISTRATORE (Nascosta) -->
-    <!-- --------------------------------------- -->
-    <div id="admin-dashboard" style="display:none;">
-        <h2>⚙️ Dashboard Amministratore</h2>
-        
-        <!-- 1. Importa Ordini da Excel -->
-        <h3>1. Importa Ordini (Fase 1: Prepara Lavoro)</h3>
-        <p>Carica un file Excel (colonne: eanCode, cliente) per popolare la tabella Ordini.</p>
-        <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv">
-        <button onclick="handleFileUpload()" id="import-button" disabled>Carica Ordini su Database</button>
-        <p id="import-status"></p>
-
-        <hr>
-
-        <!-- 2. Gestione Utenti -->
-        <h3>2. Gestione Utenti e Ruoli</h3>
-        <p>Qui puoi creare nuovi account e assegnare i ruoli (Photographer, PostProducer, Admin).</p>
-
-        <div id="user-creation-form">
-            <h4>Crea Nuovo Utente</h4>
-            <input type="email" id="new-user-email" placeholder="Email Utente" required>
-            <input type="password" id="new-user-password" placeholder="Password Iniziale" required>
-            <select id="new-user-role">
-                <option value="" disabled selected>Seleziona Ruolo</option>
-                <option value="Photographer">Photographer</option>
-                <option value="PostProducer">PostProducer</option>
-                <option value="Admin">Admin</option>
-            </select>
-            <button onclick="handleUserCreation()">Crea Account</button>
-            <p id="user-creation-status"></p>
-        </div>
-
-        <h4 style="margin-top: 30px;">Utenti Esistenti</h4>
-        <p id="loading-users">Caricamento utenti...</p>
-        <table id="users-table">
-            <thead>
-                <tr>
-                    <th>Email</th>
-                    <th>Ruolo Attuale</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
-    <!-- --------------------------------------- -->
-    <!-- DASHBOARD LAVORATORE (Nascosta) -->
-    <!-- --------------------------------------- -->
-    <div id="worker-dashboard" style="display:none;">
-        <h2>👋 Benvenuto, <span id="worker-name"></span>!</h2>
-        <p>Il tuo Ruolo: <span id="worker-role"></span></p>
-
-        <hr>
-
-        <!-- Sezione Input EAN Manuale -->
-        <h3>Aggiornamento Stato Prodotto</h3>
-        <p>Inserisci il codice EAN (tramite scanner fisico o digitazione).</p>
-        
-        <label for="ean-input">Codice EAN:</label>
-        <!-- L'evento 'onkeyup' cattura l'invio (Enter) spesso usato dagli scanner fisici -->
-        <input type="text" id="ean-input" placeholder="Digita o scansiona l'EAN" onkeyup="if(event.key === 'Enter') confirmEanInput()">
-        <button onclick="confirmEanInput()">Conferma EAN</button>
-        
-        <p id="scan-status">In attesa di EAN...</p>
-        
-        <hr>
-
-        <!-- Area di Upload Foto (Solo per Photographer, si mostra solo quando un ordine è in Magazzino) -->
-        <div id="photo-upload-area" style="display:none; padding: 20px; border: 1px dashed #007bff; border-radius: 6px; margin-bottom: 20px;">
-            <h4>Upload Foto per EAN: <span id="current-ean-display"></span></h4>
-            <p>Seleziona tutte le immagini scattate per questo prodotto.</p>
-            <input type="file" id="photo-files" multiple accept="image/*">
-            <button id="upload-complete-button" onclick="handlePhotoUploadAndCompletion()">Carica e Completa Fasi Foto</button>
-            <button class="btn-secondary" onclick="cancelPhotoUpload()">Annulla</button>
-            <p id="upload-status-message"></p>
-        </div>
-        
-        <hr>
-
-        <!-- Tabella Ordini in Lavorazione -->
-        <h3>Ordini in Attesa di Lavorazione</h3>
-        <p id="loading-orders">Caricamento ordini...</p>
-        <table id="orders-table">
-            <thead>
-                <tr>
-                    <th>EAN Code</th>
-                    <th>Cliente</th>
-                    <th>Stato Attuale</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
+<body class="min-h-screen">
     
-    <!-- Modale per Visualizzazione Foto (Post Producer) -->
-    <div id="photo-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" onclick="closePhotoModal()">&times;</span>
-            <div id="photo-modal-content">
-                <!-- Il contenuto (foto e link) viene iniettato qui da JS -->
+    <!-- SIDEBAR (Barra laterale per info utente e logout) -->
+    <div id="sidebar" class="hidden md:block">
+        <div class="text-center mb-10">
+            <h1 class="text-3xl font-extrabold text-white">PhotoFlow</h1>
+            <p class="text-sm text-gray-400">Workflow Prodotti</p>
+        </div>
+        
+        <div id="user-info" class="p-3 bg-gray-700 rounded-lg shadow-inner mb-8">
+            <p class="text-xs font-light text-gray-400 mb-1">Utente Corrente:</p>
+            <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
+            <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
+        </div>
+        
+        <button id="logout-button" onclick="handleLogout()" class="btn-danger w-full mt-4 py-3 font-semibold shadow-lg">
+            Esci (Logout)
+        </button>
+    </div>
+
+    <!-- CONTENUTO PRINCIPALE -->
+    <div id="main-content">
+        
+        <!-- HEADER MOBILE (Visibile solo su schermi piccoli) -->
+        <header class="md:hidden flex justify-between items-center mb-8 p-4 bg-white rounded-xl shadow-md">
+            <h1 class="text-xl font-bold text-gray-800">PhotoFlow</h1>
+            <button onclick="handleLogout()" class="btn-danger text-sm py-2 px-3">Logout</button>
+        </header>
+
+        <!-- AREA DI LOGIN (Inizialmente Visibile) -->
+        <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
+            <div class="space-y-4 mb-6">
+                <input type="email" id="user-email" placeholder="Email" class="w-full" value="nino_glli@yahoo.it">
+                <input type="password" id="user-password" placeholder="Password" class="w-full">
+            </div>
+            <button onclick="handleStandardLogin(document.getElementById('user-email').value, document.getElementById('user-password').value)" class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
+            
+            <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700 transition">Password Dimenticata?</button>
+            
+            <p id="login-status" class="status-message bg-red-100 text-red-700 hidden" style="display: none;"></p>
+        </div>
+
+        <!-- DASHBOARD LAVORATORI (Fotografo/Post Producer) -->
+        <div id="worker-dashboard" style="display: none;" class="space-y-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- PANNELLO 1: SCANSIONE EAN -->
+                <div class="card lg:col-span-1 h-fit">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
+                    <p class="text-sm text-gray-500 mb-4">Scannerizza il codice EAN del prodotto da lavorare.</p>
+                    
+                    <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4">
+                    <button onclick="confirmEanInput()" class="btn-primary w-full py-2 font-medium">Conferma EAN</button>
+                    
+                    <p id="scan-status" class="status-message bg-blue-100 text-blue-700 hidden" style="display: none;"></p>
+                    
+                    <!-- AREA DI UPLOAD (Mostrata dopo la scansione) -->
+                    <div id="photo-upload-area" style="display: none;" class="mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
+                        <h4 class="font-bold text-lg mb-3 text-green-700">EAN: <span id="current-ean-display"></span></h4>
+                        <label for="photo-files" class="block text-sm font-medium text-gray-700 mb-2">Carica Immagini (.jpg/.png):</label>
+                        <input type="file" id="photo-files" multiple accept="image/*" class="w-full mb-4">
+                        <div class="flex space-x-3">
+                            <button onclick="handlePhotoUploadAndCompletion()" class="btn-success flex-grow py-2">Upload & Completa Fase</button>
+                            <button onclick="cancelPhotoUpload()" class="btn-secondary py-2">Annulla</button>
+                        </div>
+                        <p id="upload-status-message" class="status-message bg-green-100 text-green-700 hidden" style="display: none;"></p>
+                    </div>
+                </div>
+
+                <!-- PANNELLO 2: LISTA ORDINI DA LAVORARE -->
+                <div class="card lg:col-span-2">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">2. Ordini in Coda per <span id="worker-role-display-queue" class="text-indigo-600"></span></h3>
+                    <p id="loading-orders" class="text-gray-500 p-4">In attesa di caricamento ordini...</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table id="orders-table" class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th>EAN</th>
+                                    <th>Cliente</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Le righe verranno inserite qui da JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- MODALE VISUALIZZAZIONE FOTO (Post Producer) -->
+        <div id="photo-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn text-3xl font-bold absolute top-3 right-5" onclick="closePhotoModal()">&times;</span>
+                <h3 class="text-2xl font-bold mb-4 text-gray-800">Visualizzazione Foto EAN: <span id="modal-ean-title"></span></h3>
+                <div id="photo-modal-content" class="mt-6 space-y-4">
+                    <!-- Contenuto dinamico delle foto e delle azioni -->
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD ADMIN (Inizialmente Nascosta) -->
+        <div id="admin-dashboard" style="display: none;" class="space-y-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Pannello Amministratore</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- GESTIONE UTENTI E RUOLI -->
+                <div class="card lg:col-span-2">
+                    <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Gestione Utenti e Ruoli</h3>
+                    
+                    <!-- Crea Nuovo Utente -->
+                    <div class="mb-6 p-6 border border-gray-200 rounded-lg bg-gray-50 shadow-inner">
+                        <h4 class="font-bold text-lg mb-3">Crea Nuovo Utente</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input type="email" id="new-user-email" placeholder="Email" class="col-span-1">
+                            <input type="password" id="new-user-password" placeholder="Password Iniziale" class="col-span-1">
+                            <select id="new-user-role" class="col-span-1">
+                                <option value="" disabled selected>Seleziona Ruolo</option>
+                                <option value="Photographer">Photographer</option>
+                                <option value="PostProducer">Post Producer</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <button onclick="handleUserCreation()" class="btn-primary mt-4 py-2 font-medium">Crea Utente</button>
+                        <p id="user-creation-status" class="status-message bg-yellow-100 text-yellow-700 hidden" style="display: none;"></p>
+                    </div>
+
+                    <!-- Lista Utenti Esistenti -->
+                    <h4 class="font-bold text-lg mt-8 mb-4 border-b pb-2">Assegna Ruoli Esistenti</h4>
+                    <p id="loading-users" class="text-gray-500 p-4">Caricamento lista utenti...</p>
+                    <div class="overflow-x-auto">
+                        <table id="users-table" class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Ruolo Attuale</th>
+                                    <th class="w-1/3">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Le righe verranno inserite qui da JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- IMPORTAZIONE ORDINI (EXCEL) -->
+                <div class="card lg:col-span-1 h-fit">
+                    <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
+                    
+                    <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS. Deve contenere colonne per **EAN** e **Cliente**.</p>
+                    
+                    <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white">
+                    
+                    <button id="import-button" onclick="handleFileUpload()" class="btn-warning w-full py-2 font-medium">Carica e Importa Ordini</button>
+                    
+                    <p id="import-status" class="status-message bg-green-100 text-green-700 hidden" style="display: none;"></p>
+                </div>
             </div>
         </div>
     </div>
-
-    <script>
-        // Abilita il bottone di importazione Excel quando un file è selezionato
-        document.getElementById('excel-file-input').addEventListener('change', function() {
-            // Abilita il pulsante solo se c'è un file selezionato
-            document.getElementById('import-button').disabled = !this.files.length;
-        });
-    </script>
+    
+    <!-- Script Applicazione (app.js) -->
+    <script src="app.js"></script>
 </body>
 </html>
-
