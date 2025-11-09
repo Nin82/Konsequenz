@@ -574,80 +574,122 @@ async function confirmEanInput() {
 }
 
 async function saveEanUpdates() {
-  const statusMsg = document.getElementById("update-status");
-  
-  if (!currentEanInProcess) { 
-    statusMsg.textContent = "⚠️ Nessun EAN attivo. Scannerizza un codice prima.";
-    statusMsg.className = "status-message status-error";
-    statusMsg.classList.remove("hidden");
-    return;
-  }
+    // Verifica se è in corso la lavorazione
+    if (!currentEanInProcess || !currentEanInProcess.objectId) {
+        showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
+        return;
+    }
 
-  const ean = currentEanInProcess.ean;
-  const objectId = currentEanInProcess.objectId;
-  
-  const map = {
-    "field-shots": "shots",
-    "field-quantity": "quantity",
-    "field-s1-prog": "s1Prog",
-    "field-s2-prog": "s2Prog",
-    "field-prog-on-model": "progOnModel",
-    "field-still-shot": "stillShot",
-    "field-onmodel-shot": "onModelShot",
-    "field-priority": "priority",
-    "field-s1-stylist": "s1Stylist",
-    "field-s2-stylist": "s2Stylist",
-    "field-provenienza": "provenienza",
-    "field-tipologia": "tipologia",
-    "field-ordine": "ordine",
-    "field-data-ordine": "dataOrdine",
-    "field-entry-date": "entryDate",
-    "field-exit-date": "exitDate",
-    "field-collo": "collo",
-    "field-data-reso": "dataReso",
-    "field-ddt": "ddt",
-    "field-note-logistica": "noteLogistica",
-    "field-data-presa-post": "dataPresaPost",
-    "field-data-consegna-post": "dataConsegnaPost",
-    "field-calendario": "calendario",
-    "field-postpresa": "postPresa",
-  };
-  
-  const updatedOrder = { objectId };
-  Object.entries(map).forEach(([inputId, key]) => {
-    const el = document.getElementById(inputId);
-    if (el) updatedOrder[key] = el.value.trim();
-  });
-  
-  updatedOrder.lastUpdated = new Date();
-  
-  try {
-    statusMsg.textContent = "⏳ Salvataggio in corso...";
-    statusMsg.className = "status-message status-info";
-    statusMsg.classList.remove("hidden");
-
-    await Backendless.Data.of("Orders").save(updatedOrder);
-    statusMsg.textContent = `✅ Aggiornamenti per ${ean} salvati correttamente!`;
-    statusMsg.className = "status-message status-success";
+    const ean = currentEanInProcess.ean;
+    const objectId = currentEanInProcess.objectId;
     
-    setTimeout(() => {
-      statusMsg.classList.add("hidden");
-    }, 4000);
-  } catch (err) {
-    console.error("Errore durante il salvataggio:", err);
-    statusMsg.textContent = "❌ Errore durante il salvataggio su Backendless.";
-    statusMsg.className = "status-message status-error";
-    statusMsg.classList.remove("hidden");
-  }
+    const map = {
+        "field-shots": "shots",
+        "field-quantity": "quantity",
+        "field-s1-prog": "s1Prog",
+        "field-s2-prog": "s2Prog",
+        "field-prog-on-model": "progOnModel",
+        "field-still-shot": "stillShot",
+        "field-onmodel-shot": "onModelShot",
+        "field-priority": "priority",
+        "field-s1-stylist": "s1Stylist",
+        "field-s2-stylist": "s2Stylist",
+        "field-provenienza": "provenienza",
+        "field-tipologia": "tipologia",
+        "field-ordine": "ordine",
+        "field-data-ordine": "dataOrdine",
+        "field-entry-date": "entryDate",
+        "field-exit-date": "exitDate",
+        "field-collo": "collo",
+        "field-data-reso": "dataReso",
+        "field-ddt": "ddt",
+        "field-note-logistica": "noteLogistica",
+        "field-data-presa-post": "dataPresaPost",
+        "field-data-consegna-post": "dataConsegnaPost",
+        "field-calendario": "calendario",
+        "field-postpresa": "postPresa",
+    };
+    
+    const updatedOrder = { objectId };
+    Object.entries(map).forEach(([inputId, key]) => {
+        const el = document.getElementById(inputId);
+        // Utilizza il valore del campo di input o una stringa vuota se l'elemento è nullo
+        updatedOrder[key] = el ? el.value.trim() : '';
+    });
+    
+    updatedOrder.lastUpdated = new Date();
+    
+    try {
+        showFeedback("⏳ Salvataggio in corso...", 'info');
+        
+        await Backendless.Data.of("Orders").save(updatedOrder);
+        
+        // Successo
+        showFeedback(`✅ Aggiornamenti per ${ean} salvati correttamente!`, 'success');
+        
+        // Reinizializza l'interfaccia dopo 1 secondo per mostrare il messaggio
+        setTimeout(() => {
+            resetEanActionState(false); // Non mostrare feedback di annullamento
+            loadOrdersForUser(currentUser); // Ricarica la tabella
+        }, 1000); 
+
+    } catch (err) {
+        console.error("Errore durante il salvataggio:", err);
+        // Errore
+        showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
+    }
 }
 
-function resetEanActionState() {
-    showStatusMessage('scan-status', 'Lavorazione annullata.', false);
-    currentEanInProcess = null;
-    document.getElementById('photo-upload-area').style.display = 'none';
-    document.getElementById('ean-actions-area').classList.add('hidden'); 
-    document.getElementById('ean-input').value = '';
+
+
+/* ======================================================
+   NUOVE UTILITY PER IL FEEDBACK
+   ====================================================== */
+
+/**
+ * Mostra un messaggio di feedback con stile specifico e lo nasconde dopo 3 secondi.
+ * @param {string} message Il testo da mostrare.
+ * @param {string} type 'success', 'error', o 'info'.
+ */
+function showFeedback(message, type) {
+    const feedbackElement = document.getElementById('operation-feedback');
+    
+    // Rimuove tutte le classi di stato precedenti
+    feedbackElement.classList.remove('status-success', 'status-error', 'status-info', 'status-info');
+    
+    // Imposta il tipo e il testo del messaggio
+    feedbackElement.textContent = message;
+    feedbackElement.classList.add(`status-${type}`);
+    feedbackElement.classList.remove('hidden');
+
+    // Nasconde il messaggio dopo 3 secondi
+    setTimeout(() => {
+        feedbackElement.classList.add('hidden');
+    }, 3000); 
 }
+
+/**
+ * Resetta l'interfaccia di azione EAN allo stato iniziale.
+ * @param {boolean} showCancelFeedback Se true, mostra un messaggio di annullamento.
+ */
+function resetEanActionState(showCancelFeedback = false) {
+    // 1. Nasconde/mostra gli elementi
+    document.getElementById('ean-actions-area').classList.add('hidden');
+    document.getElementById('photo-upload-area').classList.add('hidden');
+    document.getElementById('confirm-ean-btn').classList.remove('hidden');
+
+    // 2. Resetta i campi di input EAN
+    document.getElementById('ean-input').value = '';
+
+    // 3. (Opzionale) Feedback visivo se l'utente ha premuto Annulla/Chiudi Dettaglio
+    if (showCancelFeedback) {
+        showFeedback("Operazione di aggiornamento annullata.", 'info'); 
+    }
+}
+
+
+
+
 
 function handlePhotoUploadAndCompletion() {
     alert("Funzione di upload non ancora implementata!");
@@ -656,6 +698,10 @@ function handlePhotoUploadAndCompletion() {
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
+
+
+
+
 
 
 // ----------------------------------------------------
