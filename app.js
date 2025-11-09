@@ -9,7 +9,7 @@ const STORAGE_CONTAINER_NAME = "product_photos";
 
 // Stati Ordine
 const STATUS = {
-    WAITING_PHOTO: "In attesa foto", // Riga 12 corretta
+    WAITING_PHOTO: "In attesa foto", // Riga 12 (RIPULITA)
     IN_PHOTO_PROCESS: "Fotografia in corso",
     WAITING_POST_PRODUCTION: "In attesa post-produzione",
     IN_POST_PROCESS: "Post-produzione in corso",
@@ -21,16 +21,16 @@ const STATUS = {
 const ROLES = {
     ADMIN: "Admin",
     PHOTOGRAPHER: "Photographer",
-    [cite_start]POST_PRODUCER: "PostProducer" [cite: 4]
+    POST_PRODUCER: "PostProducer"
 };
 
 // Variabili globali di stato
 let currentUser = null;
 let currentRole = null;
-let currentEanInProcess = null; [cite_start]// [cite: 5]
+let currentEanInProcess = null; // Stato EAN attivo
 
 // Inizializzazione di Backendless
-[cite_start]Backendless.initApp(APPLICATION_ID, API_KEY); [cite: 6]
+Backendless.initApp(APPLICATION_ID, API_KEY);
 console.log("Backendless inizializzato.");
 
 // Registrazione del Service Worker per la PWA
@@ -41,17 +41,17 @@ if ('serviceWorker' in navigator) {
                 console.log('Service Worker registrato con successo:', registration.scope);
             })
             .catch(error => {
-                [cite_start]console.error('Service Worker fallito:', error); [cite: 7]
+                console.error('Service Worker fallito:', error);
             });
     });
-[cite_start]} // [cite: 8]
+} 
 
 // ----------------------------------------------------
 // FUNZIONI DI UTILITY E UI
 // ----------------------------------------------------
 
 function showLoginArea(message = "") {
-    [cite_start]document.getElementById('login-area').style.display = 'block'; [cite: 9]
+    document.getElementById('login-area').style.display = 'block';
     document.getElementById('worker-dashboard').style.display = 'none';
     document.getElementById('admin-dashboard').style.display = 'none';
     document.getElementById('worker-name').textContent = 'Ospite';
@@ -59,23 +59,23 @@ function showLoginArea(message = "") {
     
     const status = document.getElementById('login-status');
     status.textContent = message;
-    status.style.display = message ? [cite_start]'block' : 'none'; [cite: 10]
+    status.style.display = message ? 'block' : 'none';
     
     // Assicurati che gli stati di upload/scansione siano resettati
     document.getElementById('scan-status').textContent = '';
-    [cite_start]document.getElementById('photo-upload-area').style.display = 'none'; [cite: 11]
+    document.getElementById('photo-upload-area').style.display = 'none';
 }
 
 function showStatusMessage(elementId, message, isSuccess = true) {
     const el = document.getElementById(elementId);
     el.textContent = message;
-    [cite_start]el.style.display = 'block'; [cite: 12]
+    el.style.display = 'block';
     if (isSuccess) {
         el.classList.remove('text-red-600', 'bg-red-100');
-        [cite_start]el.classList.add('text-green-600', 'bg-green-100'); [cite: 13]
+        el.classList.add('text-green-600', 'bg-green-100');
     } else {
         el.classList.remove('text-green-600', 'bg-green-100');
-        [cite_start]el.classList.add('text-red-600', 'bg-red-100'); [cite: 14]
+        el.classList.add('text-red-600', 'bg-red-100');
     }
 }
 
@@ -86,11 +86,11 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 function handleStandardLogin(email, password) {
     if (!email || !password) {
         showLoginArea("Per favore, inserisci email e password.");
-        [cite_start]return; [cite: 15]
+        return;
     }
     
     document.getElementById('login-status').textContent = "Accesso in corso...";
-    [cite_start]Backendless.UserService.login(email, password, true) [cite: 16]
+    Backendless.UserService.login(email, password, true)
         .then(user => {
             handleLoginSuccess(user);
         })
@@ -98,7 +98,7 @@ function handleStandardLogin(email, password) {
             console.error("Errore di Login:", error);
             const message = error.message || "Credenziali non valide o errore di sistema.";
             showLoginArea("Accesso Fallito: " + message);
-        [cite_start]}); [cite: 17]
+        });
 }
 
 function handleLogout() {
@@ -110,16 +110,16 @@ function handleLogout() {
             showLoginArea("Logout avvenuto con successo.");
         })
         .catch(error => {
-            [cite_start]console.error("Errore di Logout:", error); [cite: 18]
+            console.error("Errore di Logout:", error);
             showLoginArea("Errore durante il logout. Riprova.");
-        [cite_start]}); [cite: 19]
+        });
 }
 
 function handlePasswordRecovery() {
-    [cite_start]const email = document.getElementById('user-email').value; [cite: 20]
+    const email = document.getElementById('user-email').value;
     if (!email) {
         showLoginArea("Per recuperare la password, inserisci l'email nel campo apposito.");
-        [cite_start]return; [cite: 21]
+        return;
     }
 
     Backendless.UserService.restorePassword(email)
@@ -129,42 +129,34 @@ function handlePasswordRecovery() {
         .catch(error => {
             console.error("Errore di recupero password:", error);
             showLoginArea(`Errore di recupero password: ${error.message}`);
-        [cite_start]}); [cite: 22]
+        });
 }
 
-/**
- * Funzione per recuperare il ruolo utente.
- * Nota: il campo "role" deve esistere nella tabella Users.
- [cite_start]*/ [cite: 23]
 function getRoleFromUser(user) {
-    // Se il campo role è già sull'oggetto utente, usalo direttamente
     if (user.role) {
-        [cite_start]return Promise.resolve(user.role); [cite: 24]
+        return Promise.resolve(user.role);
     }
 
-    // Altrimenti, fai una chiamata per recuperare l'oggetto utente con la colonna 'role'
     const queryBuilder = Backendless.DataQueryBuilder.create()
         .setProperties(["objectId", "role"])
         .setWhereClause(`objectId = '${user.objectId}'`);
-    [cite_start]return Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder) [cite: 25]
+    return Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
         .then(result => {
             if (result && result.length > 0) {
-                return result[0].role || 'Nessun Ruolo'; // Ritorna il ruolo
+                return result[0].role || 'Nessun Ruolo';
             }
-            return 'Nessun Ruolo'; // Fallback
+            return 'Nessun Ruolo';
         })
         .catch(error => {
-            [cite_start]console.error("Errore nel recupero del ruolo:", error); [cite: 26]
-            return 'Nessun Ruolo'; // Fallback in caso di errore
-        [cite_start]}); [cite: 27]
+            console.error("Errore nel recupero del ruolo:", error);
+            return 'Nessun Ruolo';
+        });
 }
 
 function handleLoginSuccess(user) {
     currentUser = user;
     
-    // >>> LOG CRITICO 1: Login avvenuto, Recupero Ruolo in corso.
-    [cite_start]console.log("LOGIN SUCCESS: Tentativo di recuperare il ruolo per l'utente.", user); [cite: 28]
-    [cite_start]getRoleFromUser(user) [cite: 29]
+    getRoleFromUser(user)
         .then(role => {
             currentRole = role;
             
@@ -172,28 +164,26 @@ function handleLoginSuccess(user) {
             document.getElementById('worker-name').textContent = displayName;
             document.getElementById('worker-role').textContent = currentRole;
             
-            [cite_start]document.getElementById('login-area').style.display = 'none'; [cite: 30]
+            document.getElementById('login-area').style.display = 'none';
 
             if (currentRole === ROLES.ADMIN) {
-                // >>> LOG CRITICO 2: Ruolo Admin rilevato, si tenta di mostrare la dashboard.
-                console.log("RUOLO ADMIN: Mostro dashboard e carico utenti."); 
                 document.getElementById('admin-dashboard').style.display = 'block';
-                document.getElementById('worker-dashboard').style.display = 'none'; [cite_start]// Nascondi worker [cite: 31]
-                loadUsersAndRoles(); // Carica la tabella utenti per l'Admin
+                document.getElementById('worker-dashboard').style.display = 'none'; 
+                loadUsersAndRoles(); 
             } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
-                document.getElementById('admin-dashboard').style.display = 'none'; [cite_start]// Nascondi Admin [cite: 32]
-                [cite_start]document.getElementById('worker-dashboard').style.display = 'block'; [cite: 33]
-                loadOrdersForUser(currentRole); // Carica gli ordini pertinenti
+                document.getElementById('admin-dashboard').style.display = 'none'; 
+                document.getElementById('worker-dashboard').style.display = 'block';
+                loadOrdersForUser(currentRole); 
             } else {
                 showLoginArea("Ruolo utente non autorizzato o non definito.");
-                [cite_start]handleLogout(); [cite: 34]
+                handleLogout();
             }
         })
         .catch(error => {
             console.error("Errore critico durante la gestione del ruolo:", error);
             showLoginArea(`Errore nella verifica del ruolo: ${error.message}`);
             handleLogout();
-        [cite_start]}); [cite: 35]
+        });
 }
 
 // ----------------------------------------------------
@@ -202,123 +192,106 @@ function handleLoginSuccess(user) {
 
 function renderUsersTable(users) {
     const tableBody = document.querySelector('#users-table tbody');
-    [cite_start]tableBody.innerHTML = ''; [cite: 36]
+    tableBody.innerHTML = '';
+    const loadingUsersEl = document.getElementById('loading-users');
     if (!users || users.length === 0) {
-        document.getElementById('loading-users').textContent = "Nessun utente trovato (a parte te, Admin).";
-        [cite_start]return; [cite: 37]
+        loadingUsersEl.textContent = "Nessun utente trovato (a parte te, Admin).";
+        loadingUsersEl.style.display = 'block';
+        return;
     }
     
-    [cite_start]document.getElementById('loading-users').style.display = 'none'; [cite: 38]
+    loadingUsersEl.style.display = 'none';
     users.forEach(user => {
-        // Ignora l'utente Admin loggato per prevenire l'auto-rimozione
         if (user.objectId === currentUser.objectId) return; 
 
         const row = tableBody.insertRow();
-        
-        // Colonna 1: Email
         row.insertCell().textContent = user.email;
 
-        // Colonna 2: Ruolo Attuale
         const currentRoleCell = row.insertCell();
-        [cite_start]currentRoleCell.textContent = user.role || 'Nessun Ruolo'; [cite: 39]
+        currentRoleCell.textContent = user.role || 'Nessun Ruolo';
         
-        // Colonna 3: Cambia Ruolo / Elimina
         const actionCell = row.insertCell();
         actionCell.classList.add('action-cell');
 
-        // Select per il cambio ruolo
         const roleSelect = document.createElement('select');
         roleSelect.className = 'w-1/2 p-2 border border-gray-300 rounded-md text-sm';
-        [cite_start]Object.values(ROLES).filter(r => r !== ROLES.ADMIN).forEach(role => { [cite: 40]
+        Object.values(ROLES).filter(r => r !== ROLES.ADMIN).forEach(role => {
             const option = document.createElement('option');
             option.value = role;
             option.textContent = role;
-            [cite_start]if (user.role === role) { [cite: 41]
-                [cite_start]option.selected = true; [cite: 42]
+            if (user.role === role) {
+                option.selected = true;
             }
             roleSelect.appendChild(option);
         });
-        // Bottone per salvare il ruolo
-        [cite_start]const saveButton = document.createElement('button'); [cite: 43]
-        [cite_start]saveButton.textContent = 'Salva Ruolo'; [cite: 44]
+        const saveButton = document.createElement('button');
+        saveButton.textContent = 'Salva Ruolo';
         saveButton.className = 'btn-success text-xs py-1 px-2 mr-2';
-        [cite_start]saveButton.onclick = () => updateRole(user.objectId, roleSelect.value); [cite: 45]
-        // Bottone per eliminare l'utente
+        saveButton.onclick = () => updateRole(user.objectId, roleSelect.value);
         const deleteButton = document.createElement('button');
-        [cite_start]deleteButton.textContent = 'Elimina'; [cite: 46]
+        deleteButton.textContent = 'Elimina';
         deleteButton.className = 'btn-danger text-xs py-1 px-2';
         deleteButton.onclick = () => deleteUser(user.objectId, user.email);
 
         actionCell.appendChild(roleSelect);
         actionCell.appendChild(saveButton);
         actionCell.appendChild(deleteButton);
-    [cite_start]}); [cite: 47]
+    });
 }
 
 function loadUsersAndRoles() {
-    try {
-        [cite_start]console.log("Inizio: Caricamento lista utenti e ruoli per dashboard Admin."); [cite: 48]
-        // Backendless non gestisce direttamente i ruoli in una singola proprietà dell'utente, 
-        [cite_start]// ma si affida al campo "role" che abbiamo aggiunto alla tabella Users. [cite: 49]
-        const queryBuilder = Backendless.DataQueryBuilder.create()
-            .setProperties(["objectId", "email", "role"]) // Richiedi esplicitamente l'email e il nostro campo 'role'
-            [cite_start].setPageSize(50); [cite: 50]
-        // Limite di 50 utenti
+    const loadingUsersEl = document.getElementById('loading-users');
+    loadingUsersEl.textContent = "Caricamento lista utenti...";
+    loadingUsersEl.style.display = 'block';
+    
+    const queryBuilder = Backendless.DataQueryBuilder.create()
+        .setProperties(["objectId", "email", "role"]) 
+        .setPageSize(50);
 
-        Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
-            .then(users => {
-                console.log("Utenti caricati:", users);
-                renderUsersTable(users);
-            })
-            .catch(error => {
-                [cite_start]// >>> LOG CRITICO 3: Errore nella query (Probabilmente permessi) [cite: 51]
-                console.error("ERRORE CRITICO in loadUsersAndRoles (Find):", error);
-                document.getElementById('loading-users').textContent = 
-                    `ERRORE: Impossibile caricare gli utenti. Controlla i permessi READ sulla tabella 'Users' (Errore: ${error.message}).`;
-                [cite_start]document.getElementById('loading-users').style.color = '#dc2626'; [cite: 52]
-            });
-    [cite_start]} catch (e) { [cite: 53]
-        // >>> LOG CRITICO 4: Errore sincrono (es. ID HTML sbagliato)
-        [cite_start]console.error("ERRORE SINCRONO in loadUsersAndRoles:", e); [cite: 54]
-        document.getElementById('loading-users').textContent = 
-            [cite_start]`ERRORE SINCRONO: La dashboard non può essere visualizzata (Errore: ${e.message}).`; [cite: 55]
-        document.getElementById('loading-users').style.color = '#dc2626';
-    }
+    Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
+        .then(users => {
+            renderUsersTable(users);
+        })
+        .catch(error => {
+            console.error("ERRORE CRITICO in loadUsersAndRoles (Find):", error);
+            loadingUsersEl.textContent = 
+                `ERRORE: Impossibile caricare gli utenti. (Errore: ${error.message}).`;
+            loadingUsersEl.style.color = '#dc2626';
+        });
 }
 
 function updateRole(userId, newRole) {
     if (userId === currentUser.objectId) {
         showStatusMessage('user-creation-status', 'Non puoi modificare il tuo ruolo tramite questo pannello.', false);
-        [cite_start]return; [cite: 56]
+        return;
     }
 
     const userUpdate = {
         objectId: userId,
         role: newRole
-    [cite_start]}; [cite: 57]
+    };
     Backendless.Data.of(USER_TABLE_NAME).save(userUpdate)
         .then(() => {
             showStatusMessage('user-creation-status', `Ruolo dell'utente aggiornato a ${newRole} con successo.`, true);
-            loadUsersAndRoles(); // Ricarica la tabella
+            loadUsersAndRoles(); 
         })
         .catch(error => {
             showStatusMessage('user-creation-status', `Errore nell'aggiornamento del ruolo: ${error.message}`, false);
             console.error("Errore aggiornamento ruolo:", error);
-        [cite_start]}); [cite: 58]
+        });
 }
 
 function deleteUser(userId, email) {
-    // In un ambiente reale, useremmo un modale al posto di alert/confirm
     if (confirm(`Sei sicuro di voler eliminare l'utente ${email}?`)) {
         Backendless.Data.of(USER_TABLE_NAME).remove({ objectId: userId })
             .then(() => {
                 showStatusMessage('user-creation-status', `Utente ${email} eliminato con successo.`, true);
-                [cite_start]loadUsersAndRoles(); // Ricarica la tabella [cite: 59]
+                loadUsersAndRoles(); 
             })
             .catch(error => {
                 showStatusMessage('user-creation-status', `Errore nell'eliminazione dell'utente: ${error.message}`, false);
                 console.error("Errore eliminazione utente:", error);
-            [cite_start]}); [cite: 60]
+            });
     }
 }
 
@@ -326,23 +299,21 @@ function deleteUser(userId, email) {
 function handleUserCreation() {
     const email = document.getElementById('new-user-email').value.trim();
     const password = document.getElementById('new-user-password').value;
-    [cite_start]const role = document.getElementById('new-user-role').value; [cite: 61]
+    const role = document.getElementById('new-user-role').value;
     if (!email || !password || !role) {
         showStatusMessage('user-creation-status', 'Per favore, compila tutti i campi per il nuovo utente.', false);
-        [cite_start]return; [cite: 62]
+        return;
     }
 
-    // 1. Registrazione in Backendless.Users
     Backendless.UserService.register({
         email: email,
         password: password
     })
     .then(newUser => {
-        // 2. Aggiornamento con il ruolo personalizzato
         const userUpdate = {
             objectId: newUser.objectId,
-            role: role // Il nostro campo personalizzato
-        [cite_start]}; [cite: 63]
+            role: role 
+        };
 
         return Backendless.Data.of(USER_TABLE_NAME).save(userUpdate);
     })
@@ -351,105 +322,87 @@ function handleUserCreation() {
         document.getElementById('new-user-email').value = '';
         document.getElementById('new-user-password').value = '';
         document.getElementById('new-user-role').value = '';
-        loadUsersAndRoles(); // Aggiorna la lista
+        loadUsersAndRoles(); 
     })
     .catch(error => {
-        [cite_start]console.error("Errore creazione utente:", error); [cite: 64]
+        console.error("Errore creazione utente:", error);
         showStatusMessage('user-creation-status', `Creazione Utente Fallita: ${error.message}`, false);
-    [cite_start]}); [cite: 65]
+    });
 }
 
 // Funzione di gestione file Excel (PLACEHOLDER, da implementare nel dettaglio)
 function handleFileUpload() {
-    [cite_start]const fileInput = document.getElementById('excel-file-input'); [cite: 89]
+    const fileInput = document.getElementById('excel-file-input');
     const statusEl = document.getElementById('import-status');
 
     if (!fileInput.files || fileInput.files.length === 0) {
         statusEl.textContent = "Seleziona un file Excel prima di procedere.";
-        [cite_start]statusEl.className = 'status-message bg-red-100 text-red-700'; [cite: 90]
+        statusEl.className = 'status-message bg-red-100 text-red-700';
         statusEl.style.display = 'block';
         return;
     }
 
-    [cite_start]const file = fileInput.files[0]; [cite: 91]
+    const file = fileInput.files[0];
     const reader = new FileReader();
     reader.onload = async function(e) {
-        [cite_start]const data = new Uint8Array(e.target.result); [cite: 92]
+        const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        // Prendi il primo foglio
-        [cite_start]const sheetName = workbook.SheetNames[0]; [cite: 93]
+        const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
 
-        // Converti in JSON
-        [cite_start]const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); [cite: 94]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
         if (!jsonData || jsonData.length === 0) {
-            [cite_start]statusEl.textContent = "File Excel vuoto o non leggibile."; [cite: 95]
+            statusEl.textContent = "File Excel vuoto o non leggibile.";
             statusEl.className = 'status-message bg-red-100 text-red-700';
             statusEl.style.display = 'block';
             return;
         }
 
-        [cite_start]statusEl.textContent = `Inizio importazione di ${jsonData.length} ordini...`; [cite: 96]
+        statusEl.textContent = `Inizio importazione di ${jsonData.length} ordini...`;
         statusEl.className = 'status-message bg-blue-100 text-blue-700';
         statusEl.style.display = 'block';
 
-        // Progress bar dinamica
-        [cite_start]let progressBar = document.getElementById('import-progress-bar'); [cite: 97]
-        if (!progressBar) {
-            progressBar = document.createElement('div');
-            [cite_start]progressBar.id = 'import-progress-bar'; [cite: 98]
-            progressBar.style.width = '0%';
-            progressBar.style.height = '8px';
-            progressBar.style.backgroundColor = '#10b981'; // verde
-            progressBar.style.borderRadius = '4px';
-            [cite_start]progressBar.style.marginTop = '6px'; [cite: 99]
-            statusEl.parentNode.insertBefore(progressBar, statusEl.nextSibling);
-        }
-
-        [cite_start]const total = jsonData.length; [cite: 100]
+        let progressBar = document.getElementById('import-progress-bar');
+        const total = jsonData.length;
         let successCount = 0;
         let failCount = 0;
 
         for (let i = 0; i < jsonData.length; i++) {
-            [cite_start]const row = jsonData[i]; [cite: 101]
-            // Crea oggetto per Backendless Orders
+            const row = jsonData[i];
             const orderObj = {
-                productCode: row["Codice Articolo"] || [cite_start]"", [cite: 102]
-                eanCode: row["Ean Code"] || [cite_start]"", [cite: 103]
-                styleName: row["Style Name"] || [cite_start]"", [cite: 104]
-                styleGroup: row["Style Group"] || [cite_start]"", [cite: 105]
-                brand: row["Brand"] || [cite_start]"", [cite: 106]
-                color: row["Colore"] || [cite_start]"", [cite: 107]
-                size: row["Taglia"] || [cite_start]"", [cite: 108]
-                category: row["Categoria"] || [cite_start]"", [cite: 109]
-                gender: row["Genere"] || [cite_start]"", [cite: 110]
-                status: STATUS.WAITING_PHOTO, // 🆕 Usa la costante globale STATUS
+                productCode: row["Codice Articolo"] || "",
+                eanCode: row["Ean Code"] || "",
+                styleName: row["Style Name"] || "",
+                styleGroup: row["Style Group"] || "",
+                brand: row["Brand"] || "",
+                color: row["Colore"] || "",
+                size: row["Taglia"] || "",
+                category: row["Categoria"] || "",
+                gender: row["Genere"] || "",
+                status: STATUS.WAITING_PHOTO, 
                 assignedToPhotographerId: "",
                 assignedToPostProducerId: "",
                 lastUpdated: new Date()
-                // puoi aggiungere altri campi step-by-step se necessario
-            [cite_start]}; [cite: 111]
-            [cite_start]try { [cite: 112]
+            };
+            try {
                 await Backendless.Data.of("Orders").save(orderObj);
-                [cite_start]successCount++; [cite: 113]
+                successCount++;
             } catch (err) {
-                [cite_start]console.error("Errore import ordine:", err); [cite: 114]
+                console.error("Errore import ordine:", err);
                 failCount++;
             }
 
-            // Aggiorna progress bar
-            [cite_start]const progress = Math.round(((i + 1) / total) * 100); [cite: 115]
-            progressBar.style.width = progress + "%";
+            const progress = Math.round(((i + 1) / total) * 100);
+            if (progressBar) progressBar.style.width = progress + "%";
         }
 
-        [cite_start]statusEl.textContent = `Importazione completata: ${successCount} successi, ${failCount} errori.`; [cite: 116]
-        statusEl.className = failCount === 0 ? [cite_start]'status-message bg-green-100 text-green-700' : 'status-message bg-yellow-100 text-yellow-700'; [cite: 117]
-        // Resetta file input
-        [cite_start]fileInput.value = ""; [cite: 118]
-        // Aggiorna lista ordini per il ruolo corrente
+        statusEl.textContent = `Importazione completata: ${successCount} successi, ${failCount} errori.`;
+        statusEl.className = failCount === 0 ? 'status-message bg-green-100 text-green-700' : 'status-message bg-yellow-100 text-yellow-700';
+        
+        fileInput.value = "";
         if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
-            [cite_start]loadOrdersForUser(currentRole); [cite: 119]
+            loadOrdersForUser(currentRole);
         }
     };
 
@@ -458,30 +411,30 @@ function handleFileUpload() {
 
 
 // ----------------------------------------------------
-// FUNZIONI WORKER (DASHBOARD) - PLACEHOLDERS
+// FUNZIONI WORKER (DASHBOARD)
 // ----------------------------------------------------
 
 function loadOrdersForUser(role) {
-    [cite_start]const tableBody = document.querySelector('#orders-table tbody'); [cite: 67]
+    const tableBody = document.querySelector('#orders-table tbody');
     const loadingText = document.getElementById('loading-orders');
 
     loadingText.textContent = `Caricamento ordini per il ruolo ${role}...`;
-    [cite_start]tableBody.innerHTML = ''; [cite: 68]
-    // Determina lo stato degli ordini da caricare in base al ruolo
-    [cite_start]let whereClause = ''; [cite: 69]
+    tableBody.innerHTML = '';
+    
+    let whereClause = '';
     if (role === ROLES.PHOTOGRAPHER) {
-        [cite_start]whereClause = `status = '${STATUS.WAITING_PHOTO}'`; [cite: 70]
+        whereClause = `status = '${STATUS.WAITING_PHOTO}'`;
     } else if (role === ROLES.POST_PRODUCER) {
-        [cite_start]whereClause = `status = '${STATUS.WAITING_POST_PRODUCTION}'`; [cite: 71]
+        whereClause = `status = '${STATUS.WAITING_POST_PRODUCTION}'`;
     } else {
-        [cite_start]tableBody.innerHTML = '<tr><td colspan="11">Ruolo non valido per la visualizzazione ordini.</td></tr>'; [cite: 72]
+        tableBody.innerHTML = '<tr><td colspan="11">Ruolo non valido per la visualizzazione ordini.</td></tr>';
         return;
     }
 
     const queryBuilder = Backendless.DataQueryBuilder.create()
         .setWhereClause(whereClause)
         .setSortBy(['lastUpdated DESC'])
-        [cite_start].setPageSize(50); [cite: 73]
+        .setPageSize(50);
     Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder)
         .then(orders => {
             if (!orders || orders.length === 0) {
@@ -490,108 +443,103 @@ function loadOrdersForUser(role) {
                 return;
             }
 
-            [cite_start]loadingText.textContent = ''; [cite: 74]
+            loadingText.textContent = '';
             document.getElementById('worker-role-display-queue').textContent = role;
 
             orders.forEach(order => {
                 const row = tableBody.insertRow();
 
                 row.insertCell().textContent = order.productCode || '';
-                [cite_start]row.insertCell().textContent = order.eanCode || ''; [cite: 75]
+                row.insertCell().textContent = order.eanCode || '';
                 row.insertCell().textContent = order.styleName || '';
                 row.insertCell().textContent = order.styleGroup || '';
                 row.insertCell().textContent = order.brand || '';
                 row.insertCell().textContent = order.color || '';
-                row.insertCell().textContent = order.size || [cite_start]''; [cite: 76]
+                row.insertCell().textContent = order.size || '';
                 row.insertCell().textContent = order.category || '';
                 row.insertCell().textContent = order.gender || '';
-                row.insertCell().textContent = order.status || [cite_start]''; [cite: 77]
-                // Colonna Azioni
-                [cite_start]const actionCell = row.insertCell(); [cite: 78]
+                row.insertCell().textContent = order.status || '';
+                
+                const actionCell = row.insertCell();
                 actionCell.classList.add('action-cell');
 
-                // Bottone per aprire il modal foto
-                [cite_start]const viewBtn = document.createElement('button'); [cite: 79]
+                const viewBtn = document.createElement('button');
                 viewBtn.textContent = 'Visualizza Foto';
                 viewBtn.className = 'btn-primary text-xs py-1 px-2';
                 viewBtn.onclick = () => openPhotoModal(order.eanCode);
 
                 actionCell.appendChild(viewBtn);
-            [cite_start]}); [cite: 80]
+            });
         })
         .catch(error => {
             console.error("Errore nel caricamento ordini:", error);
             tableBody.innerHTML = `<tr><td colspan="11">Errore nel caricamento ordini: ${error.message}</td></tr>`;
             loadingText.textContent = '';
-        [cite_start]}); [cite: 81]
+        });
 }
 
-// Funzione per aprire il modal dell'ordine (foto ecc.)
-function openOrderModal(order) {
-    [cite_start]document.getElementById('photo-modal').style.display = 'block'; [cite: 82]
-    document.getElementById('modal-ean-title').textContent = order.eanCode || '';
+function openPhotoModal(eanCode) {
+    document.getElementById('photo-modal').style.display = 'block';
+    document.getElementById('modal-ean-title').textContent = eanCode || '';
     const modalContent = document.getElementById('photo-modal-content');
-    modalContent.innerHTML = `
-        <p><strong>Brand:</strong> ${order.brand || [cite_start]''}</p> [cite: 83]
-        <p><strong>Categoria:</strong> ${order.category || [cite_start]''}</p> [cite: 84]
-        <p><strong>Colore:</strong> ${order.color || [cite_start]''}</p> [cite: 85]
-        <p><strong>Taglia:</strong> ${order.size || [cite_start]''}</p> [cite: 86]
-        <p><strong>Status:</strong> ${order.status || [cite_start]''}</p> [cite: 87]
-        <p><strong>Foto:</strong> ${order.photoStoragePath || 'Nessuna foto caricata'}</p>
-    [cite_start]`; [cite: 88]
+    modalContent.innerHTML = `<p>Caricamento foto per EAN: ${eanCode}...</p>`;
+    // TODO: implementare qui la logica per scaricare le foto da Backendless Storage
 }
 
 // 🔍 Conferma EAN o Codice Articolo e mostra azioni operative
 async function confirmEanInput() {
-  [cite_start]const eanInput = document.getElementById("ean-input").value.trim(); [cite: 120]
+  const eanInput = document.getElementById("ean-input").value.trim();
   const scanStatus = document.getElementById("scan-status");
   const actionsArea = document.getElementById("ean-actions-area");
-  const photoUploadArea = document.getElementById("photo-upload-area"); // 🆕 Riferimento area foto
-  [cite_start]const currentEanDisplay = document.querySelectorAll("#current-ean-display"); [cite: 121]
+  const photoUploadArea = document.getElementById("photo-upload-area");
+  // Per mantenere l'ID unico nel DOM, usiamo solo uno dei due span
+  const currentEanDisplay = document.getElementById("current-ean-display"); 
 
   if (!eanInput) {
     scanStatus.textContent = "Inserisci un codice EAN o un Codice Articolo!";
-    [cite_start]scanStatus.className = "status-message status-error"; [cite: 122]
+    scanStatus.className = "status-message status-error";
     scanStatus.classList.remove("hidden");
     actionsArea.classList.add("hidden");
-    photoUploadArea.style.display = 'none'; // 🆕 Nascondi l'area foto
+    photoUploadArea.style.display = 'none';
     return;
   }
 
   try {
     scanStatus.textContent = "Verifica in corso...";
     scanStatus.className = "status-message status-info";
-    [cite_start]scanStatus.classList.remove("hidden"); [cite: 123]
-    // 🔹 Query Backendless (EAN oppure Codice Articolo)
+    scanStatus.classList.remove("hidden");
+    
     const query = Backendless.DataQueryBuilder.create().setWhereClause(
       `eanCode='${eanInput}' OR productCode='${eanInput}'`
-    [cite_start]); [cite: 124]
+    );
     const orders = await Backendless.Data.of("Orders").find(query);
 
     if (!orders || orders.length === 0) {
-      [cite_start]scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`; [cite: 125]
+      scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
       scanStatus.className = "status-message status-error";
       actionsArea.classList.add("hidden");
-      photoUploadArea.style.display = 'none'; // 🆕 Nascondi l'area foto
+      photoUploadArea.style.display = 'none';
       return;
     }
 
-    // ✅ Codice trovato
     const order = orders[0];
-    scanStatus.textContent = `✅ Codice ${eanInput} trovato. [cite_start]Compila o aggiorna i dati operativi.`; [cite: 126]
+    scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
     scanStatus.className = "status-message status-success";
-    // Mostra la sezione operativa
-    [cite_start]actionsArea.classList.remove("hidden"); [cite: 127]
-    currentEanDisplay.forEach((el) => (el.textContent = eanInput));
+    
+    actionsArea.classList.remove("hidden");
+    if (currentEanDisplay) currentEanDisplay.textContent = eanInput; 
 
-    // 🆕 Visualizza l'area di upload foto solo per i Fotografi
+    // Visualizza l'area di upload foto solo per i Fotografi
     if (currentRole === ROLES.PHOTOGRAPHER) {
         photoUploadArea.style.display = 'block';
+        // Aggiorna l'EAN nell'area di upload se hai usato l'ID duplicato
+        const uploadEanDisplay = document.getElementById("current-ean-display-upload");
+        if(uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
     } else {
         photoUploadArea.style.display = 'none';
     }
 
-    // 🔹 Popola i campi se già esistono dati
+    // Popola i campi se già esistono dati
     const map = {
       "field-shots": "shots",
       "field-quantity": "quantity",
@@ -605,48 +553,37 @@ async function confirmEanInput() {
       "field-s2-stylist": "s2Stylist",
       "field-provenienza": "provenienza",
       "field-tipologia": "tipologia",
-      [cite_start]"field-ordine": "ordine", [cite: 129]
-      "field-data-ordine": "dataOrdine",
-      "field-entry-date": "entryDate",
-      "field-exit-date": "exitDate",
-      "field-collo": "collo",
-      "field-data-reso": "dataReso",
-      "field-ddt": "ddt",
-      "field-note-logistica": "noteLogistica",
-      "field-data-presa-post": "dataPresaPost",
-      "field-data-consegna-post": "dataConsegnaPost",
-      "field-calendario": "calendario",
-      "field-postpresa": "postPresa",
-    [cite_start]}; [cite: 130]
+      // Aggiungi altri campi operativi se presenti
+    };
     Object.entries(map).forEach(([inputId, key]) => {
       const el = document.getElementById(inputId);
       if (el) el.value = order[key] || "";
     });
-    // 🔹 Salva in memoria temporanea per aggiornamento successivo
-    currentEanInProcess = { objectId: order.objectId, ean: eanInput }; [cite_start]// 🆕 Usiamo la variabile globale [cite: 131]
-  [cite_start]} catch (err) { [cite: 132]
+    
+    currentEanInProcess = { objectId: order.objectId, ean: eanInput };
+  } catch (err) {
     console.error(err);
     scanStatus.textContent = "Errore durante la verifica EAN.";
     scanStatus.className = "status-message status-error";
-    [cite_start]actionsArea.classList.add("hidden"); [cite: 133]
-    photoUploadArea.style.display = 'none'; // 🆕 Nascondi l'area foto
+    actionsArea.classList.add("hidden");
+    photoUploadArea.style.display = 'none';
   }
 }
 
 // 💾 Salva i dati operativi aggiornati su Backendless
 async function saveEanUpdates() {
-  [cite_start]const statusMsg = document.getElementById("update-status"); [cite: 134]
-  // Controlla che ci sia un EAN attivo
-  if (!currentEanInProcess) { // 🆕 Usiamo la variabile globale
-    [cite_start]statusMsg.textContent = "⚠️ Nessun EAN attivo. Scannerizza un codice prima."; [cite: 135]
+  const statusMsg = document.getElementById("update-status");
+  
+  if (!currentEanInProcess) { 
+    statusMsg.textContent = "⚠️ Nessun EAN attivo. Scannerizza un codice prima.";
     statusMsg.className = "status-message status-error";
     statusMsg.classList.remove("hidden");
     return;
   }
 
-  const ean = currentEanInProcess.ean; [cite_start]// 🆕 Usiamo la variabile globale [cite: 136]
-  const objectId = currentEanInProcess.objectId; // 🆕 Usiamo la variabile globale
-  // Mappa campi HTML → colonne Backendless
+  const ean = currentEanInProcess.ean;
+  const objectId = currentEanInProcess.objectId;
+  
   const map = {
     "field-shots": "shots",
     "field-quantity": "quantity",
@@ -660,54 +597,50 @@ async function saveEanUpdates() {
     "field-s2-stylist": "s2Stylist",
     "field-provenienza": "provenienza",
     "field-tipologia": "tipologia",
-    "field-ordine": "ordine",
-    "field-data-ordine": "dataOrdine",
-    "field-entry-date": "entryDate",
-    "field-exit-date": "exitDate",
-    "field-collo": "collo",
-    [cite_start]"field-data-reso": "dataReso", [cite: 137]
-    "field-ddt": "ddt",
-    "field-note-logistica": "noteLogistica",
-    "field-data-presa-post": "dataPresaPost",
-    "field-data-consegna-post": "dataConsegnaPost",
-    "field-calendario": "calendario",
-    "field-postpresa": "postPresa",
-  [cite_start]}; [cite: 138]
-  // Costruisci l’oggetto aggiornato
-  [cite_start]const updatedOrder = { objectId }; [cite: 139]
+    // Aggiungi altri campi operativi se presenti
+  };
+  
+  const updatedOrder = { objectId };
   Object.entries(map).forEach(([inputId, key]) => {
     const el = document.getElementById(inputId);
     if (el) updatedOrder[key] = el.value.trim();
-  [cite_start]}); [cite: 140]
-  // Aggiungi timestamp di aggiornamento
-  [cite_start]updatedOrder.lastUpdated = new Date(); [cite: 141]
+  });
+  
+  updatedOrder.lastUpdated = new Date();
+  
   try {
     statusMsg.textContent = "⏳ Salvataggio in corso...";
     statusMsg.className = "status-message status-info";
     statusMsg.classList.remove("hidden");
 
-    [cite_start]await Backendless.Data.of("Orders").save(updatedOrder); [cite: 142]
+    await Backendless.Data.of("Orders").save(updatedOrder);
     statusMsg.textContent = `✅ Aggiornamenti per ${ean} salvati correttamente!`;
-    [cite_start]statusMsg.className = "status-message status-success"; [cite: 143]
-    // Pulisci i campi dopo qualche secondo
+    statusMsg.className = "status-message status-success";
+    
     setTimeout(() => {
       statusMsg.classList.add("hidden");
-    [cite_start]}, 4000); [cite: 144]
+    }, 4000);
   } catch (err) {
-    [cite_start]console.error("Errore durante il salvataggio:", err); [cite: 145]
+    console.error("Errore durante il salvataggio:", err);
     statusMsg.textContent = "❌ Errore durante il salvataggio su Backendless.";
     statusMsg.className = "status-message status-error";
-    [cite_start]statusMsg.classList.remove("hidden"); [cite: 146]
+    statusMsg.classList.remove("hidden");
   }
 }
 
-// 🆕 Funzione di reset generica (sostituisce cancelPhotoUpload)
+// 🆕 Funzione di reset generica 
 function resetEanActionState() {
     showStatusMessage('scan-status', 'Lavorazione annullata.', false);
     currentEanInProcess = null;
     document.getElementById('photo-upload-area').style.display = 'none';
-    document.getElementById('ean-actions-area').classList.add('hidden'); // 🆕 Nasconde anche le azioni
+    document.getElementById('ean-actions-area').classList.add('hidden'); 
     document.getElementById('ean-input').value = '';
+}
+
+function handlePhotoUploadAndCompletion() {
+    // TODO: Aggiungere qui la logica di upload effettivo del file su Backendless Storage
+    alert("Funzione di upload non ancora implementata!");
+    // Dopo l'upload e l'aggiornamento dello stato ordine, chiamare resetEanActionState()
 }
 
 function closePhotoModal() {
@@ -728,27 +661,23 @@ window.onload = function() {
                     .then(user => {
                         // Se l'utente è valido ma l'oggetto utente non ha il ruolo (cache), ricaricalo
                         if (!user || !user.role) {
-                             [cite_start]return user; [cite: 149]
+                             return user;
                         }
                         return user;
                     });
             } else {
                 showLoginArea();
             }
-        [cite_start]}) [cite: 150]
+        })
         .then(user => {
-            if (user) {
-                // Se user è un errore, viene catturato nel .catch precedente
-                if (user && user.objectId) {
-                    [cite_start]handleLoginSuccess(user); [cite: 151]
-                } else {
-                     showLoginArea(); [cite_start]// Se l'utente non è valido o l'oggetto è incompleto [cite: 152]
-                }
+            if (user && user.objectId) {
+                handleLoginSuccess(user);
+            } else {
+                 showLoginArea();
             }
         })
         .catch(error => {
             console.error("Errore di inizializzazione sessione:", error);
             showLoginArea();
-        [cite_start]}); [cite: 153]
-}; // ❌ La chiusura } e il testo erano qui e bloccavano tutto. Ora è corretto.
-
+        });
+};
