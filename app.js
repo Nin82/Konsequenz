@@ -74,7 +74,7 @@ function showStatusMessage(elementId, message, isSuccess = true) {
         el.classList.remove('text-red-600', 'bg-red-100');
         el.classList.add('text-green-600', 'bg-green-100');
     } else {
-        el.classList.remove('text-green-600', 'bg-green-100');
+        el.classList.remove('text-green-600', 'bg-red-100', 'bg-green-100');
         el.classList.add('text-red-600', 'bg-red-100');
     }
 }
@@ -107,17 +107,20 @@ function handleStandardLogin(email, password) {
  * @param {string} customMessage - Il messaggio da mostrare dopo il logout.
  */
 function handleLogout(customMessage = "Logout avvenuto con successo.") {
+    // Logga per debug: verifica se il messaggio di errore arriva qui
+    console.log("LOGOUT TRIGGERED. Messaggio: " + customMessage);
+
     Backendless.UserService.logout()
         .then(() => {
             currentUser = null;
             currentRole = null;
             currentEanInProcess = null;
-            showLoginArea(customMessage); // Usa il messaggio personalizzato
+            showLoginArea(customMessage); // Usa il messaggio personalizzato, anche se è il default
         })
         .catch(error => {
-            console.error("Errore di Logout:", error);
-            // Mostra l'errore di logout, ma se è un logout automatico, il messaggio passato è più importante
-            showLoginArea(`Errore durante il logout: ${error.message}.`);
+            console.error("Errore di Logout (probabilmente irrilevante in caso di logout forzato):", error);
+            // Mostra il messaggio originale anche in caso di errore di logout
+            showLoginArea(customMessage); 
         });
 }
 
@@ -161,7 +164,7 @@ function getRoleFromUser(user) {
             return 'Nessun Ruolo'; // Fallback
         })
         .catch(error => {
-            console.error("Errore nel recupero del ruolo:", error);
+            console.error("Errore nel recupero del ruolo (getRoleFromUser):", error);
             // Rilancia l'errore per essere gestito dal .catch di handleLoginSuccess
             throw new Error(`Recupero ruolo fallito: ${error.message}`); 
         });
@@ -194,15 +197,15 @@ function handleLoginSuccess(user) {
                 document.getElementById('worker-dashboard').style.display = 'block';
                 loadOrdersForUser(currentRole); // Carica gli ordini pertinenti
             } else {
-                // Caso: Ruolo non gestito (o 'Nessun Ruolo' se non trovato) -> Logout forzato
-                const errorReason = `Accesso Negato: Ruolo utente "${currentRole}" non autorizzato o non configurato correttamente. Effettuo logout automatico.`;
+                // Caso: Ruolo non gestito o 'Nessun Ruolo' -> Logout forzato
+                const errorReason = `ACCESSO NEGATO: Ruolo utente "${currentRole}" non valido o mancante. Controlla il campo 'role' nella tua tabella Users.`;
                 console.warn(errorReason);
-                handleLogout(errorReason);
+                handleLogout(errorReason); // Passa la vera causa dell'errore
             }
         })
         .catch(error => {
             // Questo catch cattura l'errore lanciato da getRoleFromUser
-            const errorReason = `Errore critico: Impossibile determinare il ruolo. Causa: ${error.message}. Effettuo logout automatico.`;
+            const errorReason = `ERRORE CRITICO (getRole): Impossibile determinare il ruolo. Causa: ${error.message}.`;
             console.error("Errore critico durante la gestione del ruolo:", error);
             handleLogout(errorReason); // Passa la vera causa dell'errore
         });
@@ -454,8 +457,7 @@ window.onload = function() {
                     .then(user => {
                         // Se l'utente è valido ma l'oggetto utente non ha il ruolo (cache), ricaricalo
                         if (!user || !user.role) {
-                            // Non usare resendEmailConfirmation, è solo un placeholder.
-                            // Lascia che handleLoginSuccess gestisca il recupero del ruolo.
+                            // Non forzare il re-login, handleLoginSuccess farà il recupero del ruolo
                             return user; 
                         }
                         return user;
@@ -466,7 +468,7 @@ window.onload = function() {
         })
         .then(user => {
             if (user) {
-                // Se user è un errore, viene catturato nel .catch precedente
+                // Se user è valido, procedi
                 if (user && user.objectId) {
                     handleLoginSuccess(user);
                 } else {
@@ -479,4 +481,3 @@ window.onload = function() {
             showLoginArea();
         });
 };
-
