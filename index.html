@@ -1,666 +1,266 @@
-// Configurazione Backendless (sostituisci con le tue chiavi reali)
-const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C'; // <--- Aggiorna qui
-const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       // <--- Aggiorna qui
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#10b981" />
+  <title>Workflow Foto Prodotto PWA</title>
 
-// Nomi delle tabelle
-const USER_TABLE_NAME = "Users";
-const ORDER_TABLE_NAME = "Orders";
-const STORAGE_CONTAINER_NAME = "product_photos";
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-// Stati Ordine
-const STATUS = {
-    WAITING_PHOTO: "In attesa foto", // Inizia qui
-    IN_PHOTO_PROCESS: "Fotografia in corso", // Durante la sessione foto
-    WAITING_POST_PRODUCTION: "In attesa post-produzione",
-    IN_POST_PROCESS: "Post-produzione in corso", // Durante la sessione post
-    COMPLETED: "Completato",
-    REJECTED: "Rifiutato/Ritorna a foto"
-};
+  <!-- Backendless SDK -->
+  <script src="https://unpkg.com/backendless@6.7.0/dist/backendless.min.js"></script>
 
-// Ruoli Utente (Devono coincidere con i ruoli Backendless)
-const ROLES = {
-    ADMIN: "Admin",
-    PHOTOGRAPHER: "Photographer",
-    POST_PRODUCER: "PostProducer"
-};
+  <!-- SheetJS per Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-// Variabili globali di stato
-let currentUser = null;
-let currentRole = null;
-let currentEanInProcess = null;
+  <!-- CSS Personalizzato -->
+  <link rel="stylesheet" href="style.css">
+</head>
 
-// Inizializzazione di Backendless
-Backendless.initApp(APPLICATION_ID, API_KEY);
-console.log("Backendless inizializzato.");
+<body class="min-h-screen">
 
-// Registrazione del Service Worker per la PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-                console.log('Service Worker registrato con successo:', registration.scope);
-            })
-            .catch(error => {
-                console.error('Service Worker fallito:', error);
-            });
-    });
-}
+  <!-- SIDEBAR -->
+  <div id="sidebar" class="hidden md:block">
+    <div class="text-center mb-10">
+      <h1 class="text-3xl font-extrabold text-white">Quiet Propaganda Studio</h1>
+      <p class="text-sm text-gray-400">Workflow Prodotti</p>
+    </div>
 
-// ----------------------------------------------------
-// FUNZIONI DI UTILITY E UI
-// ----------------------------------------------------
+    <div id="user-info" class="p-3 bg-gray-700 rounded-lg shadow-inner mb-8">
+      <p class="text-xs text-gray-400 mb-1">Utente Corrente:</p>
+      <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
+      <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
+    </div>
 
-function showLoginArea(message = "") {
-    document.getElementById('login-area').style.display = 'block';
-    document.getElementById('worker-dashboard').style.display = 'none';
-    document.getElementById('admin-dashboard').style.display = 'none';
-    document.getElementById('worker-name').textContent = 'Ospite';
-    document.getElementById('worker-role').textContent = 'Non Loggato';
+    <button id="logout-button" onclick="handleLogout()" class="btn-danger w-full mt-4 py-3 font-semibold shadow-lg">
+      Esci (Logout)
+    </button>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="main-content">
+
+    <!-- HEADER MOBILE -->
+    <header class="md:hidden flex justify-between items-center mb-8 p-4 bg-white rounded-xl shadow-md">
+      <h1 class="text-xl font-bold text-gray-800">PhotoFlow</h1>
+      <button onclick="handleLogout()" class="btn-danger text-sm py-2 px-3">Logout</button>
+    </header>
+
+    <!-- LOGIN AREA -->
+    <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
+      <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
+      <div class="space-y-4 mb-6">
+        <input type="email" id="user-email" placeholder="Email" value="nino_glli@yahoo.it" />
+        <input type="password" id="user-password" placeholder="Password" />
+      </div>
+      <button onclick="handleStandardLogin(document.getElementById('user-email').value, document.getElementById('user-password').value)" class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
+
+      <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Password Dimenticata?</button>
+      <p id="login-status" class="status-message status-error hidden"></p>
+    </div>
+
+    <!-- DASHBOARD LAVORATORI -->
+    <div id="worker-dashboard" class="space-y-8 hidden">
+      <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- SCANSIONE EAN -->
+        <div class="card lg:col-span-1">
+          <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
+          <p class="text-sm text-gray-500 mb-4">Scannerizza il codice EAN del prodotto da lavorare.</p>
+          <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4" />
+          <button onclick="confirmEanInput()" class="btn-primary w-full py-2 font-medium">Conferma EAN</button>
+
+          <p id="scan-status" class="status-message status-info hidden"></p>
+
+<!-- BLOCCO AZIONI OPERATIVE -->
+  <div id="ean-actions-area" class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
+    <h4 class="font-semibold text-gray-700 mb-3">
+      Azioni da completare per EAN: <span id="current-ean-display"></span>
+    </h4>
+
+    <div id="operational-fields" class="space-y-3">
+      <!-- Esempio di campi operativi -->
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">N. Scatti</label>
+        <input type="number" class="border rounded-md p-2" id="field-shots" placeholder="Inserisci numero scatti" />
+      </div>
+
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">Qta</label>
+        <input type="number" class="border rounded-md p-2" id="field-quantity" placeholder="Inserisci quantità" />
+      </div>
+
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">S1-Prog</label>
+        <input type="text" class="border rounded-md p-2" id="field-s1-prog" placeholder="Inserisci S1-Prog" />
+      </div>
+
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">S2-Prog</label>
+        <input type="text" class="border rounded-md p-2" id="field-s2-prog" placeholder="Inserisci S2-Prog" />
+      </div>
+
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">Prog. on-m</label>
+        <input type="text" class="border rounded-md p-2" id="field-prog-on-model" placeholder="Inserisci Prog. on-model" />
+      </div>
+
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">Scatto Still (S/N)</label>
+        <select class="border rounded-md p-2" id="field-still-shot">
+          <option value="">Seleziona</option>
+          <option value="S">S</option>
+          <option value="N">N</option>
+        </select>
+      </div>
+
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">Scatto On Model (S/N)</label>
+        <select class="border rounded-md p-2" id="field-onmodel-shot">
+          <option value="">Seleziona</option>
+          <option value="S">S</option>
+          <option value="N">N</option>
+        </select>
+      </div>
+
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">Priorità</label>
+        <input type="text" class="border rounded-md p-2" id="field-priority" placeholder="Inserisci priorità" />
+      </div>
+
+      <!-- Puoi aggiungere altre azioni come s1-stylist, s2-stylist, provenienza, tipologia ecc. -->
+    </div>
+
+    <div class="mt-4 flex space-x-3">
+      <button id="confirm-ean-updates" class="btn-success py-2 px-4" onclick="updateOrderByEan()">
+        Conferma Aggiornamenti
+      </button>
+      <button onclick="cancelEanAction()" class="btn-secondary py-2 px-4">Annulla</button>
+    </div>
+
+    <p id="ean-action-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
+  </div>
+
+<!-- BLOCCO UPLOAD FOTO -->
+          <div id="photo-upload-area" class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
+            <h4 class="font-bold text-lg mb-3 text-green-700">EAN: <span id="current-ean-display"></span></h4>
+            <label for="photo-files" class="block text-sm font-medium text-gray-700 mb-2">Carica Immagini (.jpg/.png):</label>
+            <input type="file" id="photo-files" multiple accept="image/*" class="w-full mb-4" />
+            <div class="flex space-x-3">
+              <button onclick="handlePhotoUploadAndCompletion()" class="btn-success flex-grow py-2">Upload & Completa</button>
+              <button onclick="cancelPhotoUpload()" class="btn-secondary py-2">Annulla</button>
+            </div>
+            <p id="upload-status-message" class="status-message status-success hidden"></p>
+          </div>
+        </div>
+
+ <!-- PANNELLO 2: LISTA ORDINI DA LAVORARE -->
+<div class="card lg:col-span-2">
+    <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
+        2. Ordini in Coda per <span id="worker-role-display-queue" class="text-indigo-600"></span>
+    </h3>
+    <p id="loading-orders" class="text-gray-500 p-4">In attesa di caricamento ordini...</p>
     
-    const status = document.getElementById('login-status');
-    status.textContent = message;
-    status.style.display = message ? 'block' : 'none';
-    
-    // Assicurati che gli stati di upload/scansione siano resettati
-    document.getElementById('scan-status').textContent = '';
-    document.getElementById('photo-upload-area').style.display = 'none';
-}
-
-function showStatusMessage(elementId, message, isSuccess = true) {
-    const el = document.getElementById(elementId);
-    el.textContent = message;
-    el.style.display = 'block';
-    if (isSuccess) {
-        el.classList.remove('text-red-600', 'bg-red-100');
-        el.classList.add('text-green-600', 'bg-green-100');
-    } else {
-        el.classList.remove('text-green-600', 'bg-green-100');
-        el.classList.add('text-red-600', 'bg-red-100');
-    }
-}
-
-// ----------------------------------------------------
-// AUTENTICAZIONE E GESTIONE UTENTI
-// ----------------------------------------------------
-
-function handleStandardLogin(email, password) {
-    if (!email || !password) {
-        showLoginArea("Per favore, inserisci email e password.");
-        return;
-    }
-    
-    document.getElementById('login-status').textContent = "Accesso in corso...";
-    
-    Backendless.UserService.login(email, password, true)
-        .then(user => {
-            handleLoginSuccess(user);
-        })
-        .catch(error => {
-            console.error("Errore di Login:", error);
-            const message = error.message || "Credenziali non valide o errore di sistema.";
-            showLoginArea("Accesso Fallito: " + message);
-        });
-}
-
-function handleLogout() {
-    Backendless.UserService.logout()
-        .then(() => {
-            currentUser = null;
-            currentRole = null;
-            currentEanInProcess = null;
-            showLoginArea("Logout avvenuto con successo.");
-        })
-        .catch(error => {
-            console.error("Errore di Logout:", error);
-            showLoginArea("Errore durante il logout. Riprova.");
-        });
-}
-
-function handlePasswordRecovery() {
-    const email = document.getElementById('user-email').value;
-    if (!email) {
-        showLoginArea("Per recuperare la password, inserisci l'email nel campo apposito.");
-        return;
-    }
-
-    Backendless.UserService.restorePassword(email)
-        .then(() => {
-            showLoginArea(`Email di recupero inviata a ${email}. Controlla la tua casella di posta.`);
-        })
-        .catch(error => {
-            console.error("Errore di recupero password:", error);
-            showLoginArea(`Errore di recupero password: ${error.message}`);
-        });
-}
-
-/**
- * Funzione per recuperare il ruolo utente.
- * Nota: il campo "role" deve esistere nella tabella Users.
- */
-function getRoleFromUser(user) {
-    // Se il campo role è già sull'oggetto utente, usalo direttamente
-    if (user.role) {
-        return Promise.resolve(user.role);
-    }
-
-    // Altrimenti, fai una chiamata per recuperare l'oggetto utente con la colonna 'role'
-    const queryBuilder = Backendless.DataQueryBuilder.create()
-        .setProperties(["objectId", "role"])
-        .setWhereClause(`objectId = '${user.objectId}'`);
-
-    return Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
-        .then(result => {
-            if (result && result.length > 0) {
-                return result[0].role || 'Nessun Ruolo'; // Ritorna il ruolo
-            }
-            return 'Nessun Ruolo'; // Fallback
-        })
-        .catch(error => {
-            console.error("Errore nel recupero del ruolo:", error);
-            return 'Nessun Ruolo'; // Fallback in caso di errore
-        });
-}
-
-function handleLoginSuccess(user) {
-    currentUser = user;
-    
-    // >>> LOG CRITICO 1: Login avvenuto, Recupero Ruolo in corso.
-    console.log("LOGIN SUCCESS: Tentativo di recuperare il ruolo per l'utente.", user); 
-    
-    getRoleFromUser(user)
-        .then(role => {
-            currentRole = role;
-            
-            const displayName = user.name || user.email;
-            document.getElementById('worker-name').textContent = displayName;
-            document.getElementById('worker-role').textContent = currentRole;
-            
-            document.getElementById('login-area').style.display = 'none';
-
-            if (currentRole === ROLES.ADMIN) {
-                // >>> LOG CRITICO 2: Ruolo Admin rilevato, si tenta di mostrare la dashboard.
-                console.log("RUOLO ADMIN: Mostro dashboard e carico utenti."); 
-                document.getElementById('admin-dashboard').style.display = 'block';
-                document.getElementById('worker-dashboard').style.display = 'none'; // Nascondi worker
-                loadUsersAndRoles(); // Carica la tabella utenti per l'Admin
-            } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
-                document.getElementById('admin-dashboard').style.display = 'none'; // Nascondi Admin
-                document.getElementById('worker-dashboard').style.display = 'block';
-                loadOrdersForUser(currentRole); // Carica gli ordini pertinenti
-            } else {
-                showLoginArea("Ruolo utente non autorizzato o non definito.");
-                handleLogout();
-            }
-        })
-        .catch(error => {
-            console.error("Errore critico durante la gestione del ruolo:", error);
-            showLoginArea(`Errore nella verifica del ruolo: ${error.message}`);
-            handleLogout();
-        });
-}
-
-// ----------------------------------------------------
-// FUNZIONI ADMIN (DASHBOARD)
-// ----------------------------------------------------
-
-function renderUsersTable(users) {
-    const tableBody = document.querySelector('#users-table tbody');
-    tableBody.innerHTML = '';
-    
-    if (!users || users.length === 0) {
-        document.getElementById('loading-users').textContent = "Nessun utente trovato (a parte te, Admin).";
-        return;
-    }
-    
-    document.getElementById('loading-users').style.display = 'none';
-
-    users.forEach(user => {
-        // Ignora l'utente Admin loggato per prevenire l'auto-rimozione
-        if (user.objectId === currentUser.objectId) return; 
-
-        const row = tableBody.insertRow();
-        
-        // Colonna 1: Email
-        row.insertCell().textContent = user.email;
-
-        // Colonna 2: Ruolo Attuale
-        const currentRoleCell = row.insertCell();
-        currentRoleCell.textContent = user.role || 'Nessun Ruolo';
-        
-        // Colonna 3: Cambia Ruolo / Elimina
-        const actionCell = row.insertCell();
-        actionCell.classList.add('action-cell');
-
-        // Select per il cambio ruolo
-        const roleSelect = document.createElement('select');
-        roleSelect.className = 'w-1/2 p-2 border border-gray-300 rounded-md text-sm';
-        Object.values(ROLES).filter(r => r !== ROLES.ADMIN).forEach(role => {
-            const option = document.createElement('option');
-            option.value = role;
-            option.textContent = role;
-            if (user.role === role) {
-                option.selected = true;
-            }
-            roleSelect.appendChild(option);
-        });
-
-        // Bottone per salvare il ruolo
-        const saveButton = document.createElement('button');
-        saveButton.textContent = 'Salva Ruolo';
-        saveButton.className = 'btn-success text-xs py-1 px-2 mr-2';
-        saveButton.onclick = () => updateRole(user.objectId, roleSelect.value);
-
-        // Bottone per eliminare l'utente
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Elimina';
-        deleteButton.className = 'btn-danger text-xs py-1 px-2';
-        deleteButton.onclick = () => deleteUser(user.objectId, user.email);
-
-        actionCell.appendChild(roleSelect);
-        actionCell.appendChild(saveButton);
-        actionCell.appendChild(deleteButton);
-    });
-}
-
-function loadUsersAndRoles() {
-    try {
-        console.log("Inizio: Caricamento lista utenti e ruoli per dashboard Admin.");
-        
-        // Backendless non gestisce direttamente i ruoli in una singola proprietà dell'utente, 
-        // ma si affida al campo "role" che abbiamo aggiunto alla tabella Users.
-        const queryBuilder = Backendless.DataQueryBuilder.create()
-            .setProperties(["objectId", "email", "role"]) // Richiedi esplicitamente l'email e il nostro campo 'role'
-            .setPageSize(50); // Limite di 50 utenti
-
-        Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
-            .then(users => {
-                console.log("Utenti caricati:", users);
-                renderUsersTable(users);
-            })
-            .catch(error => {
-                // >>> LOG CRITICO 3: Errore nella query (Probabilmente permessi)
-                console.error("ERRORE CRITICO in loadUsersAndRoles (Find):", error);
-                document.getElementById('loading-users').textContent = 
-                    `ERRORE: Impossibile caricare gli utenti. Controlla i permessi READ sulla tabella 'Users' (Errore: ${error.message}).`;
-                document.getElementById('loading-users').style.color = '#dc2626';
-            });
-    } catch (e) {
-        // >>> LOG CRITICO 4: Errore sincrono (es. ID HTML sbagliato)
-        console.error("ERRORE SINCRONO in loadUsersAndRoles:", e);
-        document.getElementById('loading-users').textContent = 
-            `ERRORE SINCRONO: La dashboard non può essere visualizzata (Errore: ${e.message}).`;
-        document.getElementById('loading-users').style.color = '#dc2626';
-    }
-}
-
-function updateRole(userId, newRole) {
-    if (userId === currentUser.objectId) {
-        showStatusMessage('user-creation-status', 'Non puoi modificare il tuo ruolo tramite questo pannello.', false);
-        return;
-    }
-
-    const userUpdate = {
-        objectId: userId,
-        role: newRole
-    };
-
-    Backendless.Data.of(USER_TABLE_NAME).save(userUpdate)
-        .then(() => {
-            showStatusMessage('user-creation-status', `Ruolo dell'utente aggiornato a ${newRole} con successo.`, true);
-            loadUsersAndRoles(); // Ricarica la tabella
-        })
-        .catch(error => {
-            showStatusMessage('user-creation-status', `Errore nell'aggiornamento del ruolo: ${error.message}`, false);
-            console.error("Errore aggiornamento ruolo:", error);
-        });
-}
-
-function deleteUser(userId, email) {
-    // In un ambiente reale, useremmo un modale al posto di alert/confirm
-    if (confirm(`Sei sicuro di voler eliminare l'utente ${email}?`)) {
-        Backendless.Data.of(USER_TABLE_NAME).remove({ objectId: userId })
-            .then(() => {
-                showStatusMessage('user-creation-status', `Utente ${email} eliminato con successo.`, true);
-                loadUsersAndRoles(); // Ricarica la tabella
-            })
-            .catch(error => {
-                showStatusMessage('user-creation-status', `Errore nell'eliminazione dell'utente: ${error.message}`, false);
-                console.error("Errore eliminazione utente:", error);
-            });
-    }
-}
-
-
-function handleUserCreation() {
-    const email = document.getElementById('new-user-email').value.trim();
-    const password = document.getElementById('new-user-password').value;
-    const role = document.getElementById('new-user-role').value;
-
-    if (!email || !password || !role) {
-        showStatusMessage('user-creation-status', 'Per favore, compila tutti i campi per il nuovo utente.', false);
-        return;
-    }
-
-    // 1. Registrazione in Backendless.Users
-    Backendless.UserService.register({
-        email: email,
-        password: password
-    })
-    .then(newUser => {
-        // 2. Aggiornamento con il ruolo personalizzato
-        const userUpdate = {
-            objectId: newUser.objectId,
-            role: role // Il nostro campo personalizzato
-        };
-
-        return Backendless.Data.of(USER_TABLE_NAME).save(userUpdate);
-    })
-    .then(() => {
-        showStatusMessage('user-creation-status', `Utente ${email} creato e ruolo ${role} assegnato con successo.`, true);
-        document.getElementById('new-user-email').value = '';
-        document.getElementById('new-user-password').value = '';
-        document.getElementById('new-user-role').value = '';
-        loadUsersAndRoles(); // Aggiorna la lista
-    })
-    .catch(error => {
-        console.error("Errore creazione utente:", error);
-        showStatusMessage('user-creation-status', `Creazione Utente Fallita: ${error.message}`, false);
-    });
-}
-
-// Funzione di gestione file Excel (PLACEHOLDER, da implementare nel dettaglio)
-function handleFileUpload() {
-    // Implementazione del caricamento file Excel e parsing
-    showStatusMessage('import-status', 'Funzione di importazione file Excel in fase di implementazione.', true);
-}
-
-
-// ----------------------------------------------------
-// FUNZIONI WORKER (DASHBOARD) - PLACEHOLDERS
-// ----------------------------------------------------
-
-function loadOrdersForUser(role) {
-    const tableBody = document.querySelector('#orders-table tbody');
-    const loadingText = document.getElementById('loading-orders');
-
-    loadingText.textContent = `Caricamento ordini per il ruolo ${role}...`;
-    tableBody.innerHTML = '';
-
-    // Determina lo stato degli ordini da caricare in base al ruolo
-    let whereClause = '';
-    if (role === ROLES.PHOTOGRAPHER) {
-        whereClause = `status = '${STATUS.WAITING_PHOTO}'`;
-    } else if (role === ROLES.POST_PRODUCER) {
-        whereClause = `status = '${STATUS.WAITING_POST_PRODUCTION}'`;
-    } else {
-        tableBody.innerHTML = '<tr><td colspan="11">Ruolo non valido per la visualizzazione ordini.</td></tr>';
-        return;
-    }
-
-    const queryBuilder = Backendless.DataQueryBuilder.create()
-        .setWhereClause(whereClause)
-        .setSortBy(['lastUpdated DESC'])
-        .setPageSize(50);
-
-    Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder)
-        .then(orders => {
-            if (!orders || orders.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="11">Nessun ordine da visualizzare.</td></tr>';
-                loadingText.textContent = '';
-                return;
-            }
-
-            loadingText.textContent = '';
-            document.getElementById('worker-role-display-queue').textContent = role;
-
-            orders.forEach(order => {
-                const row = tableBody.insertRow();
-
-                row.insertCell().textContent = order.productCode || '';
-                row.insertCell().textContent = order.eanCode || '';
-                row.insertCell().textContent = order.styleName || '';
-                row.insertCell().textContent = order.styleGroup || '';
-                row.insertCell().textContent = order.brand || '';
-                row.insertCell().textContent = order.color || '';
-                row.insertCell().textContent = order.size || '';
-                row.insertCell().textContent = order.category || '';
-                row.insertCell().textContent = order.gender || '';
-                row.insertCell().textContent = order.status || '';
-
-                // Colonna Azioni
-                const actionCell = row.insertCell();
-                actionCell.classList.add('action-cell');
-
-                // Bottone per aprire il modal foto
-                const viewBtn = document.createElement('button');
-                viewBtn.textContent = 'Visualizza Foto';
-                viewBtn.className = 'btn-primary text-xs py-1 px-2';
-                viewBtn.onclick = () => openPhotoModal(order.eanCode);
-
-                actionCell.appendChild(viewBtn);
-            });
-        })
-        .catch(error => {
-            console.error("Errore nel caricamento ordini:", error);
-            tableBody.innerHTML = `<tr><td colspan="11">Errore nel caricamento ordini: ${error.message}</td></tr>`;
-            loadingText.textContent = '';
-        });
-}
-
-// Funzione per aprire il modal dell'ordine (foto ecc.)
-function openOrderModal(order) {
-    document.getElementById('photo-modal').style.display = 'block';
-    document.getElementById('modal-ean-title').textContent = order.eanCode || '';
-    const modalContent = document.getElementById('photo-modal-content');
-    modalContent.innerHTML = `
-        <p><strong>Brand:</strong> ${order.brand || ''}</p>
-        <p><strong>Categoria:</strong> ${order.category || ''}</p>
-        <p><strong>Colore:</strong> ${order.color || ''}</p>
-        <p><strong>Taglia:</strong> ${order.size || ''}</p>
-        <p><strong>Status:</strong> ${order.status || ''}</p>
-        <p><strong>Foto:</strong> ${order.photoStoragePath || 'Nessuna foto caricata'}</p>
-    `;
-}
-
-// ----------------------------------------------------
-// FUNZIONE IMPORT EXCEL -> Backendless Orders (con progress bar)
-// ----------------------------------------------------
-
-function handleFileUpload() {
-    const fileInput = document.getElementById('excel-file-input');
-    const statusEl = document.getElementById('import-status');
-
-    if (!fileInput.files || fileInput.files.length === 0) {
-        statusEl.textContent = "Seleziona un file Excel prima di procedere.";
-        statusEl.className = 'status-message bg-red-100 text-red-700';
-        statusEl.style.display = 'block';
-        return;
-    }
-
-    const file = fileInput.files[0];
-
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-
-        // Prendi il primo foglio
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        // Converti in JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-
-        if (!jsonData || jsonData.length === 0) {
-            statusEl.textContent = "File Excel vuoto o non leggibile.";
-            statusEl.className = 'status-message bg-red-100 text-red-700';
-            statusEl.style.display = 'block';
-            return;
-        }
-
-        statusEl.textContent = `Inizio importazione di ${jsonData.length} ordini...`;
-        statusEl.className = 'status-message bg-blue-100 text-blue-700';
-        statusEl.style.display = 'block';
-
-        // Progress bar dinamica
-        let progressBar = document.getElementById('import-progress-bar');
-        if (!progressBar) {
-            progressBar = document.createElement('div');
-            progressBar.id = 'import-progress-bar';
-            progressBar.style.width = '0%';
-            progressBar.style.height = '8px';
-            progressBar.style.backgroundColor = '#10b981'; // verde
-            progressBar.style.borderRadius = '4px';
-            progressBar.style.marginTop = '6px';
-            statusEl.parentNode.insertBefore(progressBar, statusEl.nextSibling);
-        }
-
-        const total = jsonData.length;
-        let successCount = 0;
-        let failCount = 0;
-
-        for (let i = 0; i < jsonData.length; i++) {
-            const row = jsonData[i];
-
-            // Crea oggetto per Backendless Orders
-            const orderObj = {
-                productCode: row["Codice Articolo"] || "",
-                eanCode: row["Ean Code"] || "",
-                styleName: row["Style Name"] || "",
-                styleGroup: row["Style Group"] || "",
-                brand: row["Brand"] || "",
-                color: row["Colore"] || "",
-                size: row["Taglia"] || "",
-                category: row["Categoria"] || "",
-                gender: row["Genere"] || "",
-                status: "In attesa foto", // stato iniziale
-                assignedToPhotographerId: "",
-                assignedToPostProducerId: "",
-                lastUpdated: new Date()
-                // puoi aggiungere altri campi step-by-step se necessario
-            };
-
-            try {
-                await Backendless.Data.of("Orders").save(orderObj);
-                successCount++;
-            } catch (err) {
-                console.error("Errore import ordine:", err);
-                failCount++;
-            }
-
-            // Aggiorna progress bar
-            const progress = Math.round(((i + 1) / total) * 100);
-            progressBar.style.width = progress + "%";
-        }
-
-        statusEl.textContent = `Importazione completata: ${successCount} successi, ${failCount} errori.`;
-        statusEl.className = failCount === 0 ? 'status-message bg-green-100 text-green-700' : 'status-message bg-yellow-100 text-yellow-700';
-
-        // Resetta file input
-        fileInput.value = "";
-
-        // Aggiorna lista ordini per il ruolo corrente
-        if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
-            loadOrdersForUser(currentRole);
-        }
-    };
-
-    reader.readAsArrayBuffer(file);
-}
-
-
-function confirmEanInput() {
-    const ean = document.getElementById('ean-input').value.trim();
-    if (!ean) {
-        alert("Inserisci un EAN valido!");
-        return;
-    }
-
-    // Mostra EAN nelle sezioni
-    document.getElementById('current-ean-display').textContent = ean;
-
-    // Mostra il blocco azioni operative
-    const actionsArea = document.getElementById('ean-actions-area');
-    actionsArea.classList.remove('hidden');
-
-    // Mostra anche l'area upload foto
-    const photoArea = document.getElementById('photo-upload-area');
-    photoArea.classList.remove('hidden');
-
-    // Aggiorna status scan
-    const scanStatus = document.getElementById('scan-status');
-    scanStatus.textContent = `EAN ${ean} confermato. Ora completa le azioni operative e/o carica le foto.`;
-    scanStatus.classList.remove('hidden');
-}
-
-function handlePhotoUploadAndCompletion() {
-    if (!currentEanInProcess) {
-        showStatusMessage('upload-status-message', 'Nessun EAN in lavorazione. Scannerizza prima il codice.', false);
-        return;
-    }
-    const files = document.getElementById('photo-files').files;
-    if (files.length === 0) {
-        showStatusMessage('upload-status-message', 'Seleziona almeno un file da caricare.', false);
-        return;
-    }
-
-    showStatusMessage('upload-status-message', `Caricamento ${files.length} immagini per EAN ${currentEanInProcess}...`, true);
-    // Logica di upload Backendless e aggiornamento dello stato Ordine
-
-    // PLACEHOLDER: Simula il successo
-    setTimeout(() => {
-        showStatusMessage('upload-status-message', `Caricamento completato per EAN ${currentEanInProcess}. Ordine avanzato.`, true);
-        currentEanInProcess = null;
-        document.getElementById('photo-upload-area').style.display = 'none';
-        document.getElementById('ean-input').value = '';
-        document.getElementById('photo-files').value = null; // Resetta il campo file
-    }, 2000);
-}
-
-function cancelPhotoUpload() {
-    showStatusMessage('scan-status', 'Lavorazione annullata.', false);
-    currentEanInProcess = null;
-    document.getElementById('photo-upload-area').style.display = 'none';
-    document.getElementById('ean-input').value = '';
-}
-
-function closePhotoModal() {
-    document.getElementById('photo-modal').style.display = 'none';
-}
-
-// ----------------------------------------------------
-// GESTIONE INIZIALE
-// ----------------------------------------------------
-
-// Controlla lo stato di autenticazione all'avvio
-window.onload = function() {
-    Backendless.UserService.isValidLogin()
-        .then(isValid => {
-            if (isValid) {
-                return Backendless.UserService.getCurrentUser()
-                    .then(user => {
-                        // Se l'utente è valido ma l'oggetto utente non ha il ruolo (cache), ricaricalo
-                        if (!user || !user.role) {
-                            return Backendless.UserService.resendEmailConfirmation('email@example.com'); // Placeholder, ma non viene usato
-                        }
-                        return user;
-                    });
-            } else {
-                showLoginArea();
-            }
-        })
-        .then(user => {
-            if (user) {
-                // Se user è un errore, viene catturato nel .catch precedente
-                if (user && user.objectId) {
-                    handleLoginSuccess(user);
-                } else {
-                     showLoginArea(); // Se l'utente non è valido o l'oggetto è incompleto
-                }
-            }
-        })
-        .catch(error => {
-            console.error("Errore di inizializzazione sessione:", error);
-            showLoginArea();
-        });
-};
+    <div class="overflow-x-auto">
+        <table id="orders-table" class="min-w-full divide-y divide-gray-200">
+            <thead>
+                <tr>
+                    <th>Codice Articolo</th>
+                    <th>EAN Code</th>
+                    <th>Style Name</th>
+                    <th>Style Group</th>
+                    <th>Brand</th>
+                    <th>Colore</th>
+                    <th>Taglia</th>
+                    <th>Categoria</th>
+                    <th>Genere</th>
+                    <th>Stato</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Le righe verranno inserite dinamicamente via JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+      </div>
+    </div>
+
+    <!-- MODALE FOTO -->
+    <div id="photo-modal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn text-3xl font-bold absolute top-3 right-5" onclick="closePhotoModal()">&times;</span>
+        <h3 class="text-2xl font-bold mb-4 text-gray-800">Foto EAN: <span id="modal-ean-title"></span></h3>
+        <div id="photo-modal-content" class="mt-6 space-y-4"></div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD ADMIN -->
+    <div id="admin-dashboard" class="space-y-8 hidden">
+      <h2 class="text-3xl font-bold text-gray-800 mb-6">Pannello Amministratore</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- GESTIONE UTENTI -->
+        <div class="card lg:col-span-2">
+          <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Gestione Utenti e Ruoli</h3>
+
+          <div class="mb-6 p-6 border border-gray-200 rounded-lg bg-gray-50 shadow-inner">
+            <h4 class="font-bold text-lg mb-3">Crea Nuovo Utente</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input type="email" id="new-user-email" placeholder="Email" />
+              <input type="password" id="new-user-password" placeholder="Password Iniziale" />
+              <select id="new-user-role">
+                <option value="" disabled selected>Seleziona Ruolo</option>
+                <option value="Photographer">Photographer</option>
+                <option value="PostProducer">Post Producer</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </div>
+            <button onclick="handleUserCreation()" class="btn-primary mt-4 py-2 font-medium">Crea Utente</button>
+            <p id="user-creation-status" class="status-message status-info hidden"></p>
+          </div>
+
+          <h4 class="font-bold text-lg mt-8 mb-4 border-b pb-2">Utenti Esistenti</h4>
+          <p id="loading-users" class="text-gray-500 p-4">Caricamento lista utenti...</p>
+          <div class="overflow-x-auto">
+            <table id="users-table" class="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Ruolo</th>
+                  <th class="w-1/3">Azioni</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- IMPORTAZIONE ORDINI -->
+<div class="card lg:col-span-1 h-fit">
+  <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
+  <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.</p>
+  <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white" />
+  <button id="import-button" onclick="handleFileUpload()" class="btn-warning w-full py-2 font-medium">Carica e Importa</button>
+  <p id="import-status" class="status-message status-success hidden"></p>
+
+  <!-- 👇 QUI LA PROGRESS BAR E I LOG 👇 -->
+  <div id="import-ui" class="mt-4">
+    <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+      <div id="import-progress-bar" class="h-4 rounded-full" style="width:0%; background-color:#10b981;"></div>
+    </div>
+    <p id="import-progress-text" class="text-sm text-gray-600 mt-2">Nessuna importazione in corso.</p>
+    <pre id="import-log" class="mt-3 p-3 bg-gray-50 rounded-md text-sm text-gray-700" style="display:none; max-height:220px; overflow:auto;"></pre>
+  </div>
+</div>
+    </div>
+  </div>
+
+  <!-- JS principale -->
+  <script src="app.js" defer></script>
+</body>
+</html>
