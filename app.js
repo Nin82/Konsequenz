@@ -628,6 +628,56 @@ function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
 
+
+async function updateOrderByEan() {
+    const ean = document.getElementById('ean-input').value.trim();
+    if (!ean) return alert("EAN non trovato");
+
+    // Prepara i dati da aggiornare
+    const updatedData = {
+        shots: document.getElementById('field-shots').value,
+        quantity: document.getElementById('field-quantity').value,
+        s1Prog: document.getElementById('field-s1-prog').value,
+        s2Prog: document.getElementById('field-s2-prog').value,
+        progOnModel: document.getElementById('field-prog-on-model').value,
+        stillShot: document.getElementById('field-still-shot').value,
+        onModelShot: document.getElementById('field-onmodel-shot').value,
+        priority: document.getElementById('field-priority').value,
+        s1Stylist: document.getElementById('field-s1-stylist').value,
+        s2Stylist: document.getElementById('field-s2-stylist').value,
+        provenienza: document.getElementById('field-provenienza').value,
+        tipologia: document.getElementById('field-tipologia').value,
+        ordine: document.getElementById('field-ordine').value,
+        dataOrdine: document.getElementById('field-data-ordine').value,
+        entryDate: document.getElementById('field-entry-date').value,
+        exitDate: document.getElementById('field-exit-date').value,
+        collo: document.getElementById('field-collo').value,
+        dataReso: document.getElementById('field-data-reso').value,
+        ddt: document.getElementById('field-ddt').value,
+        noteLogistica: document.getElementById('field-note-logistica').value,
+        dataPresaPost: document.getElementById('field-data-presa-post').value,
+        dataConsegnaPost: document.getElementById('field-data-consegna-post').value,
+        calendario: document.getElementById('field-calendario').value,
+        postPresa: document.getElementById('field-postpresa').value
+    };
+
+    try {
+        // Recupera l'ordine su Backendless
+        const orders = await Backendless.Data.of("Orders").find({ where: `eanCode='${ean}'` });
+        if (orders.length === 0) return alert("Ordine non trovato su Backendless");
+
+        const orderId = orders[0].objectId;
+        await Backendless.Data.of("Orders").save({ ...updatedData, objectId: orderId });
+
+        document.getElementById('ean-action-status').textContent = "Aggiornamenti salvati con successo!";
+        document.getElementById('ean-action-status').classList.remove('hidden');
+    } catch (err) {
+        console.error(err);
+        alert("Errore durante l'aggiornamento su Backendless");
+    }
+}
+
+
 // ----------------------------------------------------
 // GESTIONE INIZIALE
 // ----------------------------------------------------
