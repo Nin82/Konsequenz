@@ -1,3 +1,4 @@
+// Configurazione Backendless (sostituisci con le tue chiavi reali)
 const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C'; // <--- Aggiorna qui
 const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       // <--- Aggiorna qui
 
@@ -367,12 +368,6 @@ function handleUserCreation() {
     });
 }
 
-// Funzione di gestione file Excel (PLACEHOLDER, da implementare nel dettaglio)
-function handleFileUpload() {
-    // Implementazione del caricamento file Excel e parsing
-    showStatusMessage('import-status', 'Funzione di importazione file Excel in fase di implementazione.', true);
-}
-
 
 // ----------------------------------------------------
 // FUNZIONI WORKER (DASHBOARD) - PLACEHOLDERS
@@ -532,7 +527,7 @@ function handleFileUpload() {
                 size: row["Taglia"] || "",
                 category: row["Categoria"] || "",
                 gender: row["Genere"] || "",
-                status: "In attesa foto", // stato iniziale
+                status: STATUS.WAITING_PHOTO, // stato iniziale
                 assignedToPhotographerId: "",
                 assignedToPostProducerId: "",
                 lastUpdated: new Date()
@@ -573,6 +568,7 @@ async function confirmEanInput() {
   const eanInput = document.getElementById("ean-input").value.trim();
   const scanStatus = document.getElementById("scan-status");
   const actionsArea = document.getElementById("ean-actions-area");
+  const photoUploadArea = document.getElementById('photo-upload-area'); // 🆕 Riferimento area foto
   const currentEanDisplay = document.querySelectorAll("#current-ean-display");
 
   if (!eanInput) {
@@ -580,6 +576,7 @@ async function confirmEanInput() {
     scanStatus.className = "status-message status-error";
     scanStatus.classList.remove("hidden");
     actionsArea.classList.add("hidden");
+    photoUploadArea.style.display = 'none'; // Nascondi
     return;
   }
 
@@ -588,30 +585,41 @@ async function confirmEanInput() {
     scanStatus.className = "status-message status-info";
     scanStatus.classList.remove("hidden");
 
-    // 🔹 Query Backendless (EAN oppure Codice Articolo)
+    // 🔹 Query Backendless (EAN oppure Codice Articolo) [cite: 123]
     const query = Backendless.DataQueryBuilder.create().setWhereClause(
       `eanCode='${eanInput}' OR productCode='${eanInput}'`
     );
-    const orders = await Backendless.Data.of("Orders").find(query);
+    const orders = await Backendless.Data.of("Orders").find(query); [cite: 124]
 
     if (!orders || orders.length === 0) {
-      scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
+      scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`; [cite: 125]
       scanStatus.className = "status-message status-error";
       actionsArea.classList.add("hidden");
+      photoUploadArea.style.display = 'none'; // Nascondi
       return;
     }
 
-    // ✅ Codice trovato
+    // ✅ Codice trovato [cite: 126]
     const order = orders[0];
-    scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
+    currentEanInProcess = { objectId: order.objectId, ean: eanInput }; // 🆕 Usa variabile globale
+
+    scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`; [cite: 126, 127]
     scanStatus.className = "status-message status-success";
 
-    // Mostra la sezione operativa
+    // Mostra la sezione operativa [cite: 127]
     actionsArea.classList.remove("hidden");
-    currentEanDisplay.forEach((el) => (el.textContent = eanInput));
+    currentEanDisplay.forEach((el) => (el.textContent = eanInput)); [cite: 128]
 
-    // 🔹 Popola i campi se già esistono dati
+    // 🆕 Logica per l'area foto: mostrala solo se l'utente è un Fotografo
+    if (currentRole === ROLES.PHOTOGRAPHER) {
+        photoUploadArea.style.display = 'block';
+    } else {
+        photoUploadArea.style.display = 'none';
+    }
+
+    // 🔹 Popola i campi se già esistono dati [cite: 129, 130]
     const map = {
+      // ... (La tua mappa rimane la stessa) [cite: 129]
       "field-shots": "shots",
       "field-quantity": "quantity",
       "field-s1-prog": "s1Prog",
@@ -637,19 +645,17 @@ async function confirmEanInput() {
       "field-calendario": "calendario",
       "field-postpresa": "postPresa",
     };
-
-    Object.entries(map).forEach(([inputId, key]) => {
+    Object.entries(map).forEach(([inputId, key]) => { [cite: 130]
       const el = document.getElementById(inputId);
       if (el) el.value = order[key] || "";
     });
-
-    // 🔹 Salva in memoria temporanea per aggiornamento successivo
-    window.currentEanInProcess = { objectId: order.objectId, ean: eanInput };
+    
   } catch (err) {
     console.error(err);
-    scanStatus.textContent = "Errore durante la verifica EAN.";
+    scanStatus.textContent = "Errore durante la verifica EAN."; [cite: 133]
     scanStatus.className = "status-message status-error";
     actionsArea.classList.add("hidden");
+    photoUploadArea.style.display = 'none'; // Nascondi
   }
 }
 
@@ -657,16 +663,16 @@ async function confirmEanInput() {
 async function saveEanUpdates() {
   const statusMsg = document.getElementById("update-status");
 
-  // Controlla che ci sia un EAN attivo
-  if (!window.currentEanInProcess) {
-    statusMsg.textContent = "⚠️ Nessun EAN attivo. Scannerizza un codice prima.";
+  // Controlla che ci sia un EAN attivo [cite: 134]
+  if (!currentEanInProcess) { // 🆕 Usa variabile globale
+    statusMsg.textContent = "⚠️ Nessun EAN attivo. Scannerizza un codice prima."; [cite: 135]
     statusMsg.className = "status-message status-error";
     statusMsg.classList.remove("hidden");
     return;
   }
 
-  const ean = window.currentEanInProcess.ean;
-  const objectId = window.currentEanInProcess.objectId;
+  const ean = currentEanInProcess.ean; // 🆕 Usa variabile globale
+  const objectId = currentEanInProcess.objectId; // 🆕 Usa variabile globale
 
   // Mappa campi HTML → colonne Backendless
   const map = {
@@ -729,12 +735,14 @@ async function saveEanUpdates() {
 }
 
 
-function cancelPhotoUpload() {
+function resetEanActionState() { // 🆕 Rinominata per essere generica
     showStatusMessage('scan-status', 'Lavorazione annullata.', false);
     currentEanInProcess = null;
     document.getElementById('photo-upload-area').style.display = 'none';
+    document.getElementById('ean-actions-area').classList.add("hidden"); // 🆕 Aggiunto
     document.getElementById('ean-input').value = '';
 }
+
 
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
