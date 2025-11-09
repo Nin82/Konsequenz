@@ -576,13 +576,15 @@ async function confirmEanInput() {
 async function saveEanUpdates() {
     // Verifica se è in corso la lavorazione
     if (!currentEanInProcess || !currentEanInProcess.objectId) {
-        showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
+        // Usa il nuovo sistema di feedback
+        showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error'); 
         return;
     }
 
     const ean = currentEanInProcess.ean;
     const objectId = currentEanInProcess.objectId;
     
+    // Mappa i campi (come nel tuo codice originale)
     const map = {
         "field-shots": "shots",
         "field-quantity": "quantity",
@@ -613,24 +615,38 @@ async function saveEanUpdates() {
     const updatedOrder = { objectId };
     Object.entries(map).forEach(([inputId, key]) => {
         const el = document.getElementById(inputId);
-        // Utilizza il valore del campo di input o una stringa vuota se l'elemento è nullo
         updatedOrder[key] = el ? el.value.trim() : '';
     });
     
     updatedOrder.lastUpdated = new Date();
     
     try {
+        // Messaggio di attesa (usando il nuovo sistema)
         showFeedback("⏳ Salvataggio in corso...", 'info');
         
+        // Salvataggio su Backendless
         await Backendless.Data.of("Orders").save(updatedOrder);
         
         // Successo
         showFeedback(`✅ Aggiornamenti per ${ean} salvati correttamente!`, 'success');
         
-        // Reinizializza l'interfaccia dopo 1 secondo per mostrare il messaggio
-        setTimeout(() => {
-            resetEanActionState(false); // Non mostrare feedback di annullamento
-            loadOrdersForUser(currentUser); // Ricarica la tabella
+        // Ricarica dell'interfaccia dopo 1 secondo per mostrare il messaggio
+        setTimeout(async () => { // <--- USO ASYNC QUI PER POTER USARE AWAIT
+            resetEanActionState(false); 
+            
+            // 🔥 SOLUZIONE AL BUG: Ricarichiamo l'utente PRIMA di caricare gli ordini 🔥
+            try {
+                const updatedUser = await Backendless.UserService.getCurrentUser();
+                
+                // Aggiorna la variabile globale (OPZIONALE, ma raccomandato)
+                currentUser = updatedUser; 
+
+                // Ricarica la lista ordini con l'oggetto utente COMPLETO
+                loadOrdersForUser(updatedUser); 
+            } catch (err) {
+                console.error("Errore nel ricaricare l'utente dopo il salvataggio:", err);
+                showFeedback("❌ Errore nel ricaricare la lista ordini. Riprova il login.", 'error');
+            }
         }, 1000); 
 
     } catch (err) {
@@ -639,7 +655,6 @@ async function saveEanUpdates() {
         showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
     }
 }
-
 
 
 /* ======================================================
@@ -681,12 +696,11 @@ function resetEanActionState(showCancelFeedback = false) {
     // 2. Resetta i campi di input EAN
     document.getElementById('ean-input').value = '';
 
-    // 3. (Opzionale) Feedback visivo se l'utente ha premuto Annulla/Chiudi Dettaglio
+    // 3. Feedback visivo se l'utente ha premuto Annulla/Chiudi Dettaglio
     if (showCancelFeedback) {
         showFeedback("Operazione di aggiornamento annullata.", 'info'); 
     }
 }
-
 
 
 
