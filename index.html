@@ -159,14 +159,22 @@
         </div>
 
         <!-- IMPORTAZIONE ORDINI -->
-        <div class="card lg:col-span-1 h-fit">
-          <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
-          <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.</p>
-          <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white" />
-          <button id="import-button" onclick="handleFileUpload()" class="btn-warning w-full py-2 font-medium">Carica e Importa</button>
-          <p id="import-status" class="status-message status-success hidden"></p>
-        </div>
-      </div>
+<div class="card lg:col-span-1 h-fit">
+  <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
+  <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.</p>
+  <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white" />
+  <button id="import-button" onclick="handleFileUpload()" class="btn-warning w-full py-2 font-medium">Carica e Importa</button>
+  <p id="import-status" class="status-message status-success hidden"></p>
+
+  <!-- 👇 QUI LA PROGRESS BAR E I LOG 👇 -->
+  <div id="import-ui" class="mt-4">
+    <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+      <div id="import-progress-bar" class="h-4 rounded-full" style="width:0%; background-color:#10b981;"></div>
+    </div>
+    <p id="import-progress-text" class="text-sm text-gray-600 mt-2">Nessuna importazione in corso.</p>
+    <pre id="import-log" class="mt-3 p-3 bg-gray-50 rounded-md text-sm text-gray-700" style="display:none; max-height:220px; overflow:auto;"></pre>
+  </div>
+</div>
     </div>
   </div>
 
