@@ -2,10 +2,6 @@
 const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C'; // <--- Aggiorna qui
 const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       // <--- Aggiorna qui
 
-// Configurazione Backendless (sostituisci con le tue chiavi reali)
-const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C'; // <--- Aggiorna qui
-const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       // <--- Aggiorna qui
-
 // Nomi delle tabelle
 const USER_TABLE_NAME = "Users";
 const ORDER_TABLE_NAME = "Orders";
@@ -472,3 +468,4 @@ window.onload = function() {
             showLoginArea();
         });
 };
+
