@@ -64,9 +64,9 @@
 <div id="worker-dashboard" class="space-y-8 hidden">
     <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
 
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
 
-        <div class="card lg:col-span-2">
+        <div class="card lg:col-span-1">
             <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
             <p class="text-sm text-gray-500 mb-4">Scannerizza o inserisci il codice EAN del prodotto da lavorare.</p>
 
@@ -78,18 +78,24 @@
             <p id="scan-status" class="status-message status-info hidden"></p>
 
             <div id="ean-actions-area" class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
-                <h4 class="font-semibold text-gray-700 mb-3">
+                <h4 class="font-semibold text-gray-700 mb-3 flex justify-between items-center">
                     Dati Operativi EAN: <span id="current-ean-display"></span>
+                    <button onclick="resetEanActionState(true)" class="btn-secondary py-1 px-3 text-sm font-medium">
+                        &times; Chiudi Dettaglio
+                    </button>
                 </h4>
                 
-                <div class="mt-4 flex space-x-3 mb-6"> 
+                <div class="mt-2 flex space-x-3 mb-4"> 
                     <button id="confirm-ean-updates" class="btn-success py-2 px-4" onclick="saveEanUpdates()">
                         Conferma Aggiornamenti
                     </button>
-                    <button onclick="resetEanActionState()" class="btn-secondary py-2 px-4">
+                    <button onclick="resetEanActionState(true)" class="btn-secondary py-2 px-4">
                         Annulla
                     </button>
                 </div>
+                
+                <p id="operation-feedback" class="status-message hidden"></p>
+
                 <div id="operational-fields" class="space-y-3">
                     <div class="flex flex-col">
                         <label class="text-sm font-medium text-gray-700">N. Scatti</label>
@@ -182,7 +188,7 @@
                 <input type="file" id="photo-files" multiple accept="image/*" class="w-full mb-4" />
                 <div class="flex space-x-3">
                     <button onclick="handlePhotoUploadAndCompletion()" class="btn-success flex-grow py-2">Upload & Completa</button>
-                    <button onclick="resetEanActionState()" class="btn-secondary py-2">Annulla</button>
+                    <button onclick="resetEanActionState(true)" class="btn-secondary py-2">Annulla</button>
                 </div>
                 <p id="upload-status-message" class="status-message status-success hidden"></p>
             </div>
@@ -292,5 +298,6 @@
   <script src="app.js" defer></script>
 </body>
 </html>
+
 
 
