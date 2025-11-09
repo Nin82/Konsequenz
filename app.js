@@ -1,6 +1,6 @@
 // Configurazione Backendless (sostituisci con le tue chiavi reali)
-const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C'; [cite_start]// <--- Aggiorna qui [cite: 1]
-const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       [cite_start]// <--- Aggiorna qui [cite: 2]
+const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C';
+const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       
 
 // Nomi delle tabelle
 const USER_TABLE_NAME = "Users";
@@ -9,10 +9,10 @@ const STORAGE_CONTAINER_NAME = "product_photos";
 
 // Stati Ordine
 const STATUS = {
-    [cite_start]WAITING_PHOTO: "In attesa foto", // Inizia qui [cite: 3]
-    IN_PHOTO_PROCESS: "Fotografia in corso", // Durante la sessione foto
+    WAITING_PHOTO: "In attesa foto", // Riga 12 corretta
+    IN_PHOTO_PROCESS: "Fotografia in corso",
     WAITING_POST_PRODUCTION: "In attesa post-produzione",
-    IN_POST_PROCESS: "Post-produzione in corso", // Durante la sessione post
+    IN_POST_PROCESS: "Post-produzione in corso",
     COMPLETED: "Completato",
     REJECTED: "Rifiutato/Ritorna a foto"
 };
@@ -751,3 +751,4 @@ window.onload = function() {
             showLoginArea();
         [cite_start]}); [cite: 153]
 }; // ❌ La chiusura } e il testo erano qui e bloccavano tutto. Ora è corretto.
+
