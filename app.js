@@ -569,75 +569,166 @@ function handleFileUpload() {
 }
 
 
+// 🔍 Conferma EAN o Codice Articolo e mostra azioni operative
 async function confirmEanInput() {
-    const eanInput = document.getElementById('ean-input').value.trim();
-    const scanStatus = document.getElementById('scan-status');
-    const actionsArea = document.getElementById('ean-actions-area');
-    const currentEanDisplay = document.querySelectorAll('#current-ean-display');
+  const eanInput = document.getElementById("ean-input").value.trim();
+  const scanStatus = document.getElementById("scan-status");
+  const actionsArea = document.getElementById("ean-actions-area");
+  const currentEanDisplay = document.querySelectorAll("#current-ean-display");
 
-    if (!eanInput) {
-        scanStatus.textContent = "Inserisci un codice EAN o Codice Articolo!";
-        scanStatus.className = "status-message status-error";
-        scanStatus.classList.remove("hidden");
-        actionsArea.classList.add("hidden");
-        return;
+  if (!eanInput) {
+    scanStatus.textContent = "Inserisci un codice EAN o un Codice Articolo!";
+    scanStatus.className = "status-message status-error";
+    scanStatus.classList.remove("hidden");
+    actionsArea.classList.add("hidden");
+    return;
+  }
+
+  try {
+    scanStatus.textContent = "Verifica in corso...";
+    scanStatus.className = "status-message status-info";
+    scanStatus.classList.remove("hidden");
+
+    // 🔹 Query Backendless (EAN oppure Codice Articolo)
+    const query = Backendless.DataQueryBuilder.create().setWhereClause(
+      `eanCode='${eanInput}' OR productCode='${eanInput}'`
+    );
+    const orders = await Backendless.Data.of("Orders").find(query);
+
+    if (!orders || orders.length === 0) {
+      scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
+      scanStatus.className = "status-message status-error";
+      actionsArea.classList.add("hidden");
+      return;
     }
 
-    try {
-        // ricerca su EAN Code O Codice Articolo
-        const orders = await Backendless.Data.of("Orders").find({ where: `eanCode='${eanInput}' OR codiceArticolo='${eanInput}'` });
+    // ✅ Codice trovato
+    const order = orders[0];
+    scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
+    scanStatus.className = "status-message status-success";
 
-        if (orders.length === 0) {
-            scanStatus.textContent = `Codice ${eanInput} non trovato in Backendless!`;
-            scanStatus.className = "status-message status-error";
-            scanStatus.classList.remove("hidden");
-            actionsArea.classList.add("hidden");
-            return;
-        }
+    // Mostra la sezione operativa
+    actionsArea.classList.remove("hidden");
+    currentEanDisplay.forEach((el) => (el.textContent = eanInput));
 
-        // Se trovato, apri la maschera azioni
-        scanStatus.textContent = `EAN ${eanInput} confermato. Compila le azioni operative.`;
-        scanStatus.className = "status-message status-success";
-        scanStatus.classList.remove("hidden");
+    // 🔹 Popola i campi se già esistono dati
+    const map = {
+      "field-shots": "shots",
+      "field-quantity": "quantity",
+      "field-s1-prog": "s1Prog",
+      "field-s2-prog": "s2Prog",
+      "field-prog-on-model": "progOnModel",
+      "field-still-shot": "stillShot",
+      "field-onmodel-shot": "onModelShot",
+      "field-priority": "priority",
+      "field-s1-stylist": "s1Stylist",
+      "field-s2-stylist": "s2Stylist",
+      "field-provenienza": "provenienza",
+      "field-tipologia": "tipologia",
+      "field-ordine": "ordine",
+      "field-data-ordine": "dataOrdine",
+      "field-entry-date": "entryDate",
+      "field-exit-date": "exitDate",
+      "field-collo": "collo",
+      "field-data-reso": "dataReso",
+      "field-ddt": "ddt",
+      "field-note-logistica": "noteLogistica",
+      "field-data-presa-post": "dataPresaPost",
+      "field-data-consegna-post": "dataConsegnaPost",
+      "field-calendario": "calendario",
+      "field-postpresa": "postPresa",
+    };
 
-        actionsArea.classList.remove("hidden");
-        currentEanDisplay.forEach(el => el.textContent = eanInput);
+    Object.entries(map).forEach(([inputId, key]) => {
+      const el = document.getElementById(inputId);
+      if (el) el.value = order[key] || "";
+    });
 
-        // Riempie i campi operativi con i dati esistenti (se presenti)
-        const order = orders[0];
-        document.getElementById('field-shots').value = order.shots || '';
-        document.getElementById('field-quantity').value = order.quantity || '';
-        document.getElementById('field-s1-prog').value = order.s1Prog || '';
-        document.getElementById('field-s2-prog').value = order.s2Prog || '';
-        document.getElementById('field-prog-on-model').value = order.progOnModel || '';
-        document.getElementById('field-still-shot').value = order.stillShot || '';
-        document.getElementById('field-onmodel-shot').value = order.onModelShot || '';
-        document.getElementById('field-priority').value = order.priority || '';
-        document.getElementById('field-s1-stylist').value = order.s1Stylist || '';
-        document.getElementById('field-s2-stylist').value = order.s2Stylist || '';
-        document.getElementById('field-provenienza').value = order.provenienza || '';
-        document.getElementById('field-tipologia').value = order.tipologia || '';
-        document.getElementById('field-ordine').value = order.ordine || '';
-        document.getElementById('field-data-ordine').value = order.dataOrdine || '';
-        document.getElementById('field-entry-date').value = order.entryDate || '';
-        document.getElementById('field-exit-date').value = order.exitDate || '';
-        document.getElementById('field-collo').value = order.collo || '';
-        document.getElementById('field-data-reso').value = order.dataReso || '';
-        document.getElementById('field-ddt').value = order.ddt || '';
-        document.getElementById('field-note-logistica').value = order.noteLogistica || '';
-        document.getElementById('field-data-presa-post').value = order.dataPresaPost || '';
-        document.getElementById('field-data-consegna-post').value = order.dataConsegnaPost || '';
-        document.getElementById('field-calendario').value = order.calendario || '';
-        document.getElementById('field-postpresa').value = order.postPresa || '';
-
-    } catch (err) {
-        console.error(err);
-        scanStatus.textContent = "Errore durante la verifica EAN.";
-        scanStatus.className = "status-message status-error";
-        scanStatus.classList.remove("hidden");
-        actionsArea.classList.add("hidden");
-    }
+    // 🔹 Salva in memoria temporanea per aggiornamento successivo
+    window.currentEanInProcess = { objectId: order.objectId, ean: eanInput };
+  } catch (err) {
+    console.error(err);
+    scanStatus.textContent = "Errore durante la verifica EAN.";
+    scanStatus.className = "status-message status-error";
+    actionsArea.classList.add("hidden");
+  }
 }
+
+// 💾 Salva i dati operativi aggiornati su Backendless
+async function saveEanUpdates() {
+  const statusMsg = document.getElementById("update-status");
+
+  // Controlla che ci sia un EAN attivo
+  if (!window.currentEanInProcess) {
+    statusMsg.textContent = "⚠️ Nessun EAN attivo. Scannerizza un codice prima.";
+    statusMsg.className = "status-message status-error";
+    statusMsg.classList.remove("hidden");
+    return;
+  }
+
+  const ean = window.currentEanInProcess.ean;
+  const objectId = window.currentEanInProcess.objectId;
+
+  // Mappa campi HTML → colonne Backendless
+  const map = {
+    "field-shots": "shots",
+    "field-quantity": "quantity",
+    "field-s1-prog": "s1Prog",
+    "field-s2-prog": "s2Prog",
+    "field-prog-on-model": "progOnModel",
+    "field-still-shot": "stillShot",
+    "field-onmodel-shot": "onModelShot",
+    "field-priority": "priority",
+    "field-s1-stylist": "s1Stylist",
+    "field-s2-stylist": "s2Stylist",
+    "field-provenienza": "provenienza",
+    "field-tipologia": "tipologia",
+    "field-ordine": "ordine",
+    "field-data-ordine": "dataOrdine",
+    "field-entry-date": "entryDate",
+    "field-exit-date": "exitDate",
+    "field-collo": "collo",
+    "field-data-reso": "dataReso",
+    "field-ddt": "ddt",
+    "field-note-logistica": "noteLogistica",
+    "field-data-presa-post": "dataPresaPost",
+    "field-data-consegna-post": "dataConsegnaPost",
+    "field-calendario": "calendario",
+    "field-postpresa": "postPresa",
+  };
+
+  // Costruisci l’oggetto aggiornato
+  const updatedOrder = { objectId };
+  Object.entries(map).forEach(([inputId, key]) => {
+    const el = document.getElementById(inputId);
+    if (el) updatedOrder[key] = el.value.trim();
+  });
+
+  // Aggiungi timestamp di aggiornamento
+  updatedOrder.lastUpdated = new Date();
+
+  try {
+    statusMsg.textContent = "⏳ Salvataggio in corso...";
+    statusMsg.className = "status-message status-info";
+    statusMsg.classList.remove("hidden");
+
+    await Backendless.Data.of("Orders").save(updatedOrder);
+
+    statusMsg.textContent = `✅ Aggiornamenti per ${ean} salvati correttamente!`;
+    statusMsg.className = "status-message status-success";
+
+    // Pulisci i campi dopo qualche secondo
+    setTimeout(() => {
+      statusMsg.classList.add("hidden");
+    }, 4000);
+  } catch (err) {
+    console.error("Errore durante il salvataggio:", err);
+    statusMsg.textContent = "❌ Errore durante il salvataggio su Backendless.";
+    statusMsg.className = "status-message status-error";
+    statusMsg.classList.remove("hidden");
+  }
+}
+
 
 function cancelPhotoUpload() {
     showStatusMessage('scan-status', 'Lavorazione annullata.', false);
