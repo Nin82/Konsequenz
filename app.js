@@ -573,18 +573,20 @@ async function confirmEanInput() {
   }
 }
 
+// 💾 Salva i dati operativi aggiornati su Backendless
 async function saveEanUpdates() {
-    // Verifica se è in corso la lavorazione
-    if (!currentEanInProcess || !currentEanInProcess.objectId) {
-        // Usa il nuovo sistema di feedback
-        showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error'); 
+    // ⚠️ Non usiamo più l'elemento statusMsg (update-status) vecchio!
+
+    // Controlla che ci sia un EAN attivo
+    if (!window.currentEanInProcess || !window.currentEanInProcess.objectId) {
+        showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
         return;
     }
 
-    const ean = currentEanInProcess.ean;
-    const objectId = currentEanInProcess.objectId;
+    const ean = window.currentEanInProcess.ean;
+    const objectId = window.currentEanInProcess.objectId;
     
-    // Mappa i campi (come nel tuo codice originale)
+    // Mappa campi HTML → colonne Backendless (Mappa dal tuo codice)
     const map = {
         "field-shots": "shots",
         "field-quantity": "quantity",
@@ -612,40 +614,42 @@ async function saveEanUpdates() {
         "field-postpresa": "postPresa",
     };
     
+    // Costruisci l’oggetto aggiornato
     const updatedOrder = { objectId };
     Object.entries(map).forEach(([inputId, key]) => {
         const el = document.getElementById(inputId);
         updatedOrder[key] = el ? el.value.trim() : '';
     });
     
+    // Aggiungi timestamp di aggiornamento
     updatedOrder.lastUpdated = new Date();
     
     try {
-        // Messaggio di attesa (usando il nuovo sistema)
         showFeedback("⏳ Salvataggio in corso...", 'info');
         
-        // Salvataggio su Backendless
         await Backendless.Data.of("Orders").save(updatedOrder);
-        
+
         // Successo
         showFeedback(`✅ Aggiornamenti per ${ean} salvati correttamente!`, 'success');
         
         // Ricarica dell'interfaccia dopo 1 secondo per mostrare il messaggio
-        setTimeout(async () => { // <--- USO ASYNC QUI PER POTER USARE AWAIT
+        setTimeout(async () => {
             resetEanActionState(false); 
             
-            // 🔥 SOLUZIONE AL BUG: Ricarichiamo l'utente PRIMA di caricare gli ordini 🔥
+            // 🔥 SOLUZIONE AL BUG DI CARICAMENTO E RUOLO NON VALIDO 🔥
             try {
+                // Ricarica l'oggetto utente COMPLETO dalla sessione corrente
                 const updatedUser = await Backendless.UserService.getCurrentUser();
                 
-                // Aggiorna la variabile globale (OPZIONALE, ma raccomandato)
-                currentUser = updatedUser; 
-
-                // Ricarica la lista ordini con l'oggetto utente COMPLETO
-                loadOrdersForUser(updatedUser); 
+                // Estrai la stringa del ruolo (usa la funzione definita in precedenza nel file)
+                const reloadedRole = await getRoleFromUser(updatedUser); 
+                
+                // Chiama la funzione di caricamento ordini PASSANDO LA STRINGA del ruolo
+                loadOrdersForUser(reloadedRole); 
             } catch (err) {
-                console.error("Errore nel ricaricare l'utente dopo il salvataggio:", err);
-                showFeedback("❌ Errore nel ricaricare la lista ordini. Riprova il login.", 'error');
+                console.error("Errore critico nel ricaricare l'utente/ruolo dopo il salvataggio:", err);
+                // Fallback in caso di errore: ricarica con il ruolo globale se ancora valido
+                loadOrdersForUser(currentRole); 
             }
         }, 1000); 
 
@@ -655,7 +659,6 @@ async function saveEanUpdates() {
         showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
     }
 }
-
 
 /* ======================================================
    NUOVE UTILITY PER IL FEEDBACK
