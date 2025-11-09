@@ -82,23 +82,23 @@
     class="mb-4 w-full p-2 border border-gray-300 rounded-md"
   />
 
-  <!-- Bottone con async wrapper -->
   <button 
+    id="confirm-ean-btn"
     class="btn-primary w-full py-2 font-medium"
     onclick="(async () => { await confirmEanInput(); })()"
   >
     Conferma EAN
   </button>
-            <p id="scan-status" class="status-message status-info hidden mt-3"></p>
 
-<!-- BLOCCO AZIONI OPERATIVE -->
+  <p id="scan-status" class="status-message status-info hidden mt-3"></p>
+
+  <!-- BLOCCO AZIONI OPERATIVE -->
   <div id="ean-actions-area" class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
     <h4 class="font-semibold text-gray-700 mb-3">
       Azioni da completare per EAN: <span id="current-ean-display"></span>
     </h4>
 
     <div id="operational-fields" class="space-y-3">
-      <!-- Esempio di campi operativi -->
       <div class="flex flex-col">
         <label class="text-sm font-medium text-gray-700">N. Scatti</label>
         <input type="number" class="border rounded-md p-2" id="field-shots" placeholder="Inserisci numero scatti" />
@@ -147,93 +147,25 @@
         <input type="text" class="border rounded-md p-2" id="field-priority" placeholder="Inserisci priorità" />
       </div>
 
-<div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Priorità</label>
-    <input type="text" class="border rounded-md p-2" id="field-priority" placeholder="Inserisci priorità" />
-  </div>
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">S1-Stylist</label>
+        <input type="text" class="border rounded-md p-2" id="field-s1-stylist" placeholder="Inserisci S1-Stylist" />
+      </div>
 
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">S1-Stylist</label>
-    <input type="text" class="border rounded-md p-2" id="field-s1-stylist" placeholder="Inserisci S1-Stylist" />
-  </div>
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">S2-Stylist</label>
+        <input type="text" class="border rounded-md p-2" id="field-s2-stylist" placeholder="Inserisci S2-Stylist" />
+      </div>
 
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">S2-Stylist</label>
-    <input type="text" class="border rounded-md p-2" id="field-s2-stylist" placeholder="Inserisci S2-Stylist" />
-  </div>
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">Provenienza</label>
+        <input type="text" class="border rounded-md p-2" id="field-provenienza" placeholder="Inserisci provenienza" />
+      </div>
 
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Provenienza</label>
-    <input type="text" class="border rounded-md p-2" id="field-provenienza" placeholder="Inserisci provenienza" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Tipologia</label>
-    <input type="text" class="border rounded-md p-2" id="field-tipologia" placeholder="Inserisci tipologia" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Ordine</label>
-    <input type="text" class="border rounded-md p-2" id="field-ordine" placeholder="Inserisci numero ordine" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Data Ordine</label>
-    <input type="date" class="border rounded-md p-2" id="field-data-ordine" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Entry Date</label>
-    <input type="date" class="border rounded-md p-2" id="field-entry-date" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Exit Date</label>
-    <input type="date" class="border rounded-md p-2" id="field-exit-date" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Collo</label>
-    <input type="text" class="border rounded-md p-2" id="field-collo" placeholder="Inserisci collo" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Data Reso</label>
-    <input type="date" class="border rounded-md p-2" id="field-data-reso" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">DDT N.</label>
-    <input type="text" class="border rounded-md p-2" id="field-ddt" placeholder="Inserisci DDT" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Note Logistica</label>
-    <input type="text" class="border rounded-md p-2" id="field-note-logistica" placeholder="Inserisci note logistica" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Data Presa in Carico Post</label>
-    <input type="date" class="border rounded-md p-2" id="field-data-presa-post" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Data Consegna Post</label>
-    <input type="date" class="border rounded-md p-2" id="field-data-consegna-post" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Calendario</label>
-    <input type="text" class="border rounded-md p-2" id="field-calendario" placeholder="Inserisci calendario" />
-  </div>
-
-  <div class="flex flex-col">
-    <label class="text-sm font-medium text-gray-700">Post-presa in carico</label>
-    <input type="text" class="border rounded-md p-2" id="field-postpresa" placeholder="Inserisci post-presa in carico" />
-  </div>  
-
-
-
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-gray-700">Tipologia</label>
+        <input type="text" class="border rounded-md p-2" id="field-tipologia" placeholder="Inserisci tipologia" />
+      </div>
     </div>
 
     <div class="mt-4 flex space-x-3">
@@ -245,6 +177,7 @@
 
     <p id="ean-action-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
   </div>
+</div>
 
 <!-- BLOCCO UPLOAD FOTO -->
           <div id="photo-upload-area" class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
