@@ -1,6 +1,6 @@
 // Configurazione Backendless (sostituisci con le tue chiavi reali)
-const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C'; // <--- Aggiorna qui
-const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       // <--- Aggiorna qui
+const APPLICATION_ID = 'TUA_APPLICATION_ID'; // <--- Aggiorna qui
+const API_KEY = 'TUA_API_KEY';       // <--- Aggiorna qui
 
 // Nomi delle tabelle
 const USER_TABLE_NAME = "Users";
@@ -102,17 +102,22 @@ function handleStandardLogin(email, password) {
         });
 }
 
-function handleLogout() {
+/**
+ * Gestisce il logout e mostra un messaggio personalizzato all'utente.
+ * @param {string} customMessage - Il messaggio da mostrare dopo il logout.
+ */
+function handleLogout(customMessage = "Logout avvenuto con successo.") {
     Backendless.UserService.logout()
         .then(() => {
             currentUser = null;
             currentRole = null;
             currentEanInProcess = null;
-            showLoginArea("Logout avvenuto con successo.");
+            showLoginArea(customMessage); // Usa il messaggio personalizzato
         })
         .catch(error => {
             console.error("Errore di Logout:", error);
-            showLoginArea("Errore durante il logout. Riprova.");
+            // Mostra l'errore di logout, ma se è un logout automatico, il messaggio passato è più importante
+            showLoginArea(`Errore durante il logout: ${error.message}.`);
         });
 }
 
@@ -157,7 +162,8 @@ function getRoleFromUser(user) {
         })
         .catch(error => {
             console.error("Errore nel recupero del ruolo:", error);
-            return 'Nessun Ruolo'; // Fallback in caso di errore
+            // Rilancia l'errore per essere gestito dal .catch di handleLoginSuccess
+            throw new Error(`Recupero ruolo fallito: ${error.message}`); 
         });
 }
 
@@ -188,14 +194,17 @@ function handleLoginSuccess(user) {
                 document.getElementById('worker-dashboard').style.display = 'block';
                 loadOrdersForUser(currentRole); // Carica gli ordini pertinenti
             } else {
-                showLoginArea("Ruolo utente non autorizzato o non definito.");
-                handleLogout();
+                // Caso: Ruolo non gestito (o 'Nessun Ruolo' se non trovato) -> Logout forzato
+                const errorReason = `Accesso Negato: Ruolo utente "${currentRole}" non autorizzato o non configurato correttamente. Effettuo logout automatico.`;
+                console.warn(errorReason);
+                handleLogout(errorReason);
             }
         })
         .catch(error => {
+            // Questo catch cattura l'errore lanciato da getRoleFromUser
+            const errorReason = `Errore critico: Impossibile determinare il ruolo. Causa: ${error.message}. Effettuo logout automatico.`;
             console.error("Errore critico durante la gestione del ruolo:", error);
-            showLoginArea(`Errore nella verifica del ruolo: ${error.message}`);
-            handleLogout();
+            handleLogout(errorReason); // Passa la vera causa dell'errore
         });
 }
 
@@ -445,7 +454,9 @@ window.onload = function() {
                     .then(user => {
                         // Se l'utente è valido ma l'oggetto utente non ha il ruolo (cache), ricaricalo
                         if (!user || !user.role) {
-                            return Backendless.UserService.resendEmailConfirmation('email@example.com'); // Placeholder, ma non viene usato
+                            // Non usare resendEmailConfirmation, è solo un placeholder.
+                            // Lascia che handleLoginSuccess gestisca il recupero del ruolo.
+                            return user; 
                         }
                         return user;
                     });
