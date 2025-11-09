@@ -61,114 +61,119 @@
       <p id="login-status" class="status-message status-error hidden"></p>
     </div>
 
-    <!-- DASHBOARD LAVORATORI -->
-    <div id="worker-dashboard" class="space-y-8 hidden">
-      <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <div id="worker-dashboard" class="space-y-8 hidden">
+    <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-<!-- SCANSIONE EAN -->
-<div class="card lg:col-span-1">
-  <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
-  <p class="text-sm text-gray-500 mb-4">Scannerizza o inserisci il codice EAN del prodotto da lavorare.</p>
+                <div class="card lg:col-span-1">
+            <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
+            <p class="text-sm text-gray-500 mb-4">Scannerizza o inserisci il codice EAN del prodotto da lavorare.</p>
 
-  <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4" />
-  <button id="confirm-ean-btn" onclick="confirmEanInput()" class="btn-primary w-full py-2 font-medium">
-    Conferma EAN
-  </button>
+            <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4" />
+            <button id="confirm-ean-btn" onclick="confirmEanInput()" class="btn-primary w-full py-2 font-medium">
+                Conferma EAN
+            </button>
 
-  <p id="scan-status" class="status-message status-info hidden"></p>
+            <p id="scan-status" class="status-message status-info hidden"></p>
 
-  <!-- 🔽 BLOCCO AZIONI OPERATIVE (mostrato solo se EAN valido) -->
-  <div id="ean-actions-area" class="hidden mt-6 border-t pt-4">
-    <h4 class="text-lg font-semibold mb-3 text-gray-700">Azioni operative</h4>
-  <p id="scan-status" class="status-message status-info hidden mt-3"></p>
+                        <div id="ean-actions-area" class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
+                <h4 class="font-semibold text-gray-700 mb-3">
+                    Azioni da completare per EAN: <span id="current-ean-display"></span>
+                </h4>
 
-  <!-- BLOCCO AZIONI OPERATIVE -->
-  <div id="ean-actions-area" class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
-    <h4 class="font-semibold text-gray-700 mb-3">
-      Azioni da completare per EAN: <span id="current-ean-display"></span>
-    </h4>
+                <div id="operational-fields" class="space-y-3">
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">N. Scatti</label>
+                        <input type="number" class="border rounded-md p-2" id="field-shots" placeholder="Inserisci numero scatti" />
+                    </div>
 
-    <div id="operational-fields" class="space-y-3">
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">N. Scatti</label>
-        <input type="number" class="border rounded-md p-2" id="field-shots" placeholder="Inserisci numero scatti" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">Qta</label>
+                        <input type="number" class="border rounded-md p-2" id="field-quantity" placeholder="Inserisci quantità" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">Qta</label>
-        <input type="number" class="border rounded-md p-2" id="field-quantity" placeholder="Inserisci quantità" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">S1-Prog</label>
+                        <input type="text" class="border rounded-md p-2" id="field-s1-prog" placeholder="Inserisci S1-Prog" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">S1-Prog</label>
-        <input type="text" class="border rounded-md p-2" id="field-s1-prog" placeholder="Inserisci S1-Prog" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">S2-Prog</label>
+                        <input type="text" class="border rounded-md p-2" id="field-s2-prog" placeholder="Inserisci S2-Prog" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">S2-Prog</label>
-        <input type="text" class="border rounded-md p-2" id="field-s2-prog" placeholder="Inserisci S2-Prog" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">Prog. on-m</label>
+                        <input type="text" class="border rounded-md p-2" id="field-prog-on-model" placeholder="Inserisci Prog. on-model" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">Prog. on-m</label>
-        <input type="text" class="border rounded-md p-2" id="field-prog-on-model" placeholder="Inserisci Prog. on-model" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">Scatto Still (S/N)</label>
+                        <select class="border rounded-md p-2" id="field-still-shot">
+                            <option value="">Seleziona</option>
+                            <option value="S">S</option>
+                            <option value="N">N</option>
+                        </select>
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">Scatto Still (S/N)</label>
-        <select class="border rounded-md p-2" id="field-still-shot">
-          <option value="">Seleziona</option>
-          <option value="S">S</option>
-          <option value="N">N</option>
-        </select>
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">Scatto On Model (S/N)</label>
+                        <select class="border rounded-md p-2" id="field-onmodel-shot">
+                            <option value="">Seleziona</option>
+                            <option value="S">S</option>
+                            <option value="N">N</option>
+                        </select>
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">Scatto On Model (S/N)</label>
-        <select class="border rounded-md p-2" id="field-onmodel-shot">
-          <option value="">Seleziona</option>
-          <option value="S">S</option>
-          <option value="N">N</option>
-        </select>
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">Priorità</label>
+                        <input type="text" class="border rounded-md p-2" id="field-priority" placeholder="Inserisci priorità" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">Priorità</label>
-        <input type="text" class="border rounded-md p-2" id="field-priority" placeholder="Inserisci priorità" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">S1-Stylist</label>
+                        <input type="text" class="border rounded-md p-2" id="field-s1-stylist" placeholder="Inserisci S1-Stylist" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">S1-Stylist</label>
-        <input type="text" class="border rounded-md p-2" id="field-s1-stylist" placeholder="Inserisci S1-Stylist" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">S2-Stylist</label>
+                        <input type="text" class="border rounded-md p-2" id="field-s2-stylist" placeholder="Inserisci S2-Stylist" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">S2-Stylist</label>
-        <input type="text" class="border rounded-md p-2" id="field-s2-stylist" placeholder="Inserisci S2-Stylist" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">Provenienza</label>
+                        <input type="text" class="border rounded-md p-2" id="field-provenienza" placeholder="Inserisci provenienza" />
+                    </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">Provenienza</label>
-        <input type="text" class="border rounded-md p-2" id="field-provenienza" placeholder="Inserisci provenienza" />
-      </div>
+                    <div class="flex flex-col">
+                        <label class="text-sm font-medium text-gray-700">Tipologia</label>
+                        <input type="text" class="border rounded-md p-2" id="field-tipologia" placeholder="Inserisci tipologia" />
+                    </div>
+                </div>
 
-      <div class="flex flex-col">
-        <label class="text-sm font-medium text-gray-700">Tipologia</label>
-        <input type="text" class="border rounded-md p-2" id="field-tipologia" placeholder="Inserisci tipologia" />
-      </div>
-    </div>
+                <div class="mt-4 flex space-x-3">
+                    <button id="confirm-ean-updates" class="btn-success py-2 px-4" onclick="saveEanUpdates()">
+                        Conferma Aggiornamenti
+                    </button>
+                    <button onclick="resetEanActionState()" class="btn-secondary py-2 px-4">
+                        Annulla
+                    </button>
+                </div>
+                
+                <p id="update-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
+            </div>
 
-    <div class="mt-4 flex space-x-3">
-      <button id="confirm-ean-updates" class="btn-success py-2 px-4" onclick="updateOrderByEan()">
-        Conferma Aggiornamenti
-      </button>
-      <button onclick="cancelEanAction()" class="btn-secondary py-2 px-4">Annulla</button>
-    </div>
-
-    <p id="ean-action-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
-  </div>
-  </div>
+                        <div id="photo-upload-area" class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
+                <h4 class="font-bold text-lg mb-3 text-green-700">EAN: <span id="current-ean-display-upload"></span></h4>
+                <label for="photo-files" class="block text-sm font-medium text-gray-700 mb-2">Carica Immagini (.jpg/.png):</label>
+                <input type="file" id="photo-files" multiple accept="image/*" class="w-full mb-4" />
+                <div class="flex space-x-3">
+                    <button onclick="handlePhotoUploadAndCompletion()" class="btn-success flex-grow py-2">Upload & Completa</button>
+                    <button onclick="resetEanActionState()" class="btn-secondary py-2">Annulla</button>
+                </div>
+                <p id="upload-status-message" class="status-message status-success hidden"></p>
+            </div>
+        </div>
 
 <!-- BLOCCO UPLOAD FOTO -->
           <div id="photo-upload-area" class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
