@@ -7,9 +7,9 @@ const USER_TABLE_NAME = "Users";
 const ORDER_TABLE_NAME = "Orders";
 const STORAGE_CONTAINER_NAME = "product_photos";
 
-// Stati Ordine
+// STATI ORDINE
+const STATUS_WAITING_PHOTO = "In attesa foto"; // 💡 NUOVA COSTANTE STRINGA SEPARATA (SOLUZIONE AL BLOCCO)
 const STATUS = {
-    WAITING_PHOTO: "In attesa foto", // Riga 12 (RIPULITA)
     IN_PHOTO_PROCESS: "Fotografia in corso",
     WAITING_POST_PRODUCTION: "In attesa post-produzione",
     IN_POST_PROCESS: "Post-produzione in corso",
@@ -27,7 +27,7 @@ const ROLES = {
 // Variabili globali di stato
 let currentUser = null;
 let currentRole = null;
-let currentEanInProcess = null; // Stato EAN attivo
+let currentEanInProcess = null;
 
 // Inizializzazione di Backendless
 Backendless.initApp(APPLICATION_ID, API_KEY);
@@ -61,7 +61,6 @@ function showLoginArea(message = "") {
     status.textContent = message;
     status.style.display = message ? 'block' : 'none';
     
-    // Assicurati che gli stati di upload/scansione siano resettati
     document.getElementById('scan-status').textContent = '';
     document.getElementById('photo-upload-area').style.display = 'none';
 }
@@ -330,7 +329,6 @@ function handleUserCreation() {
     });
 }
 
-// Funzione di gestione file Excel (PLACEHOLDER, da implementare nel dettaglio)
 function handleFileUpload() {
     const fileInput = document.getElementById('excel-file-input');
     const statusEl = document.getElementById('import-status');
@@ -380,7 +378,7 @@ function handleFileUpload() {
                 size: row["Taglia"] || "",
                 category: row["Categoria"] || "",
                 gender: row["Genere"] || "",
-                status: STATUS.WAITING_PHOTO, 
+                status: STATUS_WAITING_PHOTO, // 💡 USA LA NUOVA COSTANTE
                 assignedToPhotographerId: "",
                 assignedToPostProducerId: "",
                 lastUpdated: new Date()
@@ -423,7 +421,7 @@ function loadOrdersForUser(role) {
     
     let whereClause = '';
     if (role === ROLES.PHOTOGRAPHER) {
-        whereClause = `status = '${STATUS.WAITING_PHOTO}'`;
+        whereClause = `status = '${STATUS_WAITING_PHOTO}'`; // 💡 USA LA NUOVA COSTANTE
     } else if (role === ROLES.POST_PRODUCER) {
         whereClause = `status = '${STATUS.WAITING_POST_PRODUCTION}'`;
     } else {
@@ -483,16 +481,13 @@ function openPhotoModal(eanCode) {
     document.getElementById('modal-ean-title').textContent = eanCode || '';
     const modalContent = document.getElementById('photo-modal-content');
     modalContent.innerHTML = `<p>Caricamento foto per EAN: ${eanCode}...</p>`;
-    // TODO: implementare qui la logica per scaricare le foto da Backendless Storage
 }
 
-// 🔍 Conferma EAN o Codice Articolo e mostra azioni operative
 async function confirmEanInput() {
   const eanInput = document.getElementById("ean-input").value.trim();
   const scanStatus = document.getElementById("scan-status");
   const actionsArea = document.getElementById("ean-actions-area");
   const photoUploadArea = document.getElementById("photo-upload-area");
-  // Per mantenere l'ID unico nel DOM, usiamo solo uno dei due span
   const currentEanDisplay = document.getElementById("current-ean-display"); 
 
   if (!eanInput) {
@@ -529,17 +524,14 @@ async function confirmEanInput() {
     actionsArea.classList.remove("hidden");
     if (currentEanDisplay) currentEanDisplay.textContent = eanInput; 
 
-    // Visualizza l'area di upload foto solo per i Fotografi
     if (currentRole === ROLES.PHOTOGRAPHER) {
         photoUploadArea.style.display = 'block';
-        // Aggiorna l'EAN nell'area di upload se hai usato l'ID duplicato
         const uploadEanDisplay = document.getElementById("current-ean-display-upload");
         if(uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
     } else {
         photoUploadArea.style.display = 'none';
     }
 
-    // Popola i campi se già esistono dati
     const map = {
       "field-shots": "shots",
       "field-quantity": "quantity",
@@ -553,7 +545,18 @@ async function confirmEanInput() {
       "field-s2-stylist": "s2Stylist",
       "field-provenienza": "provenienza",
       "field-tipologia": "tipologia",
-      // Aggiungi altri campi operativi se presenti
+      "field-ordine": "ordine",
+      "field-data-ordine": "dataOrdine",
+      "field-entry-date": "entryDate",
+      "field-exit-date": "exitDate",
+      "field-collo": "collo",
+      "field-data-reso": "dataReso",
+      "field-ddt": "ddt",
+      "field-note-logistica": "noteLogistica",
+      "field-data-presa-post": "dataPresaPost",
+      "field-data-consegna-post": "dataConsegnaPost",
+      "field-calendario": "calendario",
+      "field-postpresa": "postPresa",
     };
     Object.entries(map).forEach(([inputId, key]) => {
       const el = document.getElementById(inputId);
@@ -570,7 +573,6 @@ async function confirmEanInput() {
   }
 }
 
-// 💾 Salva i dati operativi aggiornati su Backendless
 async function saveEanUpdates() {
   const statusMsg = document.getElementById("update-status");
   
@@ -597,7 +599,18 @@ async function saveEanUpdates() {
     "field-s2-stylist": "s2Stylist",
     "field-provenienza": "provenienza",
     "field-tipologia": "tipologia",
-    // Aggiungi altri campi operativi se presenti
+    "field-ordine": "ordine",
+    "field-data-ordine": "dataOrdine",
+    "field-entry-date": "entryDate",
+    "field-exit-date": "exitDate",
+    "field-collo": "collo",
+    "field-data-reso": "dataReso",
+    "field-ddt": "ddt",
+    "field-note-logistica": "noteLogistica",
+    "field-data-presa-post": "dataPresaPost",
+    "field-data-consegna-post": "dataConsegnaPost",
+    "field-calendario": "calendario",
+    "field-postpresa": "postPresa",
   };
   
   const updatedOrder = { objectId };
@@ -628,7 +641,6 @@ async function saveEanUpdates() {
   }
 }
 
-// 🆕 Funzione di reset generica 
 function resetEanActionState() {
     showStatusMessage('scan-status', 'Lavorazione annullata.', false);
     currentEanInProcess = null;
@@ -638,9 +650,7 @@ function resetEanActionState() {
 }
 
 function handlePhotoUploadAndCompletion() {
-    // TODO: Aggiungere qui la logica di upload effettivo del file su Backendless Storage
     alert("Funzione di upload non ancora implementata!");
-    // Dopo l'upload e l'aggiornamento dello stato ordine, chiamare resetEanActionState()
 }
 
 function closePhotoModal() {
@@ -659,7 +669,6 @@ window.onload = function() {
             if (isValid) {
                 return Backendless.UserService.getCurrentUser()
                     .then(user => {
-                        // Se l'utente è valido ma l'oggetto utente non ha il ruolo (cache), ricaricalo
                         if (!user || !user.role) {
                              return user;
                         }
