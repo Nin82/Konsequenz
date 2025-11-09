@@ -571,14 +571,26 @@ function handleFileUpload() {
 
 function confirmEanInput() {
     const ean = document.getElementById('ean-input').value.trim();
-    if (ean) {
-        showStatusMessage('scan-status', `EAN ${ean} confermato. Ora carica le foto.`, true);
-        document.getElementById('current-ean-display').textContent = ean;
-        document.getElementById('photo-upload-area').style.display = 'block';
-        currentEanInProcess = ean;
-    } else {
-        showStatusMessage('scan-status', 'Per favore, inserisci un codice EAN.', false);
+    if (!ean) {
+        alert("Inserisci un EAN valido!");
+        return;
     }
+
+    // Mostra EAN nelle sezioni
+    document.getElementById('current-ean-display').textContent = ean;
+
+    // Mostra il blocco azioni operative
+    const actionsArea = document.getElementById('ean-actions-area');
+    actionsArea.classList.remove('hidden');
+
+    // Mostra anche l'area upload foto
+    const photoArea = document.getElementById('photo-upload-area');
+    photoArea.classList.remove('hidden');
+
+    // Aggiorna status scan
+    const scanStatus = document.getElementById('scan-status');
+    scanStatus.textContent = `EAN ${ean} confermato. Ora completa le azioni operative e/o carica le foto.`;
+    scanStatus.classList.remove('hidden');
 }
 
 function handlePhotoUploadAndCompletion() {
