@@ -1,6 +1,8 @@
+// app.js - Blocco 1 di 3: Inizializzazione, Setup e Autenticazione
+
 // --- CONFIGURAZIONE E INIZIALIZZAZIONE ---
 
-// !!! IMPORTANTE: SOSTITUISCI CON LE TUE CHIAVI BACKENDLESS REALI !!!
+// !!! CHIAVI BACKENDLESS (Valori corretti forniti dall'utente) !!!
 const APPLICATION_ID = "C2A5C327-CF80-4BB0-8017-010681F0481C";
 const JS_API_KEY = "B266000F-684B-4889-9174-2D1734001E08";
 
@@ -8,51 +10,60 @@ const JS_API_KEY = "B266000F-684B-4889-9174-2D1734001E08";
 let currentUser = null;
 let currentRole = null;
 let currentWorkingEAN = null;
+let currentObjectId = null; // ID dell'ordine attualmente in lavorazione (per upload foto)
 
-// Stato del Database
+// Stati del Database e Nomi Tabelle
 const ORDER_TABLE_NAME = "Orders";
+const USER_TABLE_NAME = "Users";
+
+// Nomi dei ruoli
+const ROLES = {
+    PHOTOGRAPHER: 'Photographer',
+    POST_PRODUCER: 'PostProducer',
+    ADMIN: 'Admin'
+};
 
 // Stadi del Workflow
 const WORKFLOW_STATUS = {
     WAITING_ADMIN: "In attesa Admin", // Default all'importazione
     IN_MAGAZZINO: "In Magazzino", // 1. Scansione EAN in magazzino
     FOTO_SCATTATE: "Foto 1 Fatta", // 2. Photographer ha caricato le foto
-    WAITING_POST_PROD: "In attesa Post Prod.", // 3. Le foto attendono l'accettazione
+    WAITING_POST_PROD: "In attesa Post Prod.", // 3. Le foto attendono l'accettazione (Stato per il Post Producer)
     FOTO_ACCETTATE: "Foto 2 Accettate", // 4. PostProducer accetta le foto
     FOTO_RIFIUTATE: "Foto 3 Rifiutate" // 5. PostProducer rifiuta le foto (ritorna al Photographer)
-    // Se rifiutate, lo stato rimane FOTO_RIFIUTATE e l'ordine appare al Photographer
 };
 
 
-// Inizializzazione di Backendless
+// Inizializzazione di Backendless e Service Worker
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof Backendless !== 'undefined') {
         try {
             Backendless.initApp(APPLICATION_ID, JS_API_KEY);
             console.log("Backendless inizializzato.");
 
+            // Tenta di registrare il Service Worker (PWA)
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => console.log('Service Worker registrato:', registration.scope))
+                    .catch(error => console.error('Service Worker fallito:', error));
+            }
+            
             // Verifica se l'utente è già loggato
             Backendless.UserService.getCurrentUser()
                 .then(user => {
                     if (user) {
                         handleLoginSuccess(user);
                     } else {
-                        // Registra il Service Worker solo se non loggato o dopo l'attivazione
-                        if ('serviceWorker' in navigator) {
-                            navigator.serviceWorker.register('/service-worker.js')
-                                .then(registration => console.log('Service Worker registrato:', registration.scope))
-                                .catch(error => console.error('Service Worker fallito:', error));
-                        }
+                        showLoginArea("Inserisci le credenziali.");
                     }
                 })
                 .catch(error => {
                     console.error("Errore recupero utente corrente:", error);
-                    // Forza il logout e mostra l'area login
                     showLoginArea("Sessione scaduta o errore di rete. Riprova.");
                 });
 
         } catch (e) {
-            console.error("Errore fatale: Backendless.initApp non è riuscito. Hai inserito APPLICATION_ID e JS_API_KEY corretti?", e);
+            console.error("Errore fatale: Backendless.initApp non è riuscito.", e);
             showLoginArea("Errore di configurazione del servizio (Controllare le chiavi API).");
         }
     } else {
@@ -63,29 +74,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- GESTIONE UTENTE E AUTENTICAZIONE ---
 
+function getRoleFromUser(user) {
+    // Backendless di default non include il ruolo. Lo leggiamo direttamente dal campo 'role'
+    // che l'Admin imposta nella tabella Users.
+    if (!user || !user.role) {
+        return Promise.reject(new Error("Ruolo utente non trovato."));
+    }
+    return Promise.resolve(user.role);
+}
+
+
 function handleLoginSuccess(user) {
     currentUser = user;
-    currentRole = user.role;
     
-    // Mostra il nome nella dashboard (se disponibile, altrimenti usa l'email)
-    const displayName = user.name || user.email; 
-    document.getElementById('worker-name').textContent = displayName;
-    document.getElementById('worker-role').textContent = currentRole;
-    
-    // Nasconde l'area di login e mostra la dashboard appropriata
-    document.getElementById('login-area').style.display = 'none';
+    // Recupera il ruolo dall'utente (dovrebbe essere un campo nella tabella Users)
+    getRoleFromUser(user)
+        .then(role => {
+            currentRole = role;
+            
+            const displayName = user.name || user.email;
+            document.getElementById('worker-name').textContent = displayName;
+            document.getElementById('worker-role').textContent = currentRole;
+            
+            document.getElementById('login-area').style.display = 'none';
 
-    if (currentRole === 'Admin') {
-        document.getElementById('admin-dashboard').style.display = 'block';
-        loadUsersAndRoles(); // Carica la tabella utenti per l'Admin
-    } else if (currentRole === 'Photographer' || currentRole === 'PostProducer') {
-        document.getElementById('worker-dashboard').style.display = 'block';
-        loadOrdersForUser(currentRole); // Carica gli ordini pertinenti
-    } else {
-        // Ruolo non riconosciuto
-        showLoginArea("Ruolo utente non autorizzato.");
-        handleLogout();
-    }
+            if (currentRole === ROLES.ADMIN) {
+                document.getElementById('admin-dashboard').style.display = 'block';
+                loadUsersAndRoles(); // Carica la tabella utenti per l'Admin
+            } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+                document.getElementById('worker-dashboard').style.display = 'block';
+                loadOrdersForUser(currentRole); // Carica gli ordini pertinenti
+            } else {
+                showLoginArea("Ruolo utente non autorizzato.");
+                handleLogout();
+            }
+        })
+        .catch(roleError => {
+            console.error(`Errore nel recupero del ruolo: ${roleError.message}`);
+            showLoginArea(`Accesso fallito: ${roleError.message}`);
+            Backendless.UserService.logout(); 
+        });
 }
 
 function handleStandardLogin(email, password) {
@@ -98,7 +126,9 @@ function handleStandardLogin(email, password) {
         })
         .catch(error => {
             console.error("Errore di Login:", error);
-            statusDisplay.textContent = `Login fallito: ${error.message}`;
+            // Mostra un messaggio di errore informativo
+            let displayMessage = error.message || "Credenziali non valide o utente non confermato.";
+            statusDisplay.textContent = `Login fallito: ${displayMessage}`;
         });
 }
 
@@ -107,7 +137,7 @@ function handlePasswordRecovery() {
     const statusDisplay = document.getElementById('login-status');
 
     if (!email) {
-        statusDisplay.textContent = "Inserisci la tua email nel campo sopra per il recupero password.";
+        statusDisplay.textContent = "Inserisci la tua email per il recupero password.";
         return;
     }
 
@@ -116,7 +146,6 @@ function handlePasswordRecovery() {
     Backendless.UserService.restorePassword(email)
         .then(() => {
             statusDisplay.textContent = `Istruzioni di reset inviate a ${email}. Controlla la tua casella email.`;
-            // Resetta il campo password
             document.getElementById('user-password').value = '';
         })
         .catch(error => {
@@ -129,7 +158,6 @@ function handleLogout() {
     Backendless.UserService.logout()
         .then(() => {
             showLoginArea("Logout completato.");
-            // Ricarica la pagina o resetta lo stato
             window.location.reload();
         })
         .catch(error => {
@@ -145,543 +173,584 @@ function showLoginArea(message) {
     document.getElementById('login-status').textContent = message;
 }
 
-// Aggiungi un pulsante per il logout rapido (solo dopo aver effettuato il login)
-document.getElementById('worker-dashboard').insertAdjacentHTML('beforeend', '<button onclick="handleLogout()" style="margin-top: 20px;">Esci</button>');
-document.getElementById('admin-dashboard').insertAdjacentHTML('beforeend', '<button onclick="handleLogout()" style="margin-top: 20px;">Esci</button>');
-
 // --- FINE SEZIONE 1 ---
 
-// --- GESTIONE DATI E WORKFLOW (SHARED) ---
+// app.js - Blocco 2 di 3: Dashboard Admin e Logica Workflow
+
+// --- FUNZIONI UTILITY PER IL WORKFLOW ---
 
 /**
- * Carica gli ordini per il ruolo corrente e aggiorna la tabella.
- * @param {string} role - 'Photographer' o 'PostProducer'.
+ * Aggiorna lo stato di un ordine nel database.
+ * @param {string} objectId L'ID dell'oggetto ordine.
+ * @param {string} newStatus Il nuovo stato del workflow (da WORKFLOW_STATUS).
+ * @param {object} [extraData={}] Dati aggiuntivi da aggiornare (es. photoLink).
+ * @returns {Promise<object>} L'oggetto aggiornato.
  */
-async function loadOrdersForUser(role) {
-    const loadingDisplay = document.getElementById('loading-orders');
-    loadingDisplay.textContent = "Caricamento ordini dal database...";
-    const tableBody = document.getElementById('orders-table').querySelector('tbody');
-    tableBody.innerHTML = ''; // Pulisce la tabella
+function updateOrderStatus(objectId, newStatus, extraData = {}) {
+    const data = {
+        objectId: objectId,
+        status: newStatus,
+        lastUpdated: new Date().toISOString(),
+        ...extraData
+    };
+    const dataStore = Backendless.Data.of(ORDER_TABLE_NAME);
+    return dataStore.save(data);
+}
 
-    try {
-        let whereClause = "";
+// --- LOGICA DASHBOARD LAVORATORE (Photographer/PostProducer) ---
 
-        if (role === 'Photographer') {
-            // Photographer: Ordini in Magazzino (pronti per la foto) O Rifiutati (da rifare)
-            whereClause = `status = '${WORKFLOW_STATUS.IN_MAGAZZINO}' OR status = '${WORKFLOW_STATUS.FOTO_RIFIUTATE}'`;
-        } else if (role === 'PostProducer') {
-            // PostProducer: Ordini in attesa di revisione
-            whereClause = `status = '${WORKFLOW_STATUS.WAITING_POST_PROD}'`;
-        } else {
-            loadingDisplay.textContent = "Ruolo non gestito.";
-            return;
-        }
-
-        const queryBuilder = Backendless.Data.of(ORDER_TABLE_NAME).loadRelations({
-            options: {
-                where: whereClause
-            }
-        });
-        
-        const orders = await queryBuilder.find();
-
-        if (orders.length === 0) {
-            loadingDisplay.textContent = `Nessun ordine trovato con stato '${whereClause.replace(/ OR status = /g, ' o ')}'.`;
-            return;
-        }
-
-        orders.forEach(order => {
-            const row = tableBody.insertRow();
-            row.insertCell().textContent = order.eanCode;
-            row.insertCell().textContent = order.cliente;
-            row.insertCell().textContent = order.status;
-
-            const actionCell = row.insertCell();
-            actionCell.className = 'action-cell';
-
-            if (role === 'Photographer') {
-                if (order.status === WORKFLOW_STATUS.FOTO_RIFIUTATE) {
-                    // Se rifiutato, mostra il pulsante per ricominciare la fase foto
-                    actionCell.innerHTML = `<button onclick="startPhotoUpload('${order.eanCode}')" class="btn-warning">Ricomincia Foto</button>`;
-                } else if (order.status === WORKFLOW_STATUS.IN_MAGAZZINO) {
-                    // Se in magazzino, il photographer può iniziare
-                    actionCell.innerHTML = `<button onclick="startPhotoUpload('${order.eanCode}')">Inizia Foto</button>`;
-                } else {
-                    actionCell.textContent = 'In attesa di upload';
-                }
-            } else if (role === 'PostProducer') {
-                // Post Producer: Visualizza foto e Accetta/Rifiuta
-                actionCell.innerHTML = `
-                    <button onclick="viewPhotos('${order.eanCode}', '${order.photoUrls}')">Visualizza Foto</button>
-                    <button onclick="updateOrderStatus('${order.eanCode}', '${WORKFLOW_STATUS.FOTO_ACCETTATE}', true)">Accetta</button>
-                    <button onclick="updateOrderStatus('${order.eanCode}', '${WORKFLOW_STATUS.FOTO_RIFIUTATE}', true)" class="btn-danger">Rifiuta</button>
-                `;
-            }
-        });
-
-        loadingDisplay.textContent = `${orders.length} ordini caricati.`;
-    } catch (error) {
-        console.error("Errore nel caricamento ordini:", error);
-        loadingDisplay.textContent = `Errore di rete o database: ${error.message}`;
+/**
+ * Carica gli ordini pertinenti per l'utente loggato.
+ * @param {string} role Il ruolo dell'utente (Photographer o PostProducer).
+ */
+function loadOrdersForUser(role) {
+    const loadingStatusEl = document.getElementById('loading-orders');
+    loadingStatusEl.textContent = 'Caricamento ordini in corso...';
+    
+    let whereClause = "";
+    
+    if (role === ROLES.PHOTOGRAPHER) {
+        // Il Fotografo vede gli ordini da fare o da rifare
+        whereClause = `status IN ('${WORKFLOW_STATUS.IN_MAGAZZINO}', '${WORKFLOW_STATUS.FOTO_RIFIUTATE}')`;
+    } else if (role === ROLES.POST_PRODUCER) {
+        // Il Post Producer vede solo gli ordini in attesa della sua approvazione
+        whereClause = `status = '${WORKFLOW_STATUS.WAITING_POST_PROD}'`;
+    } else {
+        // L'Admin usa una funzione diversa per vedere tutti gli ordini
+        loadingStatusEl.textContent = '';
+        return; 
     }
+
+    const queryBuilder = Backendless.DataQueryBuilder.create()
+        .setWhereClause(whereClause)
+        .setSortBy(['lastUpdated DESC']);
+    
+    Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder)
+        .then(orders => {
+            loadingStatusEl.textContent = `Trovati ${orders.length} ordini in attesa.`;
+            renderOrdersTable(orders);
+        })
+        .catch(error => {
+            console.error("Errore nel caricamento degli ordini:", error);
+            loadingStatusEl.textContent = 'Errore nel caricamento degli ordini dal database.';
+            renderOrdersTable([]);
+        });
 }
 
 /**
- * Aggiorna lo stato di un ordine basato sul codice EAN.
- * @param {string} eanCode - Codice EAN da aggiornare.
- * @param {string} newStatus - Nuovo stato del workflow.
- * @param {boolean} [isWorkerView=false] - Indica se l'aggiornamento viene dalla vista lavoratore (richiede ricaricamento ordini).
- * @returns {Promise<boolean>} Vero se l'aggiornamento ha successo.
+ * Renderizza la tabella degli ordini per il lavoratore.
+ * @param {Array<object>} orders Lista degli ordini da visualizzare.
  */
-async function updateOrderStatus(eanCode, newStatus, isWorkerView = false) {
-    try {
-        // Trova il record basato su eanCode
-        const queryBuilder = Backendless.Data.of(ORDER_TABLE_NAME).loadRelations({
-            options: {
-                where: `eanCode = '${eanCode}'`
-            }
-        });
-        const result = await queryBuilder.find();
-
-        if (result.length === 0) {
-            console.warn(`Ordine con EAN ${eanCode} non trovato.`);
-            return false;
-        }
-
-        const orderObject = result[0];
-        orderObject.status = newStatus;
-
-        // Esegue l'aggiornamento
-        await Backendless.Data.of(ORDER_TABLE_NAME).save(orderObject);
-        console.log(`Stato ordine ${eanCode} aggiornato a: ${newStatus}`);
-        
-        // Se l'aggiornamento è avvenuto dalla dashboard lavoratore, ricarica la tabella
-        if (isWorkerView) {
-             loadOrdersForUser(currentRole);
-        }
-
-        return true;
-    } catch (error) {
-        console.error(`Errore nell'aggiornamento dello stato per ${eanCode}:`, error);
-        return false;
-    }
-}
-
-// --- LOGICA EAN MANUALE (Flusso Lavoratore) ---
-
-/**
- * Gestisce l'input EAN manuale (usato da scanner o digitazione).
- */
-async function confirmEanInput() {
-    const eanInput = document.getElementById('ean-input');
-    const eanCode = eanInput.value.trim();
-    const scanStatusDisplay = document.getElementById('scan-status');
-
-    if (!eanCode) {
-        scanStatusDisplay.textContent = "Inserisci un codice EAN valido.";
+function renderOrdersTable(orders) {
+    const tbody = document.getElementById('orders-table').querySelector('tbody');
+    tbody.innerHTML = ''; // Pulisce la tabella
+    
+    if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nessun ordine in attesa di lavorazione.</td></tr>';
         return;
     }
 
-    scanStatusDisplay.textContent = `EAN ${eanCode} ricevuto. Ricerca stato...`;
+    orders.forEach(order => {
+        const row = tbody.insertRow();
+        
+        // Colonna EAN Code
+        row.insertCell().textContent = order.eanCode || 'N/D';
+        // Colonna Cliente
+        row.insertCell().textContent = order.cliente || 'N/D';
+        // Colonna Stato Attuale
+        row.insertCell().textContent = order.status;
 
-    try {
-        const queryBuilder = Backendless.Data.of(ORDER_TABLE_NAME).loadRelations({
-            options: { where: `eanCode = '${eanCode}'` }
-        });
-        const result = await queryBuilder.find();
+        // Colonna Azioni
+        const actionCell = row.insertCell();
+        actionCell.className = 'action-cell';
 
-        if (result.length === 0) {
-            scanStatusDisplay.textContent = `Prodotto EAN ${eanCode} non trovato nel sistema.`;
-            return;
+        // Logica Azioni in base al Ruolo e allo Stato
+        if (currentRole === ROLES.PHOTOGRAPHER) {
+            // Fotografo: Può solo procedere scansionando l'EAN
+            actionCell.textContent = "Scannerizza l'EAN per lavorare.";
+
+        } else if (currentRole === ROLES.POST_PRODUCER) {
+            // Post Producer: Può visualizzare le foto e decidere
+            const viewButton = document.createElement('button');
+            viewButton.textContent = 'Vedi Foto';
+            viewButton.className = 'btn-warning'; // Giallo/Arancione per 'Vedi'
+            viewButton.onclick = () => showPhotoModal(order);
+            actionCell.appendChild(viewButton);
         }
-        
-        const order = result[0];
-        
-        if (currentRole === 'Photographer') {
-            // 1. Caso: Ingresso in Magazzino
-            if (order.status === WORKFLOW_STATUS.WAITING_ADMIN) {
-                const success = await updateOrderStatus(eanCode, WORKFLOW_STATUS.IN_MAGAZZINO);
-                if (success) {
-                    scanStatusDisplay.textContent = `Prodotto EAN ${eanCode} registrato in Magazzino!`;
-                    // Ricarica la tabella per mostrare il nuovo ordine in lista
-                    loadOrdersForUser(currentRole); 
-                } else {
-                    scanStatusDisplay.textContent = `Errore aggiornamento EAN ${eanCode}.`;
-                }
-            } 
-            // 2. Caso: Lavoro di Fotografia in corso (solo se in lista)
-            else if (order.status === WORKFLOW_STATUS.IN_MAGAZZINO || order.status === WORKFLOW_STATUS.FOTO_RIFIUTATE) {
-                // Se l'EAN è scansionato, apri l'area di upload
-                startPhotoUpload(eanCode);
-                scanStatusDisplay.textContent = `Pronto per l'upload foto per EAN ${eanCode}.`;
-            } else {
-                scanStatusDisplay.textContent = `EAN ${eanCode} è già in stato: ${order.status}.`;
-            }
-        } else if (currentRole === 'PostProducer') {
-             scanStatusDisplay.textContent = "Per il Post Producer, si prega di selezionare l'ordine dalla tabella in basso.";
-        }
-        
-        eanInput.value = ''; // Pulisce il campo
-        eanInput.focus(); // Mantiene il focus per la scansione successiva
-
-    } catch (error) {
-        console.error("Errore scansione EAN:", error);
-        scanStatusDisplay.textContent = `Errore di sistema durante la ricerca EAN: ${error.message}`;
-    }
+    });
 }
 
 /**
- * Prepara l'interfaccia Photographer per l'upload delle foto.
- * @param {string} eanCode - Codice EAN su cui lavorare.
+ * Gestisce l'input EAN (tramite scanner o digitazione).
  */
-function startPhotoUpload(eanCode) {
-    currentWorkingEAN = eanCode;
-    const uploadArea = document.getElementById('photo-upload-area');
-    
-    document.getElementById('current-ean-display').textContent = eanCode;
-    document.getElementById('upload-status-message').textContent = 'Seleziona le foto (.jpg, .png)';
-    document.getElementById('photo-files').value = null; // Resetta i file selezionati
+function confirmEanInput() {
+    const ean = document.getElementById('ean-input').value.trim();
+    const statusEl = document.getElementById('scan-status');
+    statusEl.textContent = 'Verifica EAN in corso...';
 
-    uploadArea.style.display = 'block';
-    // Aggiunge la classe per l'animazione di scuotimento
-    uploadArea.classList.add('animate-shake');
-    // Rimuove la classe dopo l'animazione
-    setTimeout(() => {
-        uploadArea.classList.remove('animate-shake');
-    }, 500);
-
-    // Nasconde la tabella ordini mentre si lavora
-    document.getElementById('orders-table').style.display = 'none';
-}
-
-/**
- * Annulla il processo di upload corrente.
- */
-function cancelPhotoUpload() {
-    currentWorkingEAN = null;
-    document.getElementById('photo-upload-area').style.display = 'none';
-    document.getElementById('orders-table').style.display = 'table';
-    document.getElementById('scan-status').textContent = 'In attesa di EAN...';
-}
-
-/**
- * Esegue l'upload di un singolo file su Backendless File Storage.
- * @param {File} file - Oggetto File da caricare.
- * @param {string} folderPath - Cartella di destinazione.
- * @returns {Promise<string>} URL pubblico del file.
- */
-async function uploadFileToBackendless(file, folderPath) {
-    const filePath = `${folderPath}/${file.name}`;
-    // Il metodo saveFile restituisce l'URL pubblico in caso di successo
-    const fileURL = await Backendless.Files.saveFile(filePath, file, true);
-    return fileURL;
-}
-
-/**
- * Gestisce l'upload di più foto e l'aggiornamento finale dello stato dell'ordine.
- */
-async function handlePhotoUploadAndCompletion() {
-    const filesInput = document.getElementById('photo-files');
-    const statusDisplay = document.getElementById('upload-status-message');
-    const files = filesInput.files;
-
-    if (!files.length) {
-        statusDisplay.textContent = "Seleziona almeno un file prima di caricare.";
-        return;
-    }
-    
-    if (!currentWorkingEAN) {
-        statusDisplay.textContent = "Errore interno: Nessun EAN selezionato.";
+    if (!ean) {
+        statusEl.textContent = 'Per favore, inserisci un codice EAN valido.';
         return;
     }
 
-    statusDisplay.textContent = `Caricamento di ${files.length} file in corso...`;
-    
-    // Disabilita il pulsante durante l'upload
-    document.getElementById('upload-complete-button').disabled = true;
-
-    try {
-        const fileUrls = [];
-        const folderPath = `photos/${currentWorkingEAN}`; // Cartella dedicata per l'EAN
-
-        // Svuota la cartella prima di ricaricare (utile in caso di Rifiuto/Retry)
-        await Backendless.Files.removeDirectory(folderPath); 
-
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            statusDisplay.textContent = `Caricamento file ${i + 1}/${files.length}: ${file.name}`;
-            const url = await uploadFileToBackendless(file, folderPath);
-            fileUrls.push(url);
-        }
-
-        // 1. Aggiorna il record dell'ordine nel database
-        const queryBuilder = Backendless.Data.of(ORDER_TABLE_NAME).loadRelations({
-            options: { where: `eanCode = '${currentWorkingEAN}'` }
-        });
-        const result = await queryBuilder.find();
+    // Ricerca l'ordine corrispondente all'EAN
+    const queryBuilder = Backendless.DataQueryBuilder.create()
+        .setWhereClause(`eanCode = '${ean}'`);
         
-        if (result.length === 0) throw new Error("Ordine non trovato per l'aggiornamento finale.");
-        
-        const orderObject = result[0];
-        
-        // Salva l'array di URL come stringa JSON (per compatibilità con Backendless)
-        orderObject.photoUrls = JSON.stringify(fileUrls); 
-        orderObject.status = WORKFLOW_STATUS.WAITING_POST_PROD; // Sposta al Post Producer
-        
-        await Backendless.Data.of(ORDER_TABLE_NAME).save(orderObject);
-
-        statusDisplay.textContent = `✅ Caricamento completato! Stato aggiornato a: ${WORKFLOW_STATUS.WAITING_POST_PROD}`;
-        
-        // Cleanup e ricarica
-        cancelPhotoUpload();
-        loadOrdersForUser(currentRole);
-
-    } catch (error) {
-        console.error("Errore upload o aggiornamento DB:", error);
-        statusDisplay.textContent = `❌ Errore critico: ${error.message}. Controllare la console.`;
-    } finally {
-        document.getElementById('upload-complete-button').disabled = false;
-    }
-}
-
-/**
- * Logica PostProducer: Mostra i link delle foto caricate.
- * @param {string} eanCode 
- * @param {string} photoUrlsJson 
- */
-function viewPhotos(eanCode, photoUrlsJson) {
-    if (!photoUrlsJson) {
-        alert(`Nessun URL foto trovato per EAN ${eanCode}.`);
-        return;
-    }
-    
-    try {
-        const photoUrls = JSON.parse(photoUrlsJson);
-        let content = `<h2>Foto per EAN: ${eanCode}</h2>`;
-        
-        photoUrls.forEach((url, index) => {
-            content += `<p>Link Foto ${index + 1}: <a href="${url}" target="_blank">${url}</a></p>`;
-            // Idealmente qui si mostrerebbe un'anteprima <img>, ma per semplicità usiamo i link
-            content += `<img src="${url}" style="max-width: 100%; height: auto; margin-bottom: 20px; border: 1px solid #ccc;">`;
-        });
-        
-        // Usa una nuova finestra/modale per mostrare i link (semplice)
-        const photoWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
-        photoWindow.document.write(`<html><head><title>Foto EAN ${eanCode}</title><style>body{font-family: Arial, sans-serif;}</style></head><body>${content}</body></html>`);
-        photoWindow.document.close();
-
-    } catch (e) {
-        alert("Errore nell'analisi degli URL delle foto. Controllare i dati del record.");
-        console.error("Errore parsing URL:", e);
-    }
-}
-
-
-// --- GESTIONE IMPORT EXCEL (Admin) ---
-
-/**
- * Gestisce la lettura del file Excel e l'invio dei dati a Backendless.
- */
-function handleFileUpload() {
-    const fileInput = document.getElementById('excel-file-input');
-    const statusDisplay = document.getElementById('import-status');
-    const file = fileInput.files[0];
-
-    if (!file) return;
-
-    statusDisplay.textContent = "Lettura del file Excel in corso...";
-    
-    const reader = new FileReader();
-
-    reader.onload = function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            
-            // Assumiamo che il primo foglio contenga i dati
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            
-            // Converti in JSON. Utilizza header:1 se le intestazioni non sono uniformi.
-            const jsonArray = XLSX.utils.sheet_to_json(worksheet);
-
-            if (jsonArray.length === 0) {
-                statusDisplay.textContent = "Errore: Il file Excel è vuoto.";
+    Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder)
+        .then(orders => {
+            if (orders.length === 0) {
+                statusEl.textContent = `ERRORE: Ordine con EAN ${ean} non trovato.`;
+                cancelPhotoUpload(); // Resetta l'area di upload
                 return;
             }
 
-            statusDisplay.textContent = `Trovati ${jsonArray.length} record. Invio al database...`;
+            const order = orders[0];
+            currentWorkingEAN = ean;
+            currentObjectId = order.objectId;
+            
+            // Logica di avanzamento del workflow in base al ruolo
+            processEanWorkflow(order, statusEl);
+        })
+        .catch(error => {
+            console.error("Errore durante la ricerca EAN:", error);
+            statusEl.textContent = 'Errore di connessione al database.';
+            cancelPhotoUpload();
+        });
+}
 
-            // Mappa i dati per includere lo stato iniziale
-            const ordersToSave = jsonArray.map(item => ({
-                eanCode: item.eanCode, 
-                cliente: item.cliente, 
-                status: WORKFLOW_STATUS.WAITING_ADMIN,
-                photoUrls: null // Inizializza come null
-            }));
+/**
+ * Logica di avanzamento del workflow per l'EAN scansionato.
+ * @param {object} order L'oggetto ordine.
+ * @param {HTMLElement} statusEl L'elemento dove mostrare lo stato.
+ */
+function processEanWorkflow(order, statusEl) {
+    const uploadArea = document.getElementById('photo-upload-area');
 
-            sendOrdersToBackendless(ordersToSave);
+    if (currentRole === ROLES.PHOTOGRAPHER) {
+        
+        if (order.status === WORKFLOW_STATUS.IN_MAGAZZINO || order.status === WORKFLOW_STATUS.FOTO_RIFIUTATE) {
+            // Stato corretto per il Fotografo: Può iniziare a lavorare/rifare
+            document.getElementById('current-ean-display').textContent = order.eanCode;
+            uploadArea.style.display = 'block';
+            uploadArea.classList.add('animate-shake'); // Aggiunge animazione
+            statusEl.textContent = `Ordine EAN ${order.eanCode} pronto per l'Upload.`;
+
+            // Aggiorna lo stato a "In Lavorazione (Fotografo)"
+            updateOrderStatus(order.objectId, WORKFLOW_STATUS.FOTO_SCATTATE)
+                .then(() => loadOrdersForUser(currentRole)) // Ricarica la lista per rimuoverlo subito
+                .catch(err => console.error("Errore aggiornamento stato a FOTO_SCATTATE:", err));
+                
+        } else if (order.status === WORKFLOW_STATUS.WAITING_ADMIN) {
+            // Stato iniziale: L'Admin deve approvare/iniziare
+            statusEl.textContent = `Ordine EAN ${order.eanCode} è in attesa di approvazione Admin.`;
+            cancelPhotoUpload();
+            
+        } else {
+            // Stato non lavorabile dal Fotografo (es. WAITING_POST_PROD o DONE)
+            statusEl.textContent = `Ordine EAN ${order.eanCode} è nello stato "${order.status}" e non può essere lavorato.`;
+            cancelPhotoUpload();
+        }
+
+    } else if (currentRole === ROLES.POST_PRODUCER) {
+        // Il Post Producer non usa l'input EAN per lavorare, ma la tabella
+        if (order.status === WORKFLOW_STATUS.WAITING_POST_PROD) {
+            statusEl.textContent = `Ordine EAN ${order.eanCode} in attesa di revisione. Utilizza la tabella per vedere le foto.`;
+            showPhotoModal(order); // Apre la modale per la revisione
+        } else {
+            statusEl.textContent = `Ordine EAN ${order.eanCode} non in attesa di post-produzione. Stato: ${order.status}`;
+        }
+        cancelPhotoUpload();
+    }
+    
+    // Pulisce l'input EAN
+    document.getElementById('ean-input').value = ''; 
+}
+
+/**
+ * Annulla l'upload e resetta l'area di lavoro EAN.
+ */
+function cancelPhotoUpload() {
+    const uploadArea = document.getElementById('photo-upload-area');
+    uploadArea.style.display = 'none';
+    uploadArea.classList.remove('animate-shake');
+    document.getElementById('photo-files').value = '';
+    document.getElementById('current-ean-display').textContent = '';
+    document.getElementById('upload-status-message').textContent = '';
+    currentWorkingEAN = null;
+    currentObjectId = null;
+}
+
+// --- LOGICA IMPORT EXCEL (Admin) ---
+
+/**
+ * Legge e parsifica il file Excel caricato.
+ */
+function handleFileUpload() {
+    const fileInput = document.getElementById('excel-file-input');
+    const file = fileInput.files[0];
+    const statusEl = document.getElementById('import-status');
+    statusEl.textContent = 'Parsing del file in corso...';
+    
+    if (!file) {
+        statusEl.textContent = 'Seleziona un file Excel prima di caricare.';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            
+            // Converte il foglio in un array di oggetti JSON
+            const json = XLSX.utils.sheet_to_json(worksheet, {
+                header: ['eanCode', 'cliente'], // Assumiamo le colonne EAN e Cliente
+                range: 1 // Salta la prima riga se contiene l'intestazione
+            });
+
+            statusEl.textContent = `Trovati ${json.length} record. Salvataggio su Backendless...`;
+            uploadOrdersToBackendless(json);
 
         } catch (error) {
-            console.error("Errore lettura o conversione Excel:", error);
-            statusDisplay.textContent = `Errore di elaborazione del file: ${error.message}`;
+            console.error("Errore durante il parsing Excel:", error);
+            statusEl.textContent = `ERRORE nel parsing del file: ${error.message}`;
         }
     };
-
     reader.readAsArrayBuffer(file);
 }
 
 /**
- * Invia l'array di ordini elaborati a Backendless in modalità bulk.
- * @param {Array<Object>} orders - Array di oggetti ordine da salvare.
+ * Carica gli ordini parsificati nel database Backendless.
+ * @param {Array<object>} orders I dati degli ordini.
  */
-async function sendOrdersToBackendless(orders) {
-    const statusDisplay = document.getElementById('import-status');
-    
-    try {
-        // Backendless supporta l'operazione in blocco (bulkCreate)
-        const result = await Backendless.Data.of(ORDER_TABLE_NAME).bulkCreate(orders);
-        
-        statusDisplay.textContent = `✅ Importazione completata! ${result.length} ordini inseriti.`;
-        
-        // Pulizia
-        document.getElementById('excel-file-input').value = null;
-        document.getElementById('import-button').disabled = true;
-        
-    } catch (error) {
-        console.error("Errore salvataggio bulk su Backendless:", error);
-        statusDisplay.textContent = `❌ Errore durante il salvataggio: ${error.message}`;
-    }
+function uploadOrdersToBackendless(orders) {
+    const statusEl = document.getElementById('import-status');
+    const ordersToSave = orders.map(order => ({
+        eanCode: String(order.eanCode).trim(), // Assicura che l'EAN sia una stringa pulita
+        cliente: order.cliente || 'N/D',
+        status: WORKFLOW_STATUS.IN_MAGAZZINO, // Stato iniziale del workflow
+        lastUpdated: new Date().toISOString()
+    }));
+
+    // Uso del metodo "bulkCreate" se supportato, altrimenti salvataggio singolo.
+    // Backendless supporta il salvataggio in batch tramite `save()` con un array.
+    Backendless.Data.of(ORDER_TABLE_NAME).save(ordersToSave)
+        .then(savedOrders => {
+            statusEl.textContent = `Caricamento completato. ${savedOrders.length} nuovi ordini creati e messi nello stato "${WORKFLOW_STATUS.IN_MAGAZZINO}".`;
+            document.getElementById('excel-file-input').value = '';
+            document.getElementById('import-button').disabled = true;
+        })
+        .catch(error => {
+            console.error("Errore durante il salvataggio degli ordini:", error);
+            statusEl.textContent = `ERRORE nel salvataggio degli ordini: ${error.message}`;
+        });
 }
+
+// --- LOGICA UPLOAD FOTO (Photographer) ---
+
+/**
+ * Gestisce l'upload delle foto e completa la fase "Foto 1 Fatta".
+ */
+function handlePhotoUploadAndCompletion() {
+    const fileInput = document.getElementById('photo-files');
+    const files = fileInput.files;
+    const statusEl = document.getElementById('upload-status-message');
+
+    if (!currentWorkingEAN || !currentObjectId) {
+        statusEl.textContent = 'Errore: Nessun EAN in lavorazione.';
+        return;
+    }
+
+    if (files.length === 0) {
+        statusEl.textContent = 'Seleziona almeno un file da caricare.';
+        return;
+    }
+
+    statusEl.textContent = `Caricamento di ${files.length} file in corso...`;
+    
+    // Backendless File Upload - Creazione della cartella EAN
+    const folderPath = `${FILE_PATHS.PHOTO_UPLOAD}${currentWorkingEAN}/`;
+    
+    // Inizializza l'array per tenere traccia degli URL dei file
+    const fileUrls = [];
+    const uploadPromises = [];
+
+    // Crea una Promessa per l'upload di ciascun file
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const promise = Backendless.Files.upload(file, folderPath, true)
+            .then(fileUrl => {
+                fileUrls.push(fileUrl);
+                statusEl.textContent = `Caricamento file ${i + 1}/${files.length} completato.`;
+            })
+            .catch(error => {
+                console.error(`Errore upload file ${file.name}:`, error);
+                throw new Error(`Errore caricamento file ${file.name}.`); // Ferma il processo
+            });
+        uploadPromises.push(promise);
+    }
+
+    // Esegue tutti gli upload in parallelo
+    Promise.all(uploadPromises)
+        .then(() => {
+            // TUTTI GLI UPLOAD SONO RIUSCITI
+            statusEl.textContent = 'Upload completato. Aggiornamento stato ordine...';
+            
+            // 1. Aggiorna lo stato dell'ordine al Post Producer
+            const photoLinks = fileUrls.join('\n'); // Salva gli URL come stringa separata da newline
+            
+            return updateOrderStatus(currentObjectId, WORKFLOW_STATUS.WAITING_POST_PROD, { 
+                photoLinks: photoLinks, 
+                photographerId: currentUser.objectId // Registra chi ha fatto il lavoro
+            });
+        })
+        .then(() => {
+            // 2. Successo finale
+            statusEl.textContent = `Fase Foto completata per EAN ${currentWorkingEAN}. In attesa Post Producer.`;
+            cancelPhotoUpload();
+            loadOrdersForUser(currentRole); // Aggiorna la lista
+        })
+        .catch(finalError => {
+            // 3. Fallimento generale
+            console.error("Errore finale del processo di upload:", finalError);
+            statusEl.textContent = `ERRORE CRITICO: ${finalError.message}. Ordine non aggiornato.`;
+        });
+}
+
 
 // --- FINE SEZIONE 2 ---
 
-// --- GESTIONE UTENTI (Admin) ---
+// app.js - Blocco 3 di 3: Gestione Utenti Admin e Funzioni di Supporto
+
+// Variabile per il percorso di base per l'upload dei file
+const FILE_PATHS = {
+    PHOTO_UPLOAD: "product_photos/" // La cartella base dove vanno gli EAN
+};
+
+// --- LOGICA GESTIONE UTENTI (Admin) ---
 
 /**
- * Carica tutti gli utenti (non-Admin) per la gestione e popola la tabella.
+ * Carica tutti gli utenti (Admin) e li renderizza in una tabella.
  */
-async function loadUsersAndRoles() {
-    const loadingDisplay = document.getElementById('loading-users');
-    const tableBody = document.getElementById('users-table').querySelector('tbody');
-    tableBody.innerHTML = '';
-    loadingDisplay.textContent = "Caricamento utenti...";
-
-    try {
-        // Query per caricare tutti gli utenti tranne l'utente corrente (presunto Admin)
-        const queryBuilder = Backendless.Data.of("Users").loadRelations({
-            options: {
-                where: `objectId != '${currentUser.objectId}'`
-            }
+function loadUsersAndRoles() {
+    const loadingEl = document.getElementById('loading-users');
+    loadingEl.textContent = 'Caricamento lista utenti...';
+    
+    // Query per ottenere tutti gli utenti (escluso l'utente corrente)
+    const queryBuilder = Backendless.DataQueryBuilder.create()
+        .setWhereClause(`objectId != '${currentUser.objectId}'`)
+        .setSortBy(['email ASC']);
+    
+    Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
+        .then(users => {
+            loadingEl.textContent = `Trovati ${users.length} utenti.`;
+            renderUsersTable(users);
+        })
+        .catch(error => {
+            console.error("Errore nel caricamento utenti:", error);
+            loadingEl.textContent = 'Errore nel caricamento utenti dal database.';
+            renderUsersTable([]);
         });
-        
-        const users = await queryBuilder.find();
-
-        if (users.length === 0) {
-            loadingDisplay.textContent = "Nessun altro utente trovato.";
-            return;
-        }
-
-        users.forEach(user => {
-            const row = tableBody.insertRow();
-            row.insertCell().textContent = user.email;
-            
-            const roleCell = row.insertCell();
-            roleCell.textContent = user.role || 'Nessun Ruolo';
-
-            const actionCell = row.insertCell();
-            actionCell.innerHTML = `
-                <select id="role-select-${user.objectId}" onchange="updateUserRole('${user.objectId}', this.value)">
-                    <option value="">Cambia Ruolo</option>
-                    <option value="Photographer" ${user.role === 'Photographer' ? 'selected' : ''}>Photographer</option>
-                    <option value="PostProducer" ${user.role === 'PostProducer' ? 'selected' : ''}>PostProducer</option>
-                    <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
-                </select>
-            `;
-        });
-
-        loadingDisplay.textContent = `${users.length} utenti caricati.`;
-
-    } catch (error) {
-        console.error("Errore caricamento utenti:", error);
-        loadingDisplay.textContent = `Errore di rete o database: ${error.message}`;
-    }
 }
 
 /**
- * Crea un nuovo account utente e assegna il ruolo.
+ * Renderizza la tabella degli utenti e delle loro azioni (Admin).
+ * @param {Array<object>} users Lista degli utenti.
  */
-async function handleUserCreation() {
-    const email = document.getElementById('new-user-email').value.trim();
-    const password = document.getElementById('new-user-password').value.trim();
-    const role = document.getElementById('new-user-role').value;
-    const statusDisplay = document.getElementById('user-creation-status');
-
-    if (!email || !password || !role) {
-        statusDisplay.textContent = "Tutti i campi (Email, Password, Ruolo) sono obbligatori.";
+function renderUsersTable(users) {
+    const tbody = document.getElementById('users-table').querySelector('tbody');
+    tbody.innerHTML = '';
+    
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Nessun utente trovato.</td></tr>';
         return;
     }
-    
-    statusDisplay.textContent = "Creazione utente in corso...";
 
-    try {
-        const user = {
-            email: email,
-            password: password,
-            role: role // Backendless accetta campi aggiuntivi al momento della registrazione
-        };
+    users.forEach(user => {
+        const row = tbody.insertRow();
+        const currentRoleValue = user.role || 'N/D';
         
-        // Crea l'utente. Nota: Backendless registra l'utente e restituisce l'oggetto utente
-        await Backendless.UserService.register(user);
+        row.insertCell().textContent = user.email;
+        row.insertCell().textContent = currentRoleValue;
 
-        statusDisplay.textContent = `✅ Utente ${email} creato con ruolo ${role}.`;
+        const actionCell = row.insertCell();
+        actionCell.className = 'action-cell';
+
+        // Select per il cambio ruolo
+        const roleSelect = document.createElement('select');
+        roleSelect.id = `select-role-${user.objectId}`;
+        roleSelect.innerHTML = `
+            <option value="Photographer" ${currentRoleValue === ROLES.PHOTOGRAPHER ? 'selected' : ''}>Photographer</option>
+            <option value="PostProducer" ${currentRoleValue === ROLES.POST_PRODUCER ? 'selected' : ''}>Post Producer</option>
+            <option value="Admin" ${currentRoleValue === ROLES.ADMIN ? 'selected' : ''}>Admin</option>
+        `;
+        actionCell.appendChild(roleSelect);
         
-        // Pulisce i campi e ricarica la lista
-        document.getElementById('new-user-email').value = '';
-        document.getElementById('new-user-password').value = '';
-        document.getElementById('new-user-role').value = '';
-        loadUsersAndRoles();
-
-    } catch (error) {
-        console.error("Errore creazione utente:", error);
-        // Backendless restituisce codici specifici per "utente già esistente"
-        statusDisplay.textContent = `❌ Errore: ${error.message}`;
-    }
+        // Bottone per l'aggiornamento
+        const updateButton = document.createElement('button');
+        updateButton.textContent = 'Aggiorna Ruolo';
+        updateButton.className = 'btn-secondary';
+        updateButton.style.marginLeft = '10px';
+        updateButton.onclick = () => handleRoleUpdate(user.objectId, roleSelect.value);
+        actionCell.appendChild(updateButton);
+    });
 }
 
 /**
- * Aggiorna il ruolo di un utente esistente.
- * @param {string} objectId - L'ID univoco dell'utente.
- * @param {string} newRole - Il nuovo ruolo da assegnare.
+ * Aggiorna il ruolo di un utente specifico.
+ * @param {string} userId L'objectId dell'utente.
+ * @param {string} newRole Il nuovo ruolo da assegnare.
  */
-async function updateUserRole(objectId, newRole) {
-    if (!newRole) return; // Non fare nulla se non è selezionato un ruolo
+function handleRoleUpdate(userId, newRole) {
+    const statusEl = document.getElementById('loading-users');
+    statusEl.textContent = `Aggiornamento ruolo per utente ${userId}...`;
 
-    try {
-        const user = await Backendless.Data.of("Users").findById(objectId);
-        user.role = newRole;
+    const userUpdate = {
+        objectId: userId,
+        role: newRole
+    };
+    
+    Backendless.Data.of(USER_TABLE_NAME).save(userUpdate)
+        .then(() => {
+            statusEl.textContent = `Ruolo aggiornato con successo a ${newRole}.`;
+            loadUsersAndRoles(); // Ricarica la lista per mostrare il cambio
+        })
+        .catch(error => {
+            console.error("Errore nell'aggiornamento ruolo:", error);
+            statusEl.textContent = `ERRORE: Impossibile aggiornare il ruolo: ${error.message}`;
+        });
+}
 
-        await Backendless.Data.of("Users").save(user);
-        
-        console.log(`Ruolo utente ${objectId} aggiornato a: ${newRole}`);
-        
-        // Ricarica la tabella dopo l'aggiornamento
-        loadUsersAndRoles();
+/**
+ * Gestisce la creazione di un nuovo utente (Admin).
+ */
+function handleUserCreation() {
+    const email = document.getElementById('new-user-email').value.trim();
+    const password = document.getElementById('new-user-password').value;
+    const role = document.getElementById('new-user-role').value;
+    const statusEl = document.getElementById('user-creation-status');
+    statusEl.textContent = 'Creazione in corso...';
 
-    } catch (error) {
-        console.error("Errore aggiornamento ruolo:", error);
-        alert(`Impossibile aggiornare il ruolo: ${error.message}`);
+    if (!email || !password || !role) {
+        statusEl.textContent = 'Per favore, compila tutti i campi.';
+        return;
+    }
+
+    const newUser = {
+        email: email,
+        password: password,
+        role: role,
+        name: email.split('@')[0] // Nome Utente di default
+    };
+
+    // 1. Registra l'utente (Backendless gestirà la conferma email se abilitata)
+    Backendless.UserService.register(newUser)
+        .then(user => {
+            statusEl.textContent = `Utente ${email} creato con successo. Il ruolo ${role} è stato assegnato.`;
+            document.getElementById('new-user-email').value = '';
+            document.getElementById('new-user-password').value = '';
+            document.getElementById('new-user-role').value = '';
+            loadUsersAndRoles(); // Aggiorna la lista
+        })
+        .catch(error => {
+            console.error("Errore creazione utente:", error);
+            statusEl.textContent = `ERRORE: Impossibile creare utente: ${error.message}`;
+        });
+}
+
+// --- LOGICA MODALE E POST PRODUCER ---
+
+/**
+ * Mostra la modale con i dettagli e le foto di un ordine.
+ * @param {object} order L'oggetto ordine.
+ */
+function showPhotoModal(order) {
+    const modalContent = document.getElementById('photo-modal-content');
+    const links = order.photoLinks ? order.photoLinks.split('\n').filter(l => l.trim() !== '') : [];
+    
+    if (links.length === 0) {
+        modalContent.innerHTML = `<p class="text-danger">ERRORE: Nessun link alle foto trovato per EAN ${order.eanCode}.</p>`;
+        return;
+    }
+
+    let htmlContent = `
+        <h3 style="color: #007bff;">Revisione EAN: ${order.eanCode}</h3>
+        <p>Cliente: <strong>${order.cliente}</strong></p>
+        <p>Inviato da: ${order.photographerId || 'N/D'}</p>
+        <h4>Immagini da Revisionare:</h4>
+        <div style="max-height: 400px; overflow-y: auto; padding: 10px; border: 1px solid #ccc;">
+    `;
+
+    // Aggiunge le immagini e i link
+    links.forEach(link => {
+        htmlContent += `
+            <div style="margin-bottom: 20px; border-bottom: 1px dashed #eee;">
+                <a href="${link}" target="_blank" style="font-size: 0.9em; display: block; margin-bottom: 10px;">${link}</a>
+                <img src="${link}" onerror="this.onerror=null;this.src='https://placehold.co/300x200/cccccc/333333?text=Anteprima+non+disponibile';" 
+                     style="width: 100%; max-width: 300px; height: auto; border-radius: 4px; display: block; margin-bottom: 10px;">
+            </div>
+        `;
+    });
+    
+    htmlContent += `</div>`;
+
+
+    // Aggiunge i bottoni di azione (solo per Post Producer)
+    if (currentRole === ROLES.POST_PRODUCER) {
+        htmlContent += `
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn-success" onclick="handlePostProducerAction('${order.objectId}', true)">Accetta Lavoro</button>
+                <button class="btn-danger" onclick="handlePostProducerAction('${order.objectId}', false)">Rifiuta e Invia al Fotografo</button>
+            </div>
+        `;
+    }
+
+    modalContent.innerHTML = htmlContent;
+    document.getElementById('photo-modal').style.display = 'block';
+}
+
+/**
+ * Nasconde la modale di visualizzazione foto.
+ */
+function closePhotoModal() {
+    document.getElementById('photo-modal').style.display = 'none';
+    document.getElementById('photo-modal-content').innerHTML = '';
+}
+
+/**
+ * Gestisce l'azione (Accetta/Rifiuta) del Post Producer.
+ * @param {string} objectId L'ID dell'ordine.
+ * @param {boolean} accepted True se accettato, False se rifiutato.
+ */
+function handlePostProducerAction(objectId, accepted) {
+    closePhotoModal(); // Chiude la modale
+    const statusEl = document.getElementById('loading-orders');
+    statusEl.textContent = `Azione Post Producer in corso...`;
+
+    const newStatus = accepted ? WORKFLOW_STATUS.FOTO_ACCETTATE : WORKFLOW_STATUS.FOTO_RIFIUTATE;
+    
+    updateOrderStatus(objectId, newStatus, { postProducerId: currentUser.objectId })
+        .then(() => {
+            let message = accepted ? 
+                "Lavoro Accettato. Workflow completato per questo EAN." : 
+                "Lavoro Rifiutato. EAN rimesso in coda per il Fotografo.";
+                
+            statusEl.textContent = message;
+            loadOrdersForUser(currentRole); // Ricarica la lista
+        })
+        .catch(error => {
+            console.error("Errore nell'azione Post Producer:", error);
+            statusEl.textContent = `ERRORE: Impossibile completare l'azione: ${error.message}`;
+        });
+}
+
+// Collegamento del listener di chiusura modale al click fuori dalla modale
+window.onclick = function(event) {
+    const modal = document.getElementById('photo-modal');
+    if (event.target === modal) {
+        closePhotoModal();
     }
 }
-
-// --- FINE SEZIONE 3 ---
-
-// Note: Aggiungere qui la funzione di registrazione del Service Worker, 
-// se non è già stata inclusa nella prima sezione o nell'ultima versione.
-/*
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/service-worker.js')
-        .then(registration => console.log('Service Worker registrato:', registration.scope))
-        .catch(error => console.error('Service Worker fallito:', error));
-}
-*/
