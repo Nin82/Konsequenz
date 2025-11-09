@@ -385,6 +385,114 @@ function loadOrdersForUser(role) {
     // Logica per caricare ordini in base al ruolo (Photographer: WAITING_PHOTO, PostProducer: WAITING_POST_PRODUCTION)
 }
 
+
+// ----------------------------------------------------
+// FUNZIONE IMPORT EXCEL -> Backendless Orders (con progress bar)
+// ----------------------------------------------------
+
+function handleFileUpload() {
+    const fileInput = document.getElementById('excel-file-input');
+    const statusEl = document.getElementById('import-status');
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        statusEl.textContent = "Seleziona un file Excel prima di procedere.";
+        statusEl.className = 'status-message bg-red-100 text-red-700';
+        statusEl.style.display = 'block';
+        return;
+    }
+
+    const file = fileInput.files[0];
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // Prendi il primo foglio
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        // Converti in JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (!jsonData || jsonData.length === 0) {
+            statusEl.textContent = "File Excel vuoto o non leggibile.";
+            statusEl.className = 'status-message bg-red-100 text-red-700';
+            statusEl.style.display = 'block';
+            return;
+        }
+
+        statusEl.textContent = `Inizio importazione di ${jsonData.length} ordini...`;
+        statusEl.className = 'status-message bg-blue-100 text-blue-700';
+        statusEl.style.display = 'block';
+
+        // Progress bar dinamica
+        let progressBar = document.getElementById('import-progress-bar');
+        if (!progressBar) {
+            progressBar = document.createElement('div');
+            progressBar.id = 'import-progress-bar';
+            progressBar.style.width = '0%';
+            progressBar.style.height = '8px';
+            progressBar.style.backgroundColor = '#10b981'; // verde
+            progressBar.style.borderRadius = '4px';
+            progressBar.style.marginTop = '6px';
+            statusEl.parentNode.insertBefore(progressBar, statusEl.nextSibling);
+        }
+
+        const total = jsonData.length;
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < jsonData.length; i++) {
+            const row = jsonData[i];
+
+            // Crea oggetto per Backendless Orders
+            const orderObj = {
+                productCode: row["Codice Articolo"] || "",
+                eanCode: row["Ean Code"] || "",
+                styleName: row["Style Name"] || "",
+                styleGroup: row["Style Group"] || "",
+                brand: row["Brand"] || "",
+                color: row["Colore"] || "",
+                size: row["Taglia"] || "",
+                category: row["Categoria"] || "",
+                gender: row["Genere"] || "",
+                status: "In attesa foto", // stato iniziale
+                assignedToPhotographerId: "",
+                assignedToPostProducerId: "",
+                lastUpdated: new Date()
+                // puoi aggiungere altri campi step-by-step se necessario
+            };
+
+            try {
+                await Backendless.Data.of("Orders").save(orderObj);
+                successCount++;
+            } catch (err) {
+                console.error("Errore import ordine:", err);
+                failCount++;
+            }
+
+            // Aggiorna progress bar
+            const progress = Math.round(((i + 1) / total) * 100);
+            progressBar.style.width = progress + "%";
+        }
+
+        statusEl.textContent = `Importazione completata: ${successCount} successi, ${failCount} errori.`;
+        statusEl.className = failCount === 0 ? 'status-message bg-green-100 text-green-700' : 'status-message bg-yellow-100 text-yellow-700';
+
+        // Resetta file input
+        fileInput.value = "";
+
+        // Aggiorna lista ordini per il ruolo corrente
+        if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+            loadOrdersForUser(currentRole);
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+
 function confirmEanInput() {
     const ean = document.getElementById('ean-input').value.trim();
     if (ean) {
@@ -468,4 +576,3 @@ window.onload = function() {
             showLoginArea();
         });
 };
-
