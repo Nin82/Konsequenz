@@ -704,7 +704,7 @@ async function loadAllOrdersForAdmin() {
                 <td class="px-4 py-2">${order.styleName || ''}</td>
                 <td class="px-4 py-2">${order.category || ''}</td>
                 <td class="px-4 py-2">
-                    <button onclick="openAdminOrderCard(${JSON.stringify(order).replace(/"/g,'&quot;')})" class="btn-primary px-3 py-1 text-sm">Modifica</button>
+                    <button class="btn-primary px-3 py-1 text-sm" onclick='handleAdminEdit(${JSON.stringify(order).replace(/"/g,'&quot;')})'>Modifica</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -717,6 +717,40 @@ async function loadAllOrdersForAdmin() {
         loadingEl.textContent = "Errore durante il caricamento ordini.";
     }
 }
+
+
+function handleAdminEdit(order) {
+    // 1️⃣ Nascondi lista ordini
+    const ordersCard = document.getElementById('orders-admin-card');
+    if (ordersCard) ordersCard.style.display = 'none';
+
+    // 2️⃣ Popola form/modale con i dati dell'ordine
+    openAdminOrderCard(order);
+
+    // 3️⃣ Override dei pulsanti Salva / Annulla nella modale
+    const saveBtn = document.getElementById('admin-order-save-btn');
+    const cancelBtn = document.getElementById('admin-order-cancel-btn');
+
+    if (saveBtn) {
+        saveBtn.onclick = async () => {
+            await saveAdminOrderChanges(order); // salva le modifiche su Backendless
+            closeAdminEditCard();
+        };
+    }
+
+    if (cancelBtn) {
+        cancelBtn.onclick = () => closeAdminEditCard();
+    }
+}
+
+function closeAdminEditCard() {
+    const ordersCard = document.getElementById('orders-admin-card');
+    if (ordersCard) ordersCard.style.display = 'block';
+
+    // Ricarica la lista ordini admin
+    loadAllOrdersForAdmin();
+}
+
 
 // ----------------------------------------------------
 // FUNZIONI WORKER (DASHBOARD)
@@ -1028,10 +1062,6 @@ function handlePhotoUploadAndCompletion() {
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
-
-
-
-
 
 
 // ----------------------------------------------------
