@@ -339,7 +339,28 @@
   </div>
 </div>
     </div>
-  
+ 
+<!-- LISTA ORDINI ADMIN -->
+<div class="card mt-8">
+  <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Ordini Importati</h3>
+  <p id="loading-admin-orders" class="text-gray-500 p-4">Caricamento ordini...</p>
+  <div class="overflow-x-auto">
+    <table id="admin-orders-table" class="min-w-full divide-y divide-gray-200">
+      <thead>
+        <tr>
+          <th>Codice Articolo</th>
+          <th>EAN</th>
+          <th>Brand</th>
+          <th>Colore</th>
+          <th>Taglia</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+ 
  <!-- DATI PER AMIN -->
 <div id="admin-order-edit-card" class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
   <h3 class="text-2xl font-bold mb-4 text-gray-800">Modifica Ordine: <span id="admin-ean-display"></span></h3>
