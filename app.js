@@ -672,20 +672,23 @@ async function saveEanUpdates() {
  * @param {string} type 'success', 'error', o 'info'.
  */
 function showFeedback(message, type) {
-    const feedbackElement = document.getElementById('operation-feedback');
-    
-    // Rimuove tutte le classi di stato precedenti
-    feedbackElement.classList.remove('status-success', 'status-error', 'status-info', 'status-info');
-    
-    // Imposta il tipo e il testo del messaggio
-    feedbackElement.textContent = message;
-    feedbackElement.classList.add(`status-${type}`);
-    feedbackElement.classList.remove('hidden');
+  const feedbackElement = document.getElementById('operation-feedback');
+  if (!feedbackElement) return console.error("⚠️ Elemento #operation-feedback non trovato.");
 
-    // Nasconde il messaggio dopo 3 secondi
-    setTimeout(() => {
-        feedbackElement.classList.add('hidden');
-    }, 3000); 
+  // Rimuovi tutti gli stili precedenti
+  feedbackElement.classList.remove('status-success', 'status-error', 'status-info', 'hidden');
+
+  // Applica lo stile corretto
+  feedbackElement.textContent = message;
+  feedbackElement.classList.add(`status-${type}`);
+
+  // 🔥 Forza la visibilità
+  feedbackElement.style.display = 'block';
+
+  // Nasconde dopo 3 secondi
+  setTimeout(() => {
+    feedbackElement.style.display = 'none';
+  }, 3000);
 }
 
 /**
