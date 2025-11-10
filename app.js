@@ -989,11 +989,6 @@ function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
 
-
-
-
-
-
 // ----------------------------------------------------
 // GESTIONE INIZIALE
 // ----------------------------------------------------
