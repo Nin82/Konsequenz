@@ -410,10 +410,6 @@ async function handleFileUpload() {
                 assignedToPhotographerId: "",
                 assignedToPostProducerId: "",
                 lastUpdated: new Date()
-		provenienza: document.getElementById('import-field-provenienza').value || "",
-                tipologia: document.getElementById('import-field-tipologia').value || "",
-                ordine: document.getElementById('import-field-ordine').value || "",
-                dataOrdine: document.getElementById('import-field-dataOrdine').value || ""
             };
 
             try {
@@ -433,12 +429,6 @@ async function handleFileUpload() {
         statusEl.className = failCount === 0 ? 'status-message bg-green-100 text-green-700' : 'status-message bg-yellow-100 text-yellow-700';
 
         fileInput.value = "";
-	
-	// Aggiorna lista ordini Admin
-	if (currentRole === ROLES.ADMIN) {
-    	loadAllOrdersForAdmin(); // <-- qui
-	}
-
 
         // Aggiorna griglia ordini worker se necessario
         if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
@@ -576,7 +566,6 @@ async function saveAdminOrderUpdates() {
     }
 }
 
-
 function resetAdminOrderForm() {
     document.getElementById('admin-order-edit-card').classList.add('hidden');
     currentAdminOrder = null;
@@ -587,47 +576,13 @@ function resetAdminOrderForm() {
 }
 
 
-/**
- * Mostra un messaggio di feedback all'admin
- * @param {string} message - Testo del messaggio
- * @param {"success"|"error"|"info"} type - Tipo di messaggio
- * @param {number} duration - Durata in ms prima che scompaia (opzionale, default 4000ms)
- */
-function showAdminFeedback(message, type = "info", duration = 4000) {
-    const feedbackEl = document.getElementById("admin-update-feedback");
-    if (!feedbackEl) return;
-
-    // Rimuove classi esistenti di feedback
-    feedbackEl.classList.remove(
-        "hidden",
-        "bg-green-100", "text-green-700",
-        "bg-red-100", "text-red-700",
-        "bg-blue-100", "text-blue-700"
-    );
-
-    // Aggiunge classe corretta in base al tipo
-    switch (type) {
-        case "success":
-            feedbackEl.classList.add("bg-green-100", "text-green-700");
-            break;
-        case "error":
-            feedbackEl.classList.add("bg-red-100", "text-red-700");
-            break;
-        default:
-            feedbackEl.classList.add("bg-blue-100", "text-blue-700");
-    }
-
-    // Mostra il messaggio
-    feedbackEl.textContent = message;
-    feedbackEl.style.display = "block";
-
-    // Scompare automaticamente dopo 'duration' millisecondi
-    setTimeout(() => {
-        feedbackEl.style.display = "none";
-        feedbackEl.classList.add("hidden");
-        feedbackEl.textContent = "";
-    }, duration);
+function showAdminFeedback(message, type) {
+    const el = document.getElementById('admin-update-feedback');
+    el.textContent = message;
+    el.classList.remove('hidden', 'status-success', 'status-error', 'status-info');
+    el.classList.add(type === "success" ? 'status-success' : type === "error" ? 'status-error' : 'status-info');
 }
+
 
 
 /**
@@ -988,6 +943,11 @@ function handlePhotoUploadAndCompletion() {
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
+
+
+
+
+
 
 // ----------------------------------------------------
 // GESTIONE INIZIALE
