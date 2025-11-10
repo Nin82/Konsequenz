@@ -457,6 +457,8 @@ async function handleFileUpload() {
   reader.readAsArrayBuffer(file);
 }
 
+
+
 /**
  * Mostra la card di modifica ordine per Admin e popola i campi
  * @param {Object} order - Oggetto ordine da Backendless
@@ -518,6 +520,9 @@ function openAdminOrderCard(order) {
     // Salva l'ID dell'ordine corrente per saveAdminOrderUpdates
     currentAdminOrder = order;
 }
+
+
+
 // ----------------------------------------------------
 // FUNZIONI GESTIONE ORDINI (ADMIN)
 // ----------------------------------------------------
@@ -580,6 +585,8 @@ async function saveAdminOrderUpdates() {
         currentAdminOrder = updatedOrder; // aggiorna riferimento
 	await loadAllOrdersForAdmin();// aggiorno maschera di modifica admin
 	highlightUpdatedRow(updatedOrder.objectId);// evidenzia box in verde
+	const ordersCard = document.querySelector('.card.mt-8');
+        if (ordersCard) ordersCard.classList.remove('hidden');
     } catch (err) {
         console.error(err);
         showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
@@ -629,14 +636,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 function resetAdminOrderForm() {
-    document.getElementById('admin-order-edit-card').classList.add('hidden');
+    const editCard = document.getElementById('admin-order-edit-card');
+    const ordersCard = document.querySelector('.card.mt-8'); // la tua card lista ordini
+
+    // Nasconde card modifica
+    editCard.classList.add('hidden');
     currentAdminOrder = null;
 
+    // Mostra di nuovo la lista ordini
+    if (ordersCard) ordersCard.classList.remove('hidden');
+
     // Pulisce tutti i campi
-    const fields = document.querySelectorAll('#admin-order-edit-card input, #admin-order-edit-card textarea, #admin-order-edit-card select');
+    const fields = editCard.querySelectorAll('input, textarea, select');
     fields.forEach(f => f.value = '');
 }
-
 
 function highlightUpdatedRow(objectId) {
     const table = document.getElementById('admin-orders-table');
@@ -1062,6 +1075,10 @@ function handlePhotoUploadAndCompletion() {
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
+
+
+
+
 
 
 // ----------------------------------------------------
