@@ -28,6 +28,8 @@ const ROLES = {
 let currentUser = null;
 let currentRole = null;
 let currentEanInProcess = null;
+let currentAdminOrder = null;
+
 
 // Inizializzazione di Backendless
 Backendless.initApp(APPLICATION_ID, API_KEY);
@@ -169,6 +171,7 @@ function handleLoginSuccess(user) {
                 document.getElementById('admin-dashboard').style.display = 'block';
                 document.getElementById('worker-dashboard').style.display = 'none'; 
                 loadUsersAndRoles(); 
+		loadAllOrdersForAdmin();
             } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
                 document.getElementById('admin-dashboard').style.display = 'none'; 
                 document.getElementById('worker-dashboard').style.display = 'block';
@@ -436,130 +439,198 @@ async function handleFileUpload() {
     reader.readAsArrayBuffer(file);
 }
 
-
-
-
-let currentAdminOrder = null;
-
+/**
+ * Mostra la card di modifica ordine per Admin e popola i campi
+ * @param {Object} order - Oggetto ordine da Backendless
+ */
 function openAdminOrderCard(order) {
-  const card = document.getElementById('admin-order-edit-card');
-  card.style.display = 'block';
-  document.getElementById('admin-ean-display').textContent = order.eanCode || order.productCode;
+    if (!order || !order.eanCode) return;
 
-  // Mappa campi HTML -> Backendless
-  const map = {
-    productCode: 'admin-field-productCode',
-    eanCode: 'admin-field-eanCode',
-    styleName: 'admin-field-styleName',
-    styleGroup: 'admin-field-styleGroup',
-    brand: 'admin-field-brand',
-    color: 'admin-field-color',
-    size: 'admin-field-size',
-    category: 'admin-field-category',
-    gender: 'admin-field-gender',
-    shots: 'admin-field-shots',
-    quantity: 'admin-field-quantity',
-    s1Prog: 'admin-field-s1Prog',
-    s2Prog: 'admin-field-s2Prog',
-    progOnModel: 'admin-field-progOnModel',
-    stillShot: 'admin-field-stillShot',
-    onModelShot: 'admin-field-onModelShot',
-    priority: 'admin-field-priority',
-    s1Stylist: 'admin-field-s1Stylist',
-    s2Stylist: 'admin-field-s2Stylist',
-    provenienza: 'admin-field-provenienza',
-    tipologia: 'admin-field-tipologia',
-    ordine: 'admin-field-ordine',
-    dataOrdine: 'admin-field-dataOrdine',
-    entryDate: 'admin-field-entryDate',
-    exitDate: 'admin-field-exitDate',
-    collo: 'admin-field-collo',
-    dataReso: 'admin-field-dataReso',
-    ddt: 'admin-field-ddt',
-    noteLogistica: 'admin-field-noteLogistica',
-    dataPresaPost: 'admin-field-dataPresaPost',
-    dataConsegnaPost: 'admin-field-dataConsegnaPost',
-    calendario: 'admin-field-calendario',
-    postpresa: 'admin-field-postpresa'
-  };
+    // Mostra la card
+    const card = document.getElementById('admin-order-edit-card');
+    card.classList.remove('hidden');
 
-  for (const key in map) {
-    const el = document.getElementById(map[key]);
-    if (el) el.value = order[key] || '';
-  }
+    // Mostra EAN nell'intestazione
+    document.getElementById('admin-ean-display').textContent = order.eanCode;
 
-  // Salva l'ID dell'ordine corrente per il salvataggio
-  currentAdminOrder = { objectId: order.objectId };
+    // Mappa campi HTML -> proprietà Backendless
+    const map = {
+        "admin-field-productCode": "productCode",
+        "admin-field-eanCode": "eanCode",
+        "admin-field-styleName": "styleName",
+        "admin-field-styleGroup": "styleGroup",
+        "admin-field-brand": "brand",
+        "admin-field-color": "color",
+        "admin-field-size": "size",
+        "admin-field-category": "category",
+        "admin-field-gender": "gender",
+        "admin-field-shots": "shots",
+        "admin-field-quantity": "quantity",
+        "admin-field-s1Prog": "s1Prog",
+        "admin-field-s2Prog": "s2Prog",
+        "admin-field-progOnModel": "progOnModel",
+        "admin-field-stillShot": "stillShot",
+        "admin-field-onModelShot": "onModelShot",
+        "admin-field-priority": "priority",
+        "admin-field-s1Stylist": "s1Stylist",
+        "admin-field-s2Stylist": "s2Stylist",
+        "admin-field-provenienza": "provenienza",
+        "admin-field-tipologia": "tipologia",
+        "admin-field-ordine": "ordine",
+        "admin-field-dataOrdine": "dataOrdine",
+        "admin-field-entryDate": "entryDate",
+        "admin-field-exitDate": "exitDate",
+        "admin-field-collo": "collo",
+        "admin-field-dataReso": "dataReso",
+        "admin-field-ddt": "ddt",
+        "admin-field-noteLogistica": "noteLogistica",
+        "admin-field-dataPresaPost": "dataPresaPost",
+        "admin-field-dataConsegnaPost": "dataConsegnaPost",
+        "admin-field-calendario": "calendario",
+        "admin-field-postpresa": "postPresa"
+    };
+
+    Object.entries(map).forEach(([fieldId, prop]) => {
+        const el = document.getElementById(fieldId);
+        if (el) {
+            el.value = order[prop] || '';
+        }
+    });
+
+    // Salva l'ID dell'ordine corrente per saveAdminOrderUpdates
+    currentAdminOrder = order;
 }
-
 // ----------------------------------------------------
 // FUNZIONI GESTIONE ORDINI (ADMIN)
 // ----------------------------------------------------
 async function saveAdminOrderUpdates() {
-  if (!currentAdminOrder || !currentAdminOrder.objectId) return;
+    if (!currentAdminOrder || !currentAdminOrder.objectId) {
+        showAdminFeedback("⚠️ Nessun ordine selezionato.", "error");
+        return;
+    }
 
-  const updatedOrder = { objectId: currentAdminOrder.objectId };
-  const map = {
-    productCode: 'admin-field-productCode',
-    eanCode: 'admin-field-eanCode',
-    styleName: 'admin-field-styleName',
-    styleGroup: 'admin-field-styleGroup',
-    brand: 'admin-field-brand',
-    color: 'admin-field-color',
-    size: 'admin-field-size',
-    category: 'admin-field-category',
-    gender: 'admin-field-gender',
-    shots: 'admin-field-shots',
-    quantity: 'admin-field-quantity',
-    s1Prog: 'admin-field-s1Prog',
-    s2Prog: 'admin-field-s2Prog',
-    progOnModel: 'admin-field-progOnModel',
-    stillShot: 'admin-field-stillShot',
-    onModelShot: 'admin-field-onModelShot',
-    priority: 'admin-field-priority',
-    s1Stylist: 'admin-field-s1Stylist',
-    s2Stylist: 'admin-field-s2Stylist',
-    provenienza: 'admin-field-provenienza',
-    tipologia: 'admin-field-tipologia',
-    ordine: 'admin-field-ordine',
-    dataOrdine: 'admin-field-dataOrdine',
-    entryDate: 'admin-field-entryDate',
-    exitDate: 'admin-field-exitDate',
-    collo: 'admin-field-collo',
-    dataReso: 'admin-field-dataReso',
-    ddt: 'admin-field-ddt',
-    noteLogistica: 'admin-field-noteLogistica',
-    dataPresaPost: 'admin-field-dataPresaPost',
-    dataConsegnaPost: 'admin-field-dataConsegnaPost',
-    calendario: 'admin-field-calendario',
-    postpresa: 'admin-field-postpresa'
-  };
+    const updatedOrder = { objectId: currentAdminOrder.objectId };
 
-  for (const key in map) {
-    const el = document.getElementById(map[key]);
-    updatedOrder[key] = el ? el.value : '';
-  }
+    // Stessa mappa campi
+    const map = {
+        "admin-field-productCode": "productCode",
+        "admin-field-eanCode": "eanCode",
+        "admin-field-styleName": "styleName",
+        "admin-field-styleGroup": "styleGroup",
+        "admin-field-brand": "brand",
+        "admin-field-color": "color",
+        "admin-field-size": "size",
+        "admin-field-category": "category",
+        "admin-field-gender": "gender",
+        "admin-field-shots": "shots",
+        "admin-field-quantity": "quantity",
+        "admin-field-s1Prog": "s1Prog",
+        "admin-field-s2Prog": "s2Prog",
+        "admin-field-progOnModel": "progOnModel",
+        "admin-field-stillShot": "stillShot",
+        "admin-field-onModelShot": "onModelShot",
+        "admin-field-priority": "priority",
+        "admin-field-s1Stylist": "s1Stylist",
+        "admin-field-s2Stylist": "s2Stylist",
+        "admin-field-provenienza": "provenienza",
+        "admin-field-tipologia": "tipologia",
+        "admin-field-ordine": "ordine",
+        "admin-field-dataOrdine": "dataOrdine",
+        "admin-field-entryDate": "entryDate",
+        "admin-field-exitDate": "exitDate",
+        "admin-field-collo": "collo",
+        "admin-field-dataReso": "dataReso",
+        "admin-field-ddt": "ddt",
+        "admin-field-noteLogistica": "noteLogistica",
+        "admin-field-dataPresaPost": "dataPresaPost",
+        "admin-field-dataConsegnaPost": "dataConsegnaPost",
+        "admin-field-calendario": "calendario",
+        "admin-field-postpresa": "postPresa"
+    };
 
-  updatedOrder.lastUpdated = new Date();
+    Object.entries(map).forEach(([fieldId, prop]) => {
+        const el = document.getElementById(fieldId);
+        if (el) updatedOrder[prop] = el.value.trim();
+    });
 
-  try {
-    await Backendless.Data.of('Orders').save(updatedOrder);
-    document.getElementById('admin-update-feedback').textContent = 'Aggiornamento completato!';
-    document.getElementById('admin-update-feedback').classList.remove('hidden');
-    setTimeout(() => {
-      document.getElementById('admin-update-feedback').classList.add('hidden');
-    }, 3000);
-  } catch (err) {
-    console.error(err);
-    document.getElementById('admin-update-feedback').textContent = 'Errore nel salvataggio.';
-    document.getElementById('admin-update-feedback').classList.remove('hidden');
-  }
+    // Timestamp aggiornamento
+    updatedOrder.lastUpdated = new Date();
+
+    try {
+        await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
+        showAdminFeedback("✅ Aggiornamenti salvati correttamente!", "success");
+        currentAdminOrder = updatedOrder; // aggiorna riferimento
+    } catch (err) {
+        console.error(err);
+        showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
+    }
+}
+
+function resetAdminOrderForm() {
+    document.getElementById('admin-order-edit-card').classList.add('hidden');
+    currentAdminOrder = null;
+
+    // Pulisce tutti i campi
+    const fields = document.querySelectorAll('#admin-order-edit-card input, #admin-order-edit-card textarea, #admin-order-edit-card select');
+    fields.forEach(f => f.value = '');
 }
 
 
-function resetAdminOrderForm() {
-    document.getElementById('admin-order-edit-card').style.display = 'none';
-    currentAdminOrder = null;
+function showAdminFeedback(message, type) {
+    const el = document.getElementById('admin-update-feedback');
+    el.textContent = message;
+    el.classList.remove('hidden', 'status-success', 'status-error', 'status-info');
+    el.classList.add(type === "success" ? 'status-success' : type === "error" ? 'status-error' : 'status-info');
+}
+
+
+
+/**
+ * Carica tutti gli ordini da Backendless e li mostra nella tabella Admin
+ */
+async function loadAllOrdersForAdmin() {
+    const loadingEl = document.getElementById('loading-orders');
+    const table = document.getElementById('admin-orders-table');
+    const tbody = table.querySelector('tbody');
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Modifica';
+    editBtn.className = 'btn-primary py-1 px-2';
+    editBtn.onclick = () => openAdminOrderCard(order);	
+
+    loadingEl.textContent = "Caricamento ordini in corso...";
+    tbody.innerHTML = "";
+    table.classList.add('hidden');
+
+    try {
+        const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find({ sortBy: ['lastUpdated DESC'] });
+
+        if (!orders || orders.length === 0) {
+            loadingEl.textContent = "Nessun ordine trovato.";
+            return;
+        }
+
+        orders.forEach(order => {
+            const tr = document.createElement('tr');
+            tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
+
+            tr.innerHTML = `
+                <td class="px-4 py-2">${order.eanCode || ''}</td>
+                <td class="px-4 py-2">${order.brand || ''}</td>
+                <td class="px-4 py-2">${order.styleName || ''}</td>
+                <td class="px-4 py-2">${order.category || ''}</td>
+                <td class="px-4 py-2">
+                    <button onclick="openAdminOrderCard(${JSON.stringify(order).replace(/"/g,'&quot;')})" class="btn-primary px-3 py-1 text-sm">Modifica</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        loadingEl.style.display = 'none';
+        table.classList.remove('hidden');
+    } catch (err) {
+        console.error(err);
+        loadingEl.textContent = "Errore durante il caricamento ordini.";
+    }
 }
 
 // ----------------------------------------------------
