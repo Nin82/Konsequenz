@@ -337,106 +337,124 @@ function handleUserCreation() {
 // FUNZIONI DI UPLOAD FILE ADMIN
 // ----------------------------------------------------
 async function handleFileUpload() {
-    const fileInput = document.getElementById('excel-file-input');
-    const statusEl = document.getElementById('import-status');
-    const logEl = document.getElementById('import-log');
-    logEl.textContent = '';
-    logEl.style.display = 'none';
+  const fileInput = document.getElementById('excel-file-input');
+  const statusEl = document.getElementById('import-status');
+  const logEl = document.getElementById('import-log');
+  const progressBar = document.getElementById('import-progress-bar');
 
-    if (!fileInput.files || fileInput.files.length === 0) {
-        statusEl.textContent = "Seleziona un file Excel prima di procedere.";
-        statusEl.className = 'status-message bg-red-100 text-red-700';
-        statusEl.style.display = 'block';
-        return;
+  logEl.textContent = '';
+  logEl.style.display = 'none';
+
+  if (!fileInput.files || fileInput.files.length === 0) {
+    statusEl.textContent = "Seleziona un file Excel prima di procedere.";
+    statusEl.className = 'status-message bg-red-100 text-red-700 p-2 rounded';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  // ✅ Leggiamo i valori inseriti dall’admin nei 4 campi
+  const provenienzaVal = document.getElementById('admin-provenienza').value.trim();
+  const tipologiaVal = document.getElementById('admin-tipologia').value.trim();
+  const ordineVal = document.getElementById('admin-ordine').value.trim();
+  const dataOrdineVal = document.getElementById('admin-data-ordine').value;
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+
+  reader.onload = async function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+    if (!jsonData || jsonData.length === 0) {
+      statusEl.textContent = "File Excel vuoto o non leggibile.";
+      statusEl.className = 'status-message bg-red-100 text-red-700 p-2 rounded';
+      statusEl.style.display = 'block';
+      return;
     }
 
-    const file = fileInput.files[0];
-    const reader = new FileReader();
+    statusEl.textContent = `Inizio importazione di ${jsonData.length} ordini...`;
+    statusEl.className = 'status-message bg-blue-100 text-blue-700 p-2 rounded';
+    statusEl.style.display = 'block';
 
-    reader.onload = async function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+    const total = jsonData.length;
+    let successCount = 0;
+    let failCount = 0;
 
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+    for (let i = 0; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      const productCode = row["Codice Articolo"] || "";
 
-        if (!jsonData || jsonData.length === 0) {
-            statusEl.textContent = "File Excel vuoto o non leggibile.";
-            statusEl.className = 'status-message bg-red-100 text-red-700';
-            statusEl.style.display = 'block';
-            return;
-        }
+      // Controllo duplicati
+      const query = Backendless.DataQueryBuilder.create()
+        .setWhereClause(`productCode='${productCode}'`);
+      const duplicates = await Backendless.Data.of("Orders").find(query);
 
-        statusEl.textContent = `Inizio importazione di ${jsonData.length} ordini...`;
-        statusEl.className = 'status-message bg-blue-100 text-blue-700';
-        statusEl.style.display = 'block';
+      if (duplicates.length > 0) {
+        logEl.style.display = 'block';
+        logEl.textContent += `❌ Codice duplicato trovato: ${productCode}\n`;
+        failCount++;
+        const progress = Math.round(((i + 1) / total) * 100);
+        if (progressBar) progressBar.style.width = progress + "%";
+        continue;
+      }
 
-        let progressBar = document.getElementById('import-progress-bar');
-        const total = jsonData.length;
-        let successCount = 0;
-        let failCount = 0;
+      // ✅ Creazione oggetto ordine con campi aggiuntivi
+      const orderObj = {
+        productCode,
+        eanCode: row["Ean Code"] || "",
+        styleName: row["Style Name"] || "",
+        styleGroup: row["Style Group"] || "",
+        brand: row["Brand"] || "",
+        color: row["Colore"] || "",
+        size: row["Taglia"] || "",
+        category: row["Categoria"] || "",
+        gender: row["Genere"] || "",
+        provenienza: provenienzaVal,
+        tipologia: tipologiaVal,
+        ordine: ordineVal,
+        dataOrdine: dataOrdineVal || row["Data Ordine"] || "",
+        status: STATUS_WAITING_PHOTO,
+        assignedToPhotographerId: "",
+        assignedToPostProducerId: "",
+        lastUpdated: new Date()
+      };
 
-        for (let i = 0; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            const productCode = row["Codice Articolo"] || "";
+      try {
+        await Backendless.Data.of("Orders").save(orderObj);
+        successCount++;
+      } catch (err) {
+        console.error("Errore import ordine:", err);
+        failCount++;
+      }
 
-            // Controllo duplicati
-            const query = Backendless.DataQueryBuilder.create()
-                .setWhereClause(`productCode='${productCode}'`);
-            const duplicates = await Backendless.Data.of("Orders").find(query);
+      const progress = Math.round(((i + 1) / total) * 100);
+      if (progressBar) progressBar.style.width = progress + "%";
+    }
 
-            if (duplicates.length > 0) {
-                // Log duplicati
-                logEl.style.display = 'block';
-                logEl.textContent += `❌ Codice duplicato trovato: ${productCode}\n`;
-                failCount++;
-                const progress = Math.round(((i + 1) / total) * 100);
-                if (progressBar) progressBar.style.width = progress + "%";
-                continue; // Salta inserimento duplicato
-            }
+    // ✅ Stato finale
+    statusEl.textContent = `Importazione completata: ${successCount} successi, ${failCount} errori.`;
+    statusEl.className = failCount === 0
+      ? 'status-message bg-green-100 text-green-700 p-2 rounded'
+      : 'status-message bg-yellow-100 text-yellow-700 p-2 rounded';
 
-            const orderObj = {
-                productCode,
-                eanCode: row["Ean Code"] || "",
-                styleName: row["Style Name"] || "",
-                styleGroup: row["Style Group"] || "",
-                brand: row["Brand"] || "",
-                color: row["Colore"] || "",
-                size: row["Taglia"] || "",
-                category: row["Categoria"] || "",
-                gender: row["Genere"] || "",
-                status: STATUS_WAITING_PHOTO,
-                assignedToPhotographerId: "",
-                assignedToPostProducerId: "",
-                lastUpdated: new Date()
-            };
+    fileInput.value = "";
 
-            try {
-                await Backendless.Data.of("Orders").save(orderObj);
-                successCount++;
-            } catch (err) {
-                console.error("Errore import ordine:", err);
-                failCount++;
-            }
+    // ✅ Refresh lista ordini admin
+    if (typeof loadAllOrdersForAdmin === 'function') {
+      loadAllOrdersForAdmin();
+    }
 
-            const progress = Math.round(((i + 1) / total) * 100);
-            if (progressBar) progressBar.style.width = progress + "%";
-        }
+    // ✅ Notifica visiva per admin
+    if (typeof showAdminFeedback === 'function') {
+      showAdminFeedback(`Importazione completata: ${successCount} successi, ${failCount} errori.`);
+    }
+  };
 
-        // Stato finale importazione
-        statusEl.textContent = `Importazione completata: ${successCount} successi, ${failCount} errori.`;
-        statusEl.className = failCount === 0 ? 'status-message bg-green-100 text-green-700' : 'status-message bg-yellow-100 text-yellow-700';
-
-        fileInput.value = "";
-
-        // Aggiorna griglia ordini worker se necessario
-        if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
-            loadOrdersForUser(currentRole);
-        }
-    };
-
-    reader.readAsArrayBuffer(file);
+  reader.readAsArrayBuffer(file);
 }
 
 /**
@@ -576,13 +594,18 @@ function resetAdminOrderForm() {
 }
 
 
-function showAdminFeedback(message, type) {
-    const el = document.getElementById('admin-update-feedback');
-    el.textContent = message;
-    el.classList.remove('hidden', 'status-success', 'status-error', 'status-info');
-    el.classList.add(type === "success" ? 'status-success' : type === "error" ? 'status-error' : 'status-info');
-}
+function showAdminFeedback(message, type = 'info') {
+  const feedbackBox = document.createElement('div');
+  feedbackBox.textContent = message;
+  feedbackBox.className =
+    `fixed bottom-4 right-4 px-4 py-2 rounded shadow-lg text-white z-50 
+    ${type === 'success' ? 'bg-green-600' :
+      type === 'error' ? 'bg-red-600' :
+      'bg-blue-600'}`;
 
+  document.body.appendChild(feedbackBox);
+  setTimeout(() => feedbackBox.remove(), 4000);
+}
 
 
 /**
