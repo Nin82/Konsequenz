@@ -168,26 +168,61 @@
                     </div>
                     
 		    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Ordine</label>
-                        <input type="text" class="border rounded-md p-2" id="field-tipologia" placeholder="n° ordine" />
-                    </div>
+  <label class="text-sm font-medium text-gray-700">Numero Ordine</label>
+  <input type="text" class="border rounded-md p-2" id="field-ordine" placeholder="Inserisci numero ordine" />
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Data Uscita</label>
+  <input type="date" class="border rounded-md p-2" id="field-exit-date" />
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Collo</label>
+  <input type="text" class="border rounded-md p-2" id="field-collo" placeholder="Numero collo" />
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Data Reso</label>
+  <input type="date" class="border rounded-md p-2" id="field-data-reso" />
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Numero DDT</label>
+  <input type="text" class="border rounded-md p-2" id="field-ddt" placeholder="Numero DDT" />
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Note Logistica</label>
+  <textarea class="border rounded-md p-2" id="field-note-logistica" placeholder="Inserisci eventuali note"></textarea>
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Data Presa Post</label>
+  <input type="date" class="border rounded-md p-2" id="field-data-presa-post" />
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Data Consegna Post</label>
+  <input type="date" class="border rounded-md p-2" id="field-data-consegna-post" />
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Calendario</label>
+  <select class="border rounded-md p-2" id="field-calendario">
+    <option value="">Seleziona</option>
+    <option value="S">Sì</option>
+    <option value="N">No</option>
+  </select>
+</div>
+
+<div class="flex flex-col">
+  <label class="text-sm font-medium text-gray-700">Post Presa</label>
+  <input type="text" class="border rounded-md p-2" id="field-postpresa" placeholder="Inserisci info post presa" />
+</div>
 	
                     
 
-
-
-		    <input type="hidden" id="field-ordine" />
-                    <input type="hidden" id="field-data-ordine" />
-                    <input type="hidden" id="field-entry-date" />
-                    <input type="hidden" id="field-exit-date" />
-                    <input type="hidden" id="field-collo" />
-                    <input type="hidden" id="field-data-reso" />
-                    <input type="hidden" id="field-ddt" />
-                    <input type="hidden" id="field-note-logistica" />
-                    <input type="hidden" id="field-data-presa-post" />
-                    <input type="hidden" id="field-data-consegna-post" />
-                    <input type="hidden" id="field-calendario" />
-                    <input type="hidden" id="field-postpresa" />
                 </div>
                 
                 <p id="update-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
