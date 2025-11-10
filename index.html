@@ -234,7 +234,7 @@
                 <input type="file" id="photo-files" multiple accept="image/*" class="w-full mb-4" />
                 <div class="flex space-x-3">
                     <button onclick="handlePhotoUploadAndCompletion()" class="btn-success flex-grow py-2">Upload & Completa</button>
-                    <button onclick="resetEanActionState(true)" class="btn-secondary py-2">Annulla</button>
+                    <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">Annulla</button>
                 </div>
                 <p id="upload-status-message" class="status-message status-success hidden"></p>
             </div>
@@ -540,10 +540,10 @@
 
   </div>
 
-  <div class="mt-4 flex space-x-3">
+<div class="mt-4 flex space-x-3">
     <button onclick="saveAdminOrderUpdates()" class="btn-success py-2 px-4">Salva Aggiornamenti</button>
-    <button onclick="resetAdminOrderForm()" class="btn-secondary py-2 px-4">Annulla</button>
-  </div>
+    <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">Annulla</button>
+</div>
 
   <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
 </div>
