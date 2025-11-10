@@ -575,17 +575,14 @@ async function confirmEanInput() {
 
 // 💾 Salva i dati operativi aggiornati su Backendless
 async function saveEanUpdates() {
-    // ⚠️ Non usiamo più l'elemento statusMsg (update-status) vecchio!
-
-    // Controlla che ci sia un EAN attivo
-    // Usiamo window.currentEanInProcess come nel tuo codice esistente.
-    if (!window.currentEanInProcess || !window.currentEanInProcess.objectId) {
+    // Controlla che ci sia un EAN attivo (ACCESSO DIRETTO ALLA VARIABILE GLOBALE)
+    if (!currentEanInProcess || !currentEanInProcess.objectId) {
         showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
         return;
     }
 
-    const ean = window.currentEanInProcess.ean;
-    const objectId = window.currentEanInProcess.objectId;
+    const ean = currentEanInProcess.ean;
+    const objectId = currentEanInProcess.objectId;
     
     // Mappa campi HTML → colonne Backendless (Mappa dal tuo codice)
     const map = {
@@ -646,9 +643,9 @@ async function saveEanUpdates() {
                 // Estrai la stringa del ruolo
                 const reloadedRole = await getRoleFromUser(updatedUser); 
                 
-                // Aggiorna la variabile globale del ruolo se necessario
-                window.currentRole = reloadedRole; 
-
+                // Aggiorna la variabile globale del ruolo
+                currentRole = reloadedRole; // <--- ACCESSO DIRETTO
+                
                 // Chiama la funzione di caricamento ordini PASSANDO LA STRINGA del ruolo
                 loadOrdersForUser(reloadedRole); 
             } catch (err) {
@@ -664,7 +661,6 @@ async function saveEanUpdates() {
         showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
     }
 }
-
 
 /* ======================================================
    NUOVE UTILITY PER IL FEEDBACK
