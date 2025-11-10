@@ -578,6 +578,7 @@ async function saveEanUpdates() {
     // ⚠️ Non usiamo più l'elemento statusMsg (update-status) vecchio!
 
     // Controlla che ci sia un EAN attivo
+    // Usiamo window.currentEanInProcess come nel tuo codice esistente.
     if (!window.currentEanInProcess || !window.currentEanInProcess.objectId) {
         showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
         return;
@@ -625,6 +626,7 @@ async function saveEanUpdates() {
     updatedOrder.lastUpdated = new Date();
     
     try {
+        // Usa il nuovo sistema di feedback
         showFeedback("⏳ Salvataggio in corso...", 'info');
         
         await Backendless.Data.of("Orders").save(updatedOrder);
@@ -632,23 +634,26 @@ async function saveEanUpdates() {
         // Successo
         showFeedback(`✅ Aggiornamenti per ${ean} salvati correttamente!`, 'success');
         
-        // Ricarica dell'interfaccia dopo 1 secondo per mostrare il messaggio
+        // Ricarica dell'interfaccia dopo 1 secondo
         setTimeout(async () => {
             resetEanActionState(false); 
             
-            // 🔥 SOLUZIONE AL BUG DI CARICAMENTO E RUOLO NON VALIDO 🔥
+            // 🔥 CORREZIONE DEL BUG RUOLO PERDUTO
             try {
                 // Ricarica l'oggetto utente COMPLETO dalla sessione corrente
                 const updatedUser = await Backendless.UserService.getCurrentUser();
                 
-                // Estrai la stringa del ruolo (usa la funzione definita in precedenza nel file)
+                // Estrai la stringa del ruolo
                 const reloadedRole = await getRoleFromUser(updatedUser); 
                 
+                // Aggiorna la variabile globale del ruolo se necessario
+                window.currentRole = reloadedRole; 
+
                 // Chiama la funzione di caricamento ordini PASSANDO LA STRINGA del ruolo
                 loadOrdersForUser(reloadedRole); 
             } catch (err) {
                 console.error("Errore critico nel ricaricare l'utente/ruolo dopo il salvataggio:", err);
-                // Fallback in caso di errore: ricarica con il ruolo globale se ancora valido
+                // Fallback: ricarica con il ruolo globale se ancora valido
                 loadOrdersForUser(currentRole); 
             }
         }, 1000); 
@@ -659,6 +664,7 @@ async function saveEanUpdates() {
         showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
     }
 }
+
 
 /* ======================================================
    NUOVE UTILITY PER IL FEEDBACK
@@ -704,8 +710,6 @@ function resetEanActionState(showCancelFeedback = false) {
         showFeedback("Operazione di aggiornamento annullata.", 'info'); 
     }
 }
-
-
 
 
 function handlePhotoUploadAndCompletion() {
