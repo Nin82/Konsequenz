@@ -283,10 +283,23 @@
     <!-- DASHBOARD ADMIN -->
     <div id="admin-dashboard" class="space-y-8 hidden">
       <h2 class="text-3xl font-bold text-gray-800 mb-6">Pannello Amministratore</h2>
+	<!-- === TOGGLE VISIBILITÀ SEZIONI ADMIN === -->
+         <div class="admin-toggle-controls" style="display:flex; gap:20px; margin-bottom:20px; align-items:center;">
+        <label style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="toggle-users-card" checked>
+        <span>Mostra Gestione Utenti e Ruoli</span>
+        </label>
+
+         <label style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="toggle-import-card" checked>
+        <span>Mostra Importazione Ordini (Excel)</span>
+      </label>
+    </div>		
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         <!-- GESTIONE UTENTI -->
-        <div class="card lg:col-span-2">
+        <div id="card-users" class="card lg:col-span-2">
           <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Gestione Utenti e Ruoli</h3>
 
           <div class="mb-6 p-6 border border-gray-200 rounded-lg bg-gray-50 shadow-inner">
@@ -322,7 +335,7 @@
         </div>
 
         <!-- IMPORTAZIONE ORDINI -->
-<div class="card lg:col-span-1 h-fit">
+<div id="card-import" class="card lg:col-span-1 h-fit">
   <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
   <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.</p>
   
