@@ -578,6 +578,8 @@ async function saveAdminOrderUpdates() {
         await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
         showAdminFeedback("✅ Aggiornamenti salvati correttamente!", "success");
         currentAdminOrder = updatedOrder; // aggiorna riferimento
+	await loadAllOrdersForAdmin();// aggiorno maschera di modifica admin
+	highlightUpdatedRow(updatedOrder.objectId);// evidenzia box in verde
     } catch (err) {
         console.error(err);
         showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
@@ -966,11 +968,6 @@ function handlePhotoUploadAndCompletion() {
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
-
-
-
-
-
 
 // ----------------------------------------------------
 // GESTIONE INIZIALE
