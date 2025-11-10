@@ -442,120 +442,120 @@ async function handleFileUpload() {
 let currentAdminOrder = null;
 
 function openAdminOrderCard(order) {
-    currentAdminOrder = order;
-    document.getElementById('admin-ean-display').textContent = order.eanCode || '';
-    document.getElementById('admin-order-edit-card').style.display = 'block';
+  const card = document.getElementById('admin-order-edit-card');
+  card.style.display = 'block';
+  document.getElementById('admin-ean-display').textContent = order.eanCode || order.productCode;
 
-    const map = {
-        "admin-field-productCode": "productCode",
-        "admin-field-eanCode": "eanCode",
-        "admin-field-styleName": "styleName",
-        "admin-field-styleGroup": "styleGroup",
-        "admin-field-brand": "brand",
-        "admin-field-color": "color",
-        "admin-field-size": "size",
-        "admin-field-category": "category",
-        "admin-field-gender": "gender",
-        "admin-field-shots": "shots",
-        "admin-field-quantity": "quantity",
-        "admin-field-s1Prog": "s1Prog",
-        "admin-field-s2Prog": "s2Prog",
-        "admin-field-progOnModel": "progOnModel",
-        "admin-field-stillShot": "stillShot",
-        "admin-field-onModelShot": "onModelShot",
-        "admin-field-priority": "priority",
-        "admin-field-s1Stylist": "s1Stylist",
-        "admin-field-s2Stylist": "s2Stylist",
-        "admin-field-provenienza": "provenienza",
-        "admin-field-tipologia": "tipologia",
-        "admin-field-ordine": "ordine",
-        "admin-field-dataOrdine": "dataOrdine",
-        "admin-field-entryDate": "entryDate",
-        "admin-field-exitDate": "exitDate",
-        "admin-field-collo": "collo",
-        "admin-field-dataReso": "dataReso",
-        "admin-field-ddt": "ddt",
-        "admin-field-noteLogistica": "noteLogistica",
-        "admin-field-dataPresaPost": "dataPresaPost",
-        "admin-field-dataConsegnaPost": "dataConsegnaPost",
-        "admin-field-calendario": "calendario",
-        "admin-field-postpresa": "postPresa"
-    };
+  // Mappa campi HTML -> Backendless
+  const map = {
+    productCode: 'admin-field-productCode',
+    eanCode: 'admin-field-eanCode',
+    styleName: 'admin-field-styleName',
+    styleGroup: 'admin-field-styleGroup',
+    brand: 'admin-field-brand',
+    color: 'admin-field-color',
+    size: 'admin-field-size',
+    category: 'admin-field-category',
+    gender: 'admin-field-gender',
+    shots: 'admin-field-shots',
+    quantity: 'admin-field-quantity',
+    s1Prog: 'admin-field-s1Prog',
+    s2Prog: 'admin-field-s2Prog',
+    progOnModel: 'admin-field-progOnModel',
+    stillShot: 'admin-field-stillShot',
+    onModelShot: 'admin-field-onModelShot',
+    priority: 'admin-field-priority',
+    s1Stylist: 'admin-field-s1Stylist',
+    s2Stylist: 'admin-field-s2Stylist',
+    provenienza: 'admin-field-provenienza',
+    tipologia: 'admin-field-tipologia',
+    ordine: 'admin-field-ordine',
+    dataOrdine: 'admin-field-dataOrdine',
+    entryDate: 'admin-field-entryDate',
+    exitDate: 'admin-field-exitDate',
+    collo: 'admin-field-collo',
+    dataReso: 'admin-field-dataReso',
+    ddt: 'admin-field-ddt',
+    noteLogistica: 'admin-field-noteLogistica',
+    dataPresaPost: 'admin-field-dataPresaPost',
+    dataConsegnaPost: 'admin-field-dataConsegnaPost',
+    calendario: 'admin-field-calendario',
+    postpresa: 'admin-field-postpresa'
+  };
 
-    Object.entries(map).forEach(([inputId, key]) => {
-        const el = document.getElementById(inputId);
-        if(el) el.value = order[key] || '';
-    });
+  for (const key in map) {
+    const el = document.getElementById(map[key]);
+    if (el) el.value = order[key] || '';
+  }
+
+  // Salva l'ID dell'ordine corrente per il salvataggio
+  currentAdminOrder = { objectId: order.objectId };
 }
 
 // ----------------------------------------------------
 // FUNZIONI GESTIONE ORDINI (ADMIN)
 // ----------------------------------------------------
 async function saveAdminOrderUpdates() {
-    if(!currentAdminOrder || !currentAdminOrder.objectId) return;
+  if (!currentAdminOrder || !currentAdminOrder.objectId) return;
 
-    const objectId = currentAdminOrder.objectId;
-    const updatedOrder = { objectId };
-    
-    const map = {
-        "admin-field-productCode": "productCode",
-        "admin-field-eanCode": "eanCode",
-        "admin-field-styleName": "styleName",
-        "admin-field-styleGroup": "styleGroup",
-        "admin-field-brand": "brand",
-        "admin-field-color": "color",
-        "admin-field-size": "size",
-        "admin-field-category": "category",
-        "admin-field-gender": "gender",
-        "admin-field-shots": "shots",
-        "admin-field-quantity": "quantity",
-        "admin-field-s1Prog": "s1Prog",
-        "admin-field-s2Prog": "s2Prog",
-        "admin-field-progOnModel": "progOnModel",
-        "admin-field-stillShot": "stillShot",
-        "admin-field-onModelShot": "onModelShot",
-        "admin-field-priority": "priority",
-        "admin-field-s1Stylist": "s1Stylist",
-        "admin-field-s2Stylist": "s2Stylist",
-        "admin-field-provenienza": "provenienza",
-        "admin-field-tipologia": "tipologia",
-        "admin-field-ordine": "ordine",
-        "admin-field-dataOrdine": "dataOrdine",
-        "admin-field-entryDate": "entryDate",
-        "admin-field-exitDate": "exitDate",
-        "admin-field-collo": "collo",
-        "admin-field-dataReso": "dataReso",
-        "admin-field-ddt": "ddt",
-        "admin-field-noteLogistica": "noteLogistica",
-        "admin-field-dataPresaPost": "dataPresaPost",
-        "admin-field-dataConsegnaPost": "dataConsegnaPost",
-        "admin-field-calendario": "calendario",
-        "admin-field-postpresa": "postPresa"
-    };
+  const updatedOrder = { objectId: currentAdminOrder.objectId };
+  const map = {
+    productCode: 'admin-field-productCode',
+    eanCode: 'admin-field-eanCode',
+    styleName: 'admin-field-styleName',
+    styleGroup: 'admin-field-styleGroup',
+    brand: 'admin-field-brand',
+    color: 'admin-field-color',
+    size: 'admin-field-size',
+    category: 'admin-field-category',
+    gender: 'admin-field-gender',
+    shots: 'admin-field-shots',
+    quantity: 'admin-field-quantity',
+    s1Prog: 'admin-field-s1Prog',
+    s2Prog: 'admin-field-s2Prog',
+    progOnModel: 'admin-field-progOnModel',
+    stillShot: 'admin-field-stillShot',
+    onModelShot: 'admin-field-onModelShot',
+    priority: 'admin-field-priority',
+    s1Stylist: 'admin-field-s1Stylist',
+    s2Stylist: 'admin-field-s2Stylist',
+    provenienza: 'admin-field-provenienza',
+    tipologia: 'admin-field-tipologia',
+    ordine: 'admin-field-ordine',
+    dataOrdine: 'admin-field-dataOrdine',
+    entryDate: 'admin-field-entryDate',
+    exitDate: 'admin-field-exitDate',
+    collo: 'admin-field-collo',
+    dataReso: 'admin-field-dataReso',
+    ddt: 'admin-field-ddt',
+    noteLogistica: 'admin-field-noteLogistica',
+    dataPresaPost: 'admin-field-dataPresaPost',
+    dataConsegnaPost: 'admin-field-dataConsegnaPost',
+    calendario: 'admin-field-calendario',
+    postpresa: 'admin-field-postpresa'
+  };
 
-    Object.entries(map).forEach(([inputId, key]) => {
-        const el = document.getElementById(inputId);
-        if(el) updatedOrder[key] = el.value.trim();
-    });
+  for (const key in map) {
+    const el = document.getElementById(map[key]);
+    updatedOrder[key] = el ? el.value : '';
+  }
 
-    updatedOrder.lastUpdated = new Date();
+  updatedOrder.lastUpdated = new Date();
 
-    try {
-        await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
-        const feedbackEl = document.getElementById('admin-update-feedback');
-        feedbackEl.textContent = '✅ Aggiornamenti salvati con successo!';
-        feedbackEl.className = 'status-message status-success';
-        feedbackEl.style.display = 'block';
-        setTimeout(() => feedbackEl.style.display='none', 3000);
-        resetAdminOrderForm();
-    } catch(err) {
-        console.error(err);
-        const feedbackEl = document.getElementById('admin-update-feedback');
-        feedbackEl.textContent = '❌ Errore durante il salvataggio: ' + err.message;
-        feedbackEl.className = 'status-message status-error';
-        feedbackEl.style.display = 'block';
-    }
+  try {
+    await Backendless.Data.of('Orders').save(updatedOrder);
+    document.getElementById('admin-update-feedback').textContent = 'Aggiornamento completato!';
+    document.getElementById('admin-update-feedback').classList.remove('hidden');
+    setTimeout(() => {
+      document.getElementById('admin-update-feedback').classList.add('hidden');
+    }, 3000);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('admin-update-feedback').textContent = 'Errore nel salvataggio.';
+    document.getElementById('admin-update-feedback').classList.remove('hidden');
+  }
 }
+
 
 function resetAdminOrderForm() {
     document.getElementById('admin-order-edit-card').style.display = 'none';
