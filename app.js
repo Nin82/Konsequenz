@@ -329,9 +329,16 @@ function handleUserCreation() {
     });
 }
 
-function handleFileUpload() {
+
+// ----------------------------------------------------
+// FUNZIONI DI UPLOAD FILE ADMIN
+// ----------------------------------------------------
+async function handleFileUpload() {
     const fileInput = document.getElementById('excel-file-input');
     const statusEl = document.getElementById('import-status');
+    const logEl = document.getElementById('import-log');
+    logEl.textContent = '';
+    logEl.style.display = 'none';
 
     if (!fileInput.files || fileInput.files.length === 0) {
         statusEl.textContent = "Seleziona un file Excel prima di procedere.";
@@ -342,14 +349,15 @@ function handleFileUpload() {
 
     const file = fileInput.files[0];
     const reader = new FileReader();
+
     reader.onload = async function(e) {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
         if (!jsonData || jsonData.length === 0) {
             statusEl.textContent = "File Excel vuoto o non leggibile.";
             statusEl.className = 'status-message bg-red-100 text-red-700';
@@ -368,8 +376,25 @@ function handleFileUpload() {
 
         for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
+            const productCode = row["Codice Articolo"] || "";
+
+            // Controllo duplicati
+            const query = Backendless.DataQueryBuilder.create()
+                .setWhereClause(`productCode='${productCode}'`);
+            const duplicates = await Backendless.Data.of("Orders").find(query);
+
+            if (duplicates.length > 0) {
+                // Log duplicati
+                logEl.style.display = 'block';
+                logEl.textContent += `❌ Codice duplicato trovato: ${productCode}\n`;
+                failCount++;
+                const progress = Math.round(((i + 1) / total) * 100);
+                if (progressBar) progressBar.style.width = progress + "%";
+                continue; // Salta inserimento duplicato
+            }
+
             const orderObj = {
-                productCode: row["Codice Articolo"] || "",
+                productCode,
                 eanCode: row["Ean Code"] || "",
                 styleName: row["Style Name"] || "",
                 styleGroup: row["Style Group"] || "",
@@ -378,11 +403,12 @@ function handleFileUpload() {
                 size: row["Taglia"] || "",
                 category: row["Categoria"] || "",
                 gender: row["Genere"] || "",
-                status: STATUS_WAITING_PHOTO, // 💡 USA LA NUOVA COSTANTE
+                status: STATUS_WAITING_PHOTO,
                 assignedToPhotographerId: "",
                 assignedToPostProducerId: "",
                 lastUpdated: new Date()
             };
+
             try {
                 await Backendless.Data.of("Orders").save(orderObj);
                 successCount++;
@@ -395,10 +421,13 @@ function handleFileUpload() {
             if (progressBar) progressBar.style.width = progress + "%";
         }
 
+        // Stato finale importazione
         statusEl.textContent = `Importazione completata: ${successCount} successi, ${failCount} errori.`;
         statusEl.className = failCount === 0 ? 'status-message bg-green-100 text-green-700' : 'status-message bg-yellow-100 text-yellow-700';
-        
+
         fileInput.value = "";
+
+        // Aggiorna griglia ordini worker se necessario
         if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
             loadOrdersForUser(currentRole);
         }
@@ -407,6 +436,131 @@ function handleFileUpload() {
     reader.readAsArrayBuffer(file);
 }
 
+
+
+
+let currentAdminOrder = null;
+
+function openAdminOrderCard(order) {
+    currentAdminOrder = order;
+    document.getElementById('admin-ean-display').textContent = order.eanCode || '';
+    document.getElementById('admin-order-edit-card').style.display = 'block';
+
+    const map = {
+        "admin-field-productCode": "productCode",
+        "admin-field-eanCode": "eanCode",
+        "admin-field-styleName": "styleName",
+        "admin-field-styleGroup": "styleGroup",
+        "admin-field-brand": "brand",
+        "admin-field-color": "color",
+        "admin-field-size": "size",
+        "admin-field-category": "category",
+        "admin-field-gender": "gender",
+        "admin-field-shots": "shots",
+        "admin-field-quantity": "quantity",
+        "admin-field-s1Prog": "s1Prog",
+        "admin-field-s2Prog": "s2Prog",
+        "admin-field-progOnModel": "progOnModel",
+        "admin-field-stillShot": "stillShot",
+        "admin-field-onModelShot": "onModelShot",
+        "admin-field-priority": "priority",
+        "admin-field-s1Stylist": "s1Stylist",
+        "admin-field-s2Stylist": "s2Stylist",
+        "admin-field-provenienza": "provenienza",
+        "admin-field-tipologia": "tipologia",
+        "admin-field-ordine": "ordine",
+        "admin-field-dataOrdine": "dataOrdine",
+        "admin-field-entryDate": "entryDate",
+        "admin-field-exitDate": "exitDate",
+        "admin-field-collo": "collo",
+        "admin-field-dataReso": "dataReso",
+        "admin-field-ddt": "ddt",
+        "admin-field-noteLogistica": "noteLogistica",
+        "admin-field-dataPresaPost": "dataPresaPost",
+        "admin-field-dataConsegnaPost": "dataConsegnaPost",
+        "admin-field-calendario": "calendario",
+        "admin-field-postpresa": "postPresa"
+    };
+
+    Object.entries(map).forEach(([inputId, key]) => {
+        const el = document.getElementById(inputId);
+        if(el) el.value = order[key] || '';
+    });
+}
+
+// ----------------------------------------------------
+// FUNZIONI GESTIONE ORDINI (ADMIN)
+// ----------------------------------------------------
+async function saveAdminOrderUpdates() {
+    if(!currentAdminOrder || !currentAdminOrder.objectId) return;
+
+    const objectId = currentAdminOrder.objectId;
+    const updatedOrder = { objectId };
+    
+    const map = {
+        "admin-field-productCode": "productCode",
+        "admin-field-eanCode": "eanCode",
+        "admin-field-styleName": "styleName",
+        "admin-field-styleGroup": "styleGroup",
+        "admin-field-brand": "brand",
+        "admin-field-color": "color",
+        "admin-field-size": "size",
+        "admin-field-category": "category",
+        "admin-field-gender": "gender",
+        "admin-field-shots": "shots",
+        "admin-field-quantity": "quantity",
+        "admin-field-s1Prog": "s1Prog",
+        "admin-field-s2Prog": "s2Prog",
+        "admin-field-progOnModel": "progOnModel",
+        "admin-field-stillShot": "stillShot",
+        "admin-field-onModelShot": "onModelShot",
+        "admin-field-priority": "priority",
+        "admin-field-s1Stylist": "s1Stylist",
+        "admin-field-s2Stylist": "s2Stylist",
+        "admin-field-provenienza": "provenienza",
+        "admin-field-tipologia": "tipologia",
+        "admin-field-ordine": "ordine",
+        "admin-field-dataOrdine": "dataOrdine",
+        "admin-field-entryDate": "entryDate",
+        "admin-field-exitDate": "exitDate",
+        "admin-field-collo": "collo",
+        "admin-field-dataReso": "dataReso",
+        "admin-field-ddt": "ddt",
+        "admin-field-noteLogistica": "noteLogistica",
+        "admin-field-dataPresaPost": "dataPresaPost",
+        "admin-field-dataConsegnaPost": "dataConsegnaPost",
+        "admin-field-calendario": "calendario",
+        "admin-field-postpresa": "postPresa"
+    };
+
+    Object.entries(map).forEach(([inputId, key]) => {
+        const el = document.getElementById(inputId);
+        if(el) updatedOrder[key] = el.value.trim();
+    });
+
+    updatedOrder.lastUpdated = new Date();
+
+    try {
+        await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
+        const feedbackEl = document.getElementById('admin-update-feedback');
+        feedbackEl.textContent = '✅ Aggiornamenti salvati con successo!';
+        feedbackEl.className = 'status-message status-success';
+        feedbackEl.style.display = 'block';
+        setTimeout(() => feedbackEl.style.display='none', 3000);
+        resetAdminOrderForm();
+    } catch(err) {
+        console.error(err);
+        const feedbackEl = document.getElementById('admin-update-feedback');
+        feedbackEl.textContent = '❌ Errore durante il salvataggio: ' + err.message;
+        feedbackEl.className = 'status-message status-error';
+        feedbackEl.style.display = 'block';
+    }
+}
+
+function resetAdminOrderForm() {
+    document.getElementById('admin-order-edit-card').style.display = 'none';
+    currentAdminOrder = null;
+}
 
 // ----------------------------------------------------
 // FUNZIONI WORKER (DASHBOARD)
