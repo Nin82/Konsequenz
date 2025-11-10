@@ -582,11 +582,19 @@ async function saveAdminOrderUpdates() {
     try {
         await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
         showAdminFeedback("✅ Aggiornamenti salvati correttamente!", "success");
-        currentAdminOrder = updatedOrder; // aggiorna riferimento
-	await loadAllOrdersForAdmin();// aggiorno maschera di modifica admin
-	highlightUpdatedRow(updatedOrder.objectId);// evidenzia box in verde
-	const ordersCard = document.querySelector('.card.mt-8');
+        currentAdminOrder = updatedOrder; 
+
+        await loadAllOrdersForAdmin(); // ricarica la lista ordini
+
+        highlightUpdatedRow(updatedOrder.objectId); // evidenzia riga aggiornata
+
+        // Chiudi card modifica e riapri lista ordini
+        const editCard = document.getElementById('admin-order-edit-card');
+        editCard.classList.add('hidden');
+
+        const ordersCard = document.getElementById('orders-admin-card'); 
         if (ordersCard) ordersCard.classList.remove('hidden');
+
     } catch (err) {
         console.error(err);
         showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
@@ -635,9 +643,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
-function resetAdminOrderForm() {
+function cancelAdminOrderEdit() {
     const editCard = document.getElementById('admin-order-edit-card');
-    const ordersCard = document.querySelector('.card.mt-8'); // la tua card lista ordini
+    const ordersCard = document.getElementById('orders-admin-card'); // usa ID sicuro
 
     // Nasconde card modifica
     editCard.classList.add('hidden');
@@ -646,7 +654,7 @@ function resetAdminOrderForm() {
     // Mostra di nuovo la lista ordini
     if (ordersCard) ordersCard.classList.remove('hidden');
 
-    // Pulisce tutti i campi
+    // Pulisce tutti i campi della card di modifica
     const fields = editCard.querySelectorAll('input, textarea, select');
     fields.forEach(f => f.value = '');
 }
