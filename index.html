@@ -339,7 +339,175 @@
   </div>
 </div>
     </div>
+  
+ <!-- DATI PER AMIN -->
+<div id="admin-order-edit-card" class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
+  <h3 class="text-2xl font-bold mb-4 text-gray-800">Modifica Ordine: <span id="admin-ean-display"></span></h3>
+  
+  <div id="admin-order-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <!-- Colonne A–I: import Excel -->
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Codice Articolo</label>
+      <input type="text" id="admin-field-productCode" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">EAN Code</label>
+      <input type="text" id="admin-field-eanCode" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Style Name</label>
+      <input type="text" id="admin-field-styleName" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Style Group</label>
+      <input type="text" id="admin-field-styleGroup" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Brand</label>
+      <input type="text" id="admin-field-brand" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Colore</label>
+      <input type="text" id="admin-field-color" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Taglia</label>
+      <input type="text" id="admin-field-size" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Categoria</label>
+      <input type="text" id="admin-field-category" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Genere</label>
+      <input type="text" id="admin-field-gender" class="border rounded-md p-2" />
+    </div>
+
+    <!-- Colonne successive: compilabili da Admin -->
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">N. Scatti</label>
+      <input type="number" id="admin-field-shots" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Qta</label>
+      <input type="number" id="admin-field-quantity" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">s1-Prog</label>
+      <input type="text" id="admin-field-s1Prog" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">s2-Prog</label>
+      <input type="text" id="admin-field-s2Prog" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Prog. on-m</label>
+      <input type="text" id="admin-field-progOnModel" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Scatto Still (S/N)</label>
+      <select id="admin-field-stillShot" class="border rounded-md p-2">
+        <option value="">Seleziona</option>
+        <option value="S">S</option>
+        <option value="N">N</option>
+      </select>
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Scatto On Model (S/N)</label>
+      <select id="admin-field-onModelShot" class="border rounded-md p-2">
+        <option value="">Seleziona</option>
+        <option value="S">S</option>
+        <option value="N">N</option>
+      </select>
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Priorità</label>
+      <input type="text" id="admin-field-priority" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">s1-Stylist</label>
+      <input type="text" id="admin-field-s1Stylist" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">s2-Stylist</label>
+      <input type="text" id="admin-field-s2Stylist" class="border rounded-md p-2" />
+    </div>
+
+    <!-- Campi Logistica -->
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Provenienza</label>
+      <input type="text" id="admin-field-provenienza" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Tipologia</label>
+      <input type="text" id="admin-field-tipologia" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Numero Ordine</label>
+      <input type="text" id="admin-field-ordine" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Data Ordine</label>
+      <input type="date" id="admin-field-dataOrdine" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Entry Date</label>
+      <input type="date" id="admin-field-entryDate" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Exit Date</label>
+      <input type="date" id="admin-field-exitDate" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Collo</label>
+      <input type="text" id="admin-field-collo" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Data Reso</label>
+      <input type="date" id="admin-field-dataReso" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">DDT N.</label>
+      <input type="text" id="admin-field-ddt" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col col-span-2">
+      <label class="text-sm font-medium text-gray-700">Note Logistica</label>
+      <textarea id="admin-field-noteLogistica" class="border rounded-md p-2"></textarea>
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Data Presa in Carico Post</label>
+      <input type="date" id="admin-field-dataPresaPost" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Data Consegna Post</label>
+      <input type="date" id="admin-field-dataConsegnaPost" class="border rounded-md p-2" />
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Calendario</label>
+      <select id="admin-field-calendario" class="border rounded-md p-2">
+        <option value="">Seleziona</option>
+        <option value="S">Sì</option>
+        <option value="N">No</option>
+      </select>
+    </div>
+    <div class="flex flex-col">
+      <label class="text-sm font-medium text-gray-700">Post-presa in carico</label>
+      <input type="text" id="admin-field-postpresa" class="border rounded-md p-2" />
+    </div>
+
   </div>
+
+  <div class="mt-4 flex space-x-3">
+    <button onclick="saveAdminOrderUpdates()" class="btn-success py-2 px-4">Salva Aggiornamenti</button>
+    <button onclick="resetAdminOrderForm()" class="btn-secondary py-2 px-4">Annulla</button>
+  </div>
+
+  <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
+</div>
+
+
+</div>
 
   <!-- JS principale -->
   <script src="app.js" defer></script>
