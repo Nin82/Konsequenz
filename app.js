@@ -22,6 +22,10 @@ const ROLES = {
     ADMIN: "Admin",
     PHOTOGRAPHER: "Photographer",
     POST_PRODUCER: "PostProducer"
+    MAGAZZINO: "Magazzino",
+    PARTNER: "Partner"
+    FORNITORE: "Fornitore"		
+	
 };
 
 // Variabili globali di stato
@@ -156,23 +160,31 @@ function getRoleFromUser(user) {
 
 function handleLoginSuccess(user) {
     currentUser = user;
-    
+
     getRoleFromUser(user)
         .then(role => {
             currentRole = role;
-            
+
             const displayName = user.name || user.email;
             document.getElementById('worker-name').textContent = displayName;
             document.getElementById('worker-role').textContent = currentRole;
-            
+
             document.getElementById('login-area').style.display = 'none';
 
             if (currentRole === ROLES.ADMIN) {
+                // Dashboard Admin
                 document.getElementById('admin-dashboard').style.display = 'block';
                 document.getElementById('worker-dashboard').style.display = 'none'; 
                 loadUsersAndRoles(); 
-		loadAllOrdersForAdmin();
-            } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+                loadAllOrdersForAdmin();
+            } else if (
+                currentRole === ROLES.PHOTOGRAPHER || 
+                currentRole === ROLES.POST_PRODUCER || 
+                currentRole === ROLES.MAGAZZINO ||
+                currentRole === ROLES.PARTNER ||
+                currentRole === ROLES.FORNITORE
+            ) {
+                // Dashboard Worker generici
                 document.getElementById('admin-dashboard').style.display = 'none'; 
                 document.getElementById('worker-dashboard').style.display = 'block';
                 loadOrdersForUser(currentRole); 
@@ -1087,6 +1099,114 @@ function closePhotoModal() {
 
 
 
+/**
+ * Carica e mostra gli ordini nella card "Riepilogo Ordini" con filtri.
+ * @param {Object} filters - Oggetto contenente i filtri: {status, role, ean}
+ */
+async function loadSummaryOrders(filters = {}) {
+    const tbody = document.getElementById('summary-orders-table').querySelector('tbody');
+    tbody.innerHTML = ''; // svuota la tabella prima di riempirla
+
+    try {
+        // Configurazione della query Backendless
+        let whereClauses = [];
+
+        if (filters.status) {
+            whereClauses.push(`stato = '${filters.status}'`);
+        }
+        if (filters.role) {
+            whereClauses.push(`assegnatoARuolo = '${filters.role}'`);
+        }
+        if (filters.ean) {
+            whereClauses.push(`EAN LIKE '%${filters.ean}%'`);
+        }
+
+        const whereClause = whereClauses.length > 0 ? whereClauses.join(' AND ') : '';
+
+        // Recupero dati da Backendless
+        const result = await Backendless.Data.of("Orders").find({ where: whereClause });
+
+        if (result.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="8" class="text-center py-2">Nessun ordine trovato</td>`;
+            tbody.appendChild(tr);
+            return;
+        }
+
+        // Popola la tabella
+        result.forEach(order => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="border px-2 py-1 text-sm">${order.EAN || ''}</td>
+                <td class="border px-2 py-1 text-sm">${order.codiceArticolo || ''}</td>
+                <td class="border px-2 py-1 text-sm">${order.brand || ''}</td>
+                <td class="border px-2 py-1 text-sm">${order.stile || ''}</td>
+                <td class="border px-2 py-1 text-sm">${order.categoria || ''}</td>
+                <td class="border px-2 py-1 text-sm">${order.genere || ''}</td>
+                <td class="border px-2 py-1 text-sm">${order.stato || ''}</td>
+                <td class="border px-2 py-1 text-sm">${order.assegnatoARuolo || ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+    } catch (error) {
+        console.error("Errore caricamento ordini:", error);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="8" class="text-center py-2 text-red-600">Errore nel caricamento degli ordini</td>`;
+        tbody.appendChild(tr);
+    }
+}
+
+
+function openSummaryOrdersCard() {
+    // 1️⃣ Nasconde tutte le card principali
+    const cards = document.querySelectorAll('.dashboard-card');
+    cards.forEach(card => {
+        card.style.display = 'none';
+    });
+
+    // 2️⃣ Mostra la card riepilogo
+    const summaryCard = document.getElementById('summary-orders-card');
+    if (summaryCard) {
+        summaryCard.style.display = 'block';
+    } else {
+        console.error("Elemento #summary-orders-card non trovato.");
+        return;
+    }
+
+    // 3️⃣ Resetta i filtri
+    const filterStatus = document.getElementById('filter-status');
+    const filterRole = document.getElementById('filter-role');
+    const filterEan = document.getElementById('filter-ean');
+
+    if (filterStatus) filterStatus.value = '';
+    if (filterRole) filterRole.value = '';
+    if (filterEan) filterEan.value = '';
+
+    // 4️⃣ Carica tutti gli ordini senza filtri inizialmente
+    loadSummaryOrders();
+}
+
+// Collega il pulsante alla funzione
+const summaryBtn = document.getElementById('open-summary-btn');
+if (summaryBtn) {
+    summaryBtn.addEventListener('click', openSummaryOrdersCard);
+} else {
+    console.error("Pulsante #open-summary-btn non trovato.");
+}
+
+
+
+// Event listener bottone Riepilogo
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('open-summary-btn').onclick = openSummaryOrdersCard;
+  document.getElementById('apply-filters-btn').onclick = () => {
+    const status = document.getElementById('filter-status').value;
+    const role = document.getElementById('filter-role').value;
+    const ean = document.getElementById('filter-ean').value.trim();
+    loadSummaryOrders({ status, role, ean });
+  };
+});
 
 
 // ----------------------------------------------------
