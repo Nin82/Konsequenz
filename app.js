@@ -586,6 +586,48 @@ async function saveAdminOrderUpdates() {
     }
 }
 
+
+// ----------------------------------------------------
+// FUNZIONI CHIUSURA CARD (ADMIN)
+// ----------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", () => {
+  const toggleUsers = document.getElementById('toggle-users-card');
+  const toggleImport = document.getElementById('toggle-import-card');
+  const usersCard = document.getElementById('card-users');
+  const importCard = document.getElementById('card-import');
+
+  // === Card Gestione Utenti ===
+  if (toggleUsers && usersCard) {
+    const savedUsersVisibility = localStorage.getItem('showUsersCard');
+    if (savedUsersVisibility !== null) {
+      toggleUsers.checked = savedUsersVisibility === 'true';
+      usersCard.style.display = toggleUsers.checked ? 'block' : 'none';
+    }
+
+    toggleUsers.addEventListener('change', () => {
+      usersCard.style.display = toggleUsers.checked ? 'block' : 'none';
+      localStorage.setItem('showUsersCard', toggleUsers.checked);
+    });
+  }
+
+  // === Card Import Excel ===
+  if (toggleImport && importCard) {
+    const savedImportVisibility = localStorage.getItem('showImportCard');
+    if (savedImportVisibility !== null) {
+      toggleImport.checked = savedImportVisibility === 'true';
+      importCard.style.display = toggleImport.checked ? 'block' : 'none';
+    }
+
+    toggleImport.addEventListener('change', () => {
+      importCard.style.display = toggleImport.checked ? 'block' : 'none';
+      localStorage.setItem('showImportCard', toggleImport.checked);
+    });
+  }
+});
+
+
+
 function resetAdminOrderForm() {
     document.getElementById('admin-order-edit-card').classList.add('hidden');
     currentAdminOrder = null;
@@ -594,6 +636,24 @@ function resetAdminOrderForm() {
     const fields = document.querySelectorAll('#admin-order-edit-card input, #admin-order-edit-card textarea, #admin-order-edit-card select');
     fields.forEach(f => f.value = '');
 }
+
+
+function highlightUpdatedRow(objectId) {
+    const table = document.getElementById('admin-orders-table');
+    if (!table) return;
+
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        if (row.dataset.objectid === objectId) {
+            // Effetto flash verde
+            row.style.transition = 'background-color 0.5s ease';
+            row.style.backgroundColor = '#d1fae5'; // verde chiaro Tailwind (emerald-100)
+            setTimeout(() => {
+                row.style.backgroundColor = '';
+            }, 1500);
+        }
+    });
+}	
 
 
 function showAdminFeedback(message, type = 'info') {
@@ -968,6 +1028,11 @@ function handlePhotoUploadAndCompletion() {
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
 }
+
+
+
+
+
 
 // ----------------------------------------------------
 // GESTIONE INIZIALE
