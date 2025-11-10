@@ -325,6 +325,14 @@
 <div class="card lg:col-span-1 h-fit">
   <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
   <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.</p>
+  
+<div class="grid grid-cols-4 gap-2 mb-2">
+  <input type="text" id="admin-provenienza" placeholder="Provenienza" class="border p-1 rounded">
+  <input type="text" id="admin-tipologia" placeholder="Tipologia" class="border p-1 rounded">
+  <input type="text" id="admin-ordine" placeholder="Ordine" class="border p-1 rounded">
+  <input type="date" id="admin-data-ordine" placeholder="Data Ordine" class="border p-1 rounded">
+</div>	
+
   <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white" />
   <button id="import-button" onclick="handleFileUpload()" class="btn-warning w-full py-2 font-medium">Carica e Importa</button>
   <p id="import-status" class="status-message status-success hidden"></p>
