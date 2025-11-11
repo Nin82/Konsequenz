@@ -1221,23 +1221,20 @@ function populateSummaryOrdersTable(orders) {
 function openSummaryOrdersCard() {
     // 1️⃣ Nasconde TUTTI i contenitori principali
     hideAllCards(); 
-	
-    const summaryCard = document.getElementById('summary-orders-card'); 
     
-    // Per un test pulito, assicurati che la dashboard worker/admin sia nascosta
-    const workerDashboard = document.getElementById('worker-dashboard');
-    if (workerDashboard) workerDashboard.style.display = 'none';
-    const adminDashboard = document.getElementById('admin-dashboard');
-    if (adminDashboard) adminDashboard.style.display = 'none';
-
+    // 🛑 AGGIUNTO: Assicuriamo che il contenitore principale sia visibile
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+        mainContent.style.display = 'block'; 
+        mainContent.style.visibility = 'visible'; 
+    }
+    
+    const summaryCard = document.getElementById('summary-orders-card'); 
+    // ... (resto del codice per mostrare la summaryCard)
     if (summaryCard) {
-        summaryCard.classList.remove('hidden'); 
-        // 2️⃣ Usa SOLO 'block' per la visualizzazione corretta
+        // ... (rimozione classe hidden se l'avevi, e style.display = 'block')
         summaryCard.style.display = 'block';
-
-    } else {
-        console.error("Elemento #summary-orders-card non trovato.");
-        return;
+        summaryCard.style.visibility = 'visible';
     }
 
     // 3️⃣ Resetta i filtri e Carica i dati (la tua logica originale)
