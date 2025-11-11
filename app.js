@@ -1161,26 +1161,28 @@ async function loadSummaryOrders(filters = {}) {
 
 
 function openSummaryOrdersCard() {
-    // 1️⃣ Nasconde tutte le card principali (usando la funzione corretta)
-    hideAllCards(); 
+     hideAllCards(); 
 
-    // 2️⃣ Mostra la card riepilogo
-    const summaryCard = document.getElementById('summary-orders-card');
+    const summaryCard = document.getElementById('summary-orders-card'); 
+    
     if (summaryCard) {
         summaryCard.style.display = 'block';
     } else {
-        console.error("Elemento #summary-orders-card non trovato.");
+        console.error("Elemento #summary-orders-card non trovato, verifica l'HTML.");
         return;
     }
 
-    // 3️⃣ Resetta i filtri (logica corretta)
     const filterStatus = document.getElementById('filter-status');
-    // ... (restano invariati)
+    const filterRole = document.getElementById('filter-role');
+    const filterEan = document.getElementById('filter-ean');
 
-    // 4️⃣ Carica tutti gli ordini senza filtri inizialmente (logica corretta)
+    if (filterStatus) filterStatus.value = '';
+    if (filterRole) filterRole.value = '';
+    if (filterEan) filterEan.value = '';
+
+
     loadSummaryOrders();
 }
-
 
 // Collega il pulsante alla funzione
 const summaryBtn = document.getElementById('open-summary-btn');
@@ -1192,18 +1194,16 @@ if (summaryBtn) {
 
 
 function hideAllCards() {
-    // 1. Array di ID di tutte le card visibili (ORA CORRETTO)
     const cardIds = [
-        'login-area', // ✅ FIX: Aggiunta la virgoletta iniziale
+        'login-area', 
         'worker-dashboard',
         'admin-dashboard',
+        'orders-admin-card',
         'admin-order-edit-card',
-        'orders-admin-card', 
-        'summary-orders-card', // ✅ FIX: ID corretto per coerenza
+        'summary-orders-card', 
         'photo-modal'
     ];
 
-    // 2. Iterazione e Nascondi
     cardIds.forEach(id => {
         const card = document.getElementById(id);
         if (card) {
@@ -1211,7 +1211,6 @@ function hideAllCards() {
         }
     });
 }
-
 
 
 // Event listener bottone Riepilogo
