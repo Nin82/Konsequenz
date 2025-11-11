@@ -1245,6 +1245,26 @@ function restoreUserInterface() {
     }
 }
 
+function hideAllCardsExcept(exceptIds = []) {
+    const cardIds = [
+        'login-area',
+        'worker-dashboard',
+        'admin-dashboard',
+        'orders-admin-card',
+        'admin-order-edit-card',
+        'summary-orders-card',
+        'photo-modal',
+        'global-controls'
+    ];
+
+    cardIds.forEach(id => {
+        if (!exceptIds.includes(id)) {
+            const card = document.getElementById(id);
+            if (card) card.style.display = 'none';
+        }
+    });
+}
+
 // Event listener bottone Riepilogo
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('open-summary-btn').onclick = openSummaryOrdersCard;
