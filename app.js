@@ -1217,7 +1217,7 @@ function populateSummaryOrdersTable(orders) {
     summaryTableBody.innerHTML = html;
 }	
 
-function function openSummaryOrdersCard() {
+function openSummaryOrdersCard() {
     // 1️⃣ Nasconde TUTTI i contenitori principali
     hideAllCards(); 
 	
