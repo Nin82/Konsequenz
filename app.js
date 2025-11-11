@@ -136,38 +136,27 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 function hideAllDashboards() {
     document.getElementById('worker-dashboard').style.display = 'none';
     document.getElementById('admin-dashboard').style.display = 'none';
-    document.getElementById('general-orders-view').style.display = 'none';
+    document.getElementById('general-orders-view').classList.add('hidden');
 }
 
 function showGeneralOrdersView() {
-    if (!currentUser) return;
+  console.log("➡️ Apertura vista generale ordini"); // per debug
 
-    // Switch UI
-    hideAllDashboards();
-    document.getElementById('general-orders-view').style.display = 'block';
+  // Nasconde tutte le dashboard
+  hideAllDashboards();
 
-    // Carica i dati (senza filtri iniziali)
-    loadAllOrdersForGeneralView();
+  // Mostra la sezione "Tutti gli ordini"
+  const view = document.getElementById('general-orders-view');
+  if (view) {
+    view.classList.remove('hidden'); // 🔥 mostra la sezione
+  } else {
+    console.error("⚠️ Elemento #general-orders-view non trovato!");
+  }
+
+  // Carica gli ordini completi
+  loadAllOrdersForGeneralView();
 }
 
-function showMainDashboard() {
-    hideAllDashboards();
-    if (currentRole === ROLES.ADMIN) {
-        document.getElementById('admin-dashboard').style.display = 'block';
-        // Usa la tua funzione per ricaricare la dashboard Admin
-        if (typeof loadAllOrdersForAdmin === 'function') {
-            loadAllOrdersForAdmin();
-        }
-    } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
-        document.getElementById('worker-dashboard').style.display = 'block';
-        // Usa la tua funzione per ricaricare la dashboard Worker
-        if (typeof loadOrdersForUser === 'function') {
-             loadOrdersForUser(currentRole);
-        }
-    } else {
-        handleLogout();
-    }
-}
 
 // ====================================================
 // FINE NUOVE FUNZIONI DI NAVIGAZIONE
