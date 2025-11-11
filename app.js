@@ -169,7 +169,11 @@ function handleLoginSuccess(user) {
             document.getElementById('worker-name').textContent = displayName;
             document.getElementById('worker-role').textContent = currentRole;
 
+            // ✅ Nascondi login
             document.getElementById('login-area').style.display = 'none';
+
+            // ✅ Mostra i controlli globali (bottone "Riepilogo Ordini")
+            document.getElementById('global-controls').classList.remove('hidden');
 
             if (currentRole === ROLES.ADMIN) {
                 // Dashboard Admin
@@ -199,7 +203,6 @@ function handleLoginSuccess(user) {
             handleLogout();
         });
 }
-
 // ----------------------------------------------------
 // FUNZIONI ADMIN (DASHBOARD)
 // ----------------------------------------------------
@@ -1165,34 +1168,28 @@ async function loadSummaryOrders(filters = {}) {
  * Avvia il caricamento dei dati di riepilogo.
  */
 function openSummaryOrdersCard() {
-    // 1️⃣ Nasconde tutte le card principali (qui è nascosta anche la dashboard admin/worker)
-    hideAllCards(); 
-	
-       const summaryCard = document.getElementById('summary-orders-card'); 
-    
-    // (Il console.log ha confermato che la card è trovata correttamente)
-    // console.log("Elemento card trovato? ", summaryCard); 
+    console.log("Apertura card riepilogo ordini..."); // debug
 
-    if (summaryCard) {
-        // 🛑 FIX VISIBILITÀ: Rimuove la classe 'hidden' di Tailwind
-        summaryCard.classList.remove('hidden'); 
-        
-        // 2️⃣ Mostra la card riepilogo
-        summaryCard.style.display = 'block';
-    } else {
-        console.error("Elemento #summary-orders-card non trovato. Verificare l'HTML.");
+    // 1️⃣ Nasconde tutto
+    hideAllCards();
+
+    // 2️⃣ Mostra la card riepilogo
+    const summaryCard = document.getElementById('summary-orders-card');
+    if (!summaryCard) {
+        console.error("❌ summary-orders-card non trovato!");
         return;
     }
 
-    // 3️⃣ Resetta i filtri e Carica i dati (la logica è corretta)
-    const filterStatus = document.getElementById('filter-status');
-    const filterRole = document.getElementById('filter-role');
-    const filterEan = document.getElementById('filter-ean');
+    summaryCard.classList.remove('hidden');
+    summaryCard.style.display = 'block';
+    
+    // 3️⃣ Pulisce i filtri
+    ['filter-status', 'filter-role', 'filter-ean'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
 
-    if (filterStatus) filterStatus.value = '';
-    if (filterRole) filterRole.value = '';
-    if (filterEan) filterEan.value = '';
-
+    // 4️⃣ Carica i dati
     loadSummaryOrders();
 }
 
