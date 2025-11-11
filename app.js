@@ -1237,25 +1237,25 @@ function populateSummaryOrdersTable(orders) {
 }	
 
 function openSummaryOrdersCard() {
-    // 1️⃣ Nasconde TUTTI i contenitori principali
+    // 1. Nasconde tutto il resto (ora include la card di riepilogo)
     hideAllCards(); 
-    
-    // 🛑 AGGIUNTO: Assicuriamo che il contenitore principale sia visibile
-    const mainContent = document.getElementById('main-content');
-    if (mainContent) {
-        mainContent.style.display = 'block'; 
-        mainContent.style.visibility = 'visible'; 
-    }
-    
+	
     const summaryCard = document.getElementById('summary-orders-card'); 
-    // ... (resto del codice per mostrare la summaryCard)
+    
     if (summaryCard) {
-        // ... (rimozione classe hidden se l'avevi, e style.display = 'block')
+        // 🛑 L'AZIONE MANCANTE: forzare la visualizzazione
         summaryCard.style.display = 'block';
-        summaryCard.style.visibility = 'visible';
+        summaryCard.classList.remove('hidden'); 
+        
+        // **OPZIONALE MA CONSIGLIATO**: Forza lo z-index
+        summaryCard.style.zIndex = '1000'; 
+        
+    } else {
+        console.error("Elemento #summary-orders-card non trovato. Verificare l'ID nell'HTML.");
+        return;
     }
 
-    // 3️⃣ Resetta i filtri e Carica i dati (la tua logica originale)
+    // 3. Resetta i filtri e Carica i dati
     const filterStatus = document.getElementById('filter-status');
     const filterRole = document.getElementById('filter-role');
     const filterEan = document.getElementById('filter-ean');
@@ -1268,16 +1268,17 @@ function openSummaryOrdersCard() {
 }
 
 function hideAllCards() {
+    // 🛑 RIPRISTINO: L'array completo e stabile
     const cardIds = [
         'login-area',               
         'worker-dashboard',         
         'admin-dashboard',          
-        //'orders-admin-card',        
+        'summary-orders-card',      // DEVE ESSERE QUI per essere nascosta all'avvio!
+        'orders-admin-card',        
         'admin-order-edit-card',    
-        'summary-orders-card'      
-       // 'photo-modal',              
-       // 'global-controls',
-       // 'main-content'
+        'photo-modal',              
+        'global-controls'          
+        // 'main-content' (lascia commentato se non ti ha aiutato)
     ];
     cardIds.forEach(id => {
         const card = document.getElementById(id);
@@ -1285,7 +1286,7 @@ function hideAllCards() {
             // Usa lo stile inline per forzare la chiusura su tutti
             card.style.display = 'none'; 
             // In caso ci sia una classe 'hidden' di Tailwind
-            card.classList.add('hidden'); 
+            card.classList.add('hidden'); 	
         }
     });
 }
