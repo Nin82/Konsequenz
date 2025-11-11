@@ -89,12 +89,32 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // ----------------------------------------------------
 
 function handleStandardLogin(event) {
-  
+    // Gestione del crash 'preventDefault' (che hai risolto)
+    if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault(); 
+    }
     
-    const login = document.getElementById('login').value;
-    const password = document.getElementById('password').value;
+    // 🛑 NUOVA CORREZIONE: VERIFICA L'ESISTENZA DEGLI ELEMENTI
+    const loginElement = document.getElementById('login');
+    const passwordElement = document.getElementById('password');
+
+    // Se uno dei due non esiste, usciamo per evitare il crash
+    if (!loginElement || !passwordElement) {
+        console.error("ERRORE CRITICO: Input 'login' o 'password' non trovati nell'HTML.");
+        return; 
+    }
+
+    const login = loginElement.value;
+    const password = passwordElement.value;
     
-    Backendless.UserService.login(login, password, true) // Passa il token
+    // Controlliamo anche che i campi non siano vuoti prima di chiamare Backendless
+    if (!login || !password) {
+        showLoginArea("Inserisci sia l'email che la password.");
+        return; 
+    }
+
+    // ... (restante LOGICA DI LOGIN)
+    Backendless.UserService.login(login, password, true) 
         .then(user => {
             handleLoginSuccess(user);
         })
@@ -1251,12 +1271,12 @@ function hideAllCards() {
         'login-area',               
         'worker-dashboard',         
         'admin-dashboard',          
-        'orders-admin-card',        
+        //'orders-admin-card',        
         'admin-order-edit-card',    
-        'summary-orders-card',      
-        'photo-modal',              
-        'global-controls',
-        'main-content'
+        'summary-orders-card'      
+       // 'photo-modal',              
+       // 'global-controls',
+       // 'main-content'
     ];
     cardIds.forEach(id => {
         const card = document.getElementById(id);
