@@ -88,21 +88,22 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // AUTENTICAZIONE E GESTIONE UTENTI
 // ----------------------------------------------------
 
-function handleStandardLogin (email, password) {
-    if (!email || !password) {
-        showLoginArea("Per favore, inserisci email e password.");
-        return;
-    }
+// Cerca la tua funzione attuale di login: function [NomeAttuale](event) {...}
+// E rinominala in:
+function handleStandardLogin(event) {
+    event.preventDefault(); // Previeni il ricaricamento della pagina
     
-    document.getElementById('login-status').textContent = "Accesso in corso...";
-    Backendless.UserService.login(email, password, true)
+    // 🛑 AGGIUNGI QUI LA LOGICA DI LOGIN CHE AVEVI PRIMA
+    const login = document.getElementById('login').value;
+    const password = document.getElementById('password').value;
+    
+    Backendless.UserService.login(login, password, true) // Passa il token
         .then(user => {
             handleLoginSuccess(user);
         })
         .catch(error => {
             console.error("Errore di Login:", error);
-            const message = error.message || "Credenziali non valide o errore di sistema.";
-            showLoginArea("Accesso Fallito: " + message);
+            showLoginArea(`Credenziali non valide: ${error.message}`);
         });
 }
 
@@ -1234,7 +1235,7 @@ function openSummaryOrdersCard() {
         // 2️⃣ Usa SOLO 'block' per la visualizzazione corretta
         summaryCard.style.display = 'block';
 
-          } else {
+    } else {
         console.error("Elemento #summary-orders-card non trovato.");
         return;
     }
