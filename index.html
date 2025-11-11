@@ -48,8 +48,6 @@
       <button onclick="handleLogout()" class="btn-danger text-sm py-2 px-3">Logout</button>
     </header>
 
-
-
     <!-- LOGIN AREA -->
     <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
       <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
@@ -62,13 +60,6 @@
       <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Password Dimenticata?</button>
       <p id="login-status" class="status-message status-error hidden"></p>
     </div>
-
-<!-- CONTROLLI GLOBALI (visibili dopo il login) -->
-<div id="global-controls" class="hidden mb-4 text-center">
-  <button id="open-summary-btn" class="btn-primary py-2 px-4">
-    📋 Riepilogo Ordini
-  </button>
-</div>	
 
 <div id="worker-dashboard" class="space-y-8 hidden">
     <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
@@ -320,9 +311,6 @@
                 <option value="" disabled selected>Seleziona Ruolo</option>
                 <option value="Photographer">Photographer</option>
                 <option value="PostProducer">Post Producer</option>
-		<option value="Magazzino">Magazzino</option>
-		<option value="Fornitore">Fornitore</option>
-		<option value="Partner">Partner</option>		
                 <option value="Admin">Admin</option>
               </select>
             </div>
@@ -560,77 +548,9 @@
   <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
 </div>
 
-<!-- ===============================
-     CARD RIEPILOGO ORDINI
-================================= -->
-<div id="summary-orders-card" class="card p-4 bg-white shadow rounded-md">
-  <h2 class="text-xl font-bold mb-4">Riepilogo Ordini</h2>
-
-  <!-- Sezione Filtri -->
-  <div class="filters flex gap-4 mb-4">
-    <div>
-      <label for="filter-status" class="block text-sm font-medium">Stato</label>
-      <select id="filter-status" class="border rounded p-1 text-sm">
-        <option value="">Tutti</option>
-        <option value="In attesa foto">In attesa foto</option>
-        <option value="Fotografia in corso">Fotografia in corso</option>
-        <option value="In attesa post-produzione">In attesa post-produzione</option>
-        <option value="Post-produzione in corso">Post-produzione in corso</option>
-        <option value="Completato">Completato</option>
-        <option value="Rifiutato/Ritorna a foto">Rifiutato/Ritorna a foto</option>
-      </select>
-    </div>
-    <div>
-      <label for="filter-role" class="block text-sm font-medium">Ruolo Assegnato</label>
-      <select id="filter-role" class="border rounded p-1 text-sm">
-        <option value="">Tutti</option>
-        <option value="Photographer">Photographer</option>
-        <option value="PostProducer">PostProducer</option>
-        <option value="Magazzino">Magazzino</option>
-        <option value="Partner">Partner</option>
-        <option value="Fornitore">Fornitore</option>
-      </select>
-    </div>
-    <div>
-      <label for="filter-ean" class="block text-sm font-medium">EAN / Codice Articolo</label>
-      <input type="text" id="filter-ean" class="border rounded p-1 text-sm" placeholder="EAN o codice">
-    </div>
-    <div class="flex items-end">
-      <button id="apply-filters-btn" class="btn-primary text-sm px-3 py-1">Applica Filtri</button>
-    </div>
-  </div>
-
-  <!-- Tabella Ordini -->
-  <div class="overflow-x-auto">
-    <table id="summary-orders-table" class="table-auto w-full border-collapse border border-gray-200">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="border px-2 py-1 text-left text-sm">EAN</th>
-          <th class="border px-2 py-1 text-left text-sm">Codice Articolo</th>
-          <th class="border px-2 py-1 text-left text-sm">Brand</th>
-          <th class="border px-2 py-1 text-left text-sm">Stile</th>
-          <th class="border px-2 py-1 text-left text-sm">Categoria</th>
-          <th class="border px-2 py-1 text-left text-sm">Genere</th>
-          <th class="border px-2 py-1 text-left text-sm">Stato</th>
-          <th class="border px-2 py-1 text-left text-sm">Ruolo</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Le righe saranno generate da loadSummaryOrders(filters) -->
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Pulsante chiusura card -->
-  <div class="mt-4">
-    <button onclick="restoreUserInterface()" class="btn-secondary text-sm px-3 py-1">Chiudi</button>
-  </div>
-</div>
-
-
-
 
 </div>
+
   <!-- JS principale -->
   <script src="app.js" defer></script>
 </body>
