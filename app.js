@@ -1168,25 +1168,43 @@ async function loadSummaryOrders(filters = {}) {
  * Avvia il caricamento dei dati di riepilogo.
  */
 function openSummaryOrdersCard() {
-    // Nascondi tutto tranne la card e i controlli globali
-    hideAllCardsExcept(['summary-orders-card', 'global-controls']);
-
-    const summaryCard = document.getElementById('summary-orders-card');
+    // 1️⃣ Nasconde TUTTI i contenitori principali
+    hideAllCards(); 
+	
+    const summaryCard = document.getElementById('summary-orders-card'); 
+    
     if (summaryCard) {
-        summaryCard.classList.remove('hidden');
+        // Rimuove la classe 'hidden' di Tailwind
+        summaryCard.classList.remove('hidden'); 
+        
+        // 2️⃣ Mostra la card riepilogo
         summaryCard.style.display = 'block';
+
+        // 🛑 NUOVE RIGHE CRITICHE: FORZA LA VISUALIZZAZIONE
+        summaryCard.style.position = 'fixed'; // Usa 'fixed' per coprire anche lo scroll
+        summaryCard.style.top = '50%';        
+        summaryCard.style.left = '50%';
+        summaryCard.style.transform = 'translate(-50%, -50%)'; // Centra
+        summaryCard.style.width = '80%';     // Assicurati che abbia una dimensione
+        summaryCard.style.height = '80%';    // Assicurati che abbia un'altezza
+        summaryCard.style.zIndex = '100';    // Mettila sopra tutto
+
+    } else {
+        console.error("Elemento #summary-orders-card non trovato. Verificare l'HTML.");
+        return;
     }
 
-    // Resetta filtri
-    ['filter-status','filter-role','filter-ean'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
+    // 3️⃣ Resetta i filtri e Carica i dati (la tua logica originale)
+    const filterStatus = document.getElementById('filter-status');
+    const filterRole = document.getElementById('filter-role');
+    const filterEan = document.getElementById('filter-ean');
 
-    // Carica dati
+    if (filterStatus) filterStatus.value = '';
+    if (filterRole) filterRole.value = '';
+    if (filterEan) filterEan.value = '';
+
     loadSummaryOrders();
 }
-
 
 function hideAllCards() {
     const cardIds = [
@@ -1245,25 +1263,6 @@ function restoreUserInterface() {
     }
 }
 
-function hideAllCardsExcept(exceptIds = []) {
-    const cardIds = [
-        'login-area',
-        'worker-dashboard',
-        'admin-dashboard',
-        'orders-admin-card',
-        'admin-order-edit-card',
-        'summary-orders-card',
-        'photo-modal',
-        'global-controls'
-    ];
-
-    cardIds.forEach(id => {
-        if (!exceptIds.includes(id)) {
-            const card = document.getElementById(id);
-            if (card) card.style.display = 'none';
-        }
-    });
-}
 
 // Event listener bottone Riepilogo
 document.addEventListener('DOMContentLoaded', () => {
