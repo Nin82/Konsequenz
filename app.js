@@ -1169,7 +1169,7 @@ function openSummaryOrdersCard() {
     hideAllCards(); 
 
     const summaryCard = document.getElementById('summary-orders-card'); 
-    
+    console.log("Elemento card trovato? ", summaryCard);
     if (summaryCard) {
         // 🛑 FIX VISIBILITÀ: Rimuove la classe 'hidden' di Tailwind
         summaryCard.classList.remove('hidden'); 
