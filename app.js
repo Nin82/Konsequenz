@@ -109,10 +109,20 @@ function handleStandardLogin (email, password) {
 function handleLogout() {
     Backendless.UserService.logout()
         .then(() => {
+            // 🛑 AGGIUNTO: Nasconde tutte le dashboard e le card attive
+            hideAllCards(); 
+            
             currentUser = null;
             currentRole = null;
             currentEanInProcess = null;
+            
+            // Mostra solo l'area di login
             showLoginArea("Logout avvenuto con successo.");
+            
+            // 💡 Aggiungi anche l'aggiornamento dell'header per un'interfaccia pulita
+            document.getElementById('worker-name').textContent = 'Ospite';
+            document.getElementById('worker-role').textContent = 'Non Loggato';
+
         })
         .catch(error => {
             console.error("Errore di Logout:", error);
@@ -1168,49 +1178,32 @@ async function loadSummaryOrders(filters = {}) {
  * Avvia il caricamento dei dati di riepilogo.
  */
 function openSummaryOrdersCard() {
-    // 1️⃣ NASCONDIAMO SOLO LA CLASSE 'hidden' E MOSTRIAMO
-    // Abbiamo rimosso: hideAllCards(); 
+    // 1️⃣ Nascondiamo le dashboard e la login area PRIMA di mostrare la card riepilogo
+    hideAllCards(); 
 	
     const summaryCard = document.getElementById('summary-orders-card'); 
     
-    // Per un test pulito, nascondi esplicitamente gli altri contenitori principali
-    // (Non avendo hideAllCards, devi nascondere almeno l'elemento che la copre,
-    // che è quasi sempre la login-area all'inizio).
-    const loginArea = document.getElementById('login-area');
-    if (loginArea) loginArea.style.display = 'none';
-
-    const workerDashboard = document.getElementById('worker-dashboard');
-    if (workerDashboard) workerDashboard.style.display = 'none';
-
-    const adminDashboard = document.getElementById('admin-dashboard');
-    if (adminDashboard) adminDashboard.style.display = 'none';
-    
-    const globalControls = document.getElementById('global-controls');
-    if (globalControls) globalControls.style.display = 'none';
-
-
     if (summaryCard) {
-        // Rimuove la classe 'hidden' di Tailwind
         summaryCard.classList.remove('hidden'); 
         
-        // 2️⃣ Mostra la card riepilogo
+        // 2️⃣ MANTENIAMO SOLO display: 'block'
         summaryCard.style.display = 'block';
 
-        // Manteniamo la forzatura CSS estrema per assicurarci che appaia
-        summaryCard.style.position = 'fixed'; 
-        summaryCard.style.top = '50%';        
-        summaryCard.style.left = '50%';
-        summaryCard.style.transform = 'translate(-50%, -50%)'; 
-        summaryCard.style.width = '80%';     
-        summaryCard.style.height = '80%';    
-        summaryCard.style.zIndex = '100';    
+        // 🛑 RIMUOVI TUTTE QUESTE RIGHE CHE CAUSAVANO L'ANOMALIA:
+        // summaryCard.style.position = 'fixed'; 
+        // summaryCard.style.top = '50%';        
+        // summaryCard.style.left = '50%';
+        // summaryCard.style.transform = 'translate(-50%, -50%)'; 
+        // summaryCard.style.width = '80%';     
+        // summaryCard.style.height = '80%';    
+        // summaryCard.style.zIndex = '100';    
 
     } else {
-        console.error("Elemento #summary-orders-card non trovato. Verificare l'HTML.");
+        console.error("Elemento #summary-orders-card non trovato.");
         return;
     }
 
-    // 3️⃣ Resetta i filtri e Carica i dati (mantenuti intatti)
+    // 3️⃣ Resetta i filtri e Carica i dati (la tua logica originale)
     const filterStatus = document.getElementById('filter-status');
     const filterRole = document.getElementById('filter-role');
     const filterEan = document.getElementById('filter-ean');
@@ -1223,25 +1216,28 @@ function openSummaryOrdersCard() {
 }
 
 function hideAllCards() {
+    // Lista completa e verificata di TUTTI i contenitori principali e le card
     const cardIds = [
-        //'login-area',               // ✅
-        //'worker-dashboard',         // ✅
-        'admin-dashboard',          // ✅
-        //'orders-admin-card',        // ✅ Se è un contenitore separato
-        //'admin-order-edit-card',    // ✅
-        //'summary-orders-card',      // ✅
-        //'photo-modal',              // ✅
-        //'global-controls'           // 💡 FORSE DA NASCONDERE?
+        'login-area',               // L'area di login
+        'worker-dashboard',         // Dashboard Lavoratori
+        'admin-dashboard',          // Dashboard Admin
+        'orders-admin-card',        // Card Ordini (all'interno di admin-dashboard)
+        'admin-order-edit-card',    // Card Modifica Ordine
+        'summary-orders-card',      // La card di riepilogo (deve essere nascosta)
+        'photo-modal',              // Il modale per le foto
+        'global-controls'           // Il contenitore del bottone "Riepilogo Ordini"
     ];
 
     cardIds.forEach(id => {
         const card = document.getElementById(id);
         if (card) {
-            card.style.display = 'none';
+            // Usa lo stile inline per forzare la chiusura su tutti
+            card.style.display = 'none'; 
+            // In caso ci sia una classe 'hidden' di Tailwind
+            card.classList.add('hidden'); 
         }
     });
 }
-
 
 /**
  * Chiude tutte le card e ripristina la dashboard appropriata 
@@ -1251,17 +1247,25 @@ function restoreUserInterface() {
     // 1. Nasconde TUTTO (incluso il Riepilogo Ordini)
     hideAllCards(); 
 
-    // 2. Determina la dashboard da mostrare
+    // 2. RIPRISTINA IL CONTROLLO GLOBALE (Il bottone Riepilogo Ordini)
+    // 💡 IMPORTANTE: Questo elemento viene nascosto da hideAllCards() e va riattivato.
+    const globalControls = document.getElementById('global-controls');
+    if (globalControls) {
+        globalControls.style.display = 'block';
+    }
+    
+    // 3. Determina la dashboard da mostrare
     
     // Logica Admin
     if (currentRole === ROLES.ADMIN) {
         document.getElementById('admin-dashboard').style.display = 'block';
         // 💡 Assicurati che anche la lista degli ordini sia visibile nella dashboard Admin
         document.getElementById('orders-admin-card').style.display = 'block'; 
-        // Non ricarichiamo i dati qui, assumendo che siano già stati caricati o che vengano ricaricati su bisogno.
+        // Ricarica la lista degli ordini Admin per avere dati freschi
+        loadAdminOrders();
     } 
     
-    // Logica Worker generici
+    // Logica Worker (TUTTI I RUOLI INCLUSI)
     else if (
         currentRole === ROLES.PHOTOGRAPHER || 
         currentRole === ROLES.POST_PRODUCER || 
@@ -1270,15 +1274,15 @@ function restoreUserInterface() {
         currentRole === ROLES.FORNITORE
     ) {
         document.getElementById('worker-dashboard').style.display = 'block';
-        // Non ricarichiamo gli ordini qui, a meno che non sia strettamente necessario
+        // Ricarica la lista degli ordini del Worker per avere dati freschi
+        loadOrders();
     } 
     
-    // Fallback in caso di stato indefinito o errore
+    // Fallback in caso di stato indefinito
     else {
         showLoginArea(); 
     }
 }
-
 
 // Event listener bottone Riepilogo
 document.addEventListener('DOMContentLoaded', () => {
@@ -1326,4 +1330,3 @@ window.onload = function() {
             showLoginArea();
         });
 };
-
