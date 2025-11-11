@@ -1165,28 +1165,26 @@ async function loadSummaryOrders(filters = {}) {
  * Avvia il caricamento dei dati di riepilogo.
  */
 function openSummaryOrdersCard() {
-    // 1️⃣ Nasconde tutto
+    // 1️⃣ Nasconde tutte le card principali (qui è nascosta anche la dashboard admin/worker)
     hideAllCards(); 
 	
-    // 🛑 FIX GENITORE: Mostra il contenitore principale dell'applicazione (SOSTITUISCI 'app-area' con l'ID REALE)
-    document.getElementById('app-area').style.display = 'block'; // O l'ID corretto
+       const summaryCard = document.getElementById('summary-orders-card'); 
     
-    const summaryCard = document.getElementById('summary-orders-card'); 
-    
-    console.log("Elemento card trovato? ", summaryCard); // Risultato: Trovato e corretto
+    // (Il console.log ha confermato che la card è trovata correttamente)
+    // console.log("Elemento card trovato? ", summaryCard); 
 
     if (summaryCard) {
-        // Rimuove la classe 'hidden' di Tailwind
+        // 🛑 FIX VISIBILITÀ: Rimuove la classe 'hidden' di Tailwind
         summaryCard.classList.remove('hidden'); 
         
-        // Mostra la card riepilogo
+        // 2️⃣ Mostra la card riepilogo
         summaryCard.style.display = 'block';
     } else {
         console.error("Elemento #summary-orders-card non trovato. Verificare l'HTML.");
         return;
     }
 
-    // 3️⃣ Resetta i filtri per una visualizzazione pulita all'apertura
+    // 3️⃣ Resetta i filtri e Carica i dati (la logica è corretta)
     const filterStatus = document.getElementById('filter-status');
     const filterRole = document.getElementById('filter-role');
     const filterEan = document.getElementById('filter-ean');
@@ -1195,21 +1193,19 @@ function openSummaryOrdersCard() {
     if (filterRole) filterRole.value = '';
     if (filterEan) filterEan.value = '';
 
-    // 4️⃣ Carica tutti gli ordini senza filtri (chiama la funzione asincrona di caricamento)
-    // Se loadSummaryOrders() è definita altrove (e lo è), va solo chiamata qui:
     loadSummaryOrders();
 }
 
-
 function hideAllCards() {
     const cardIds = [
-        'login-area', 
-        'worker-dashboard',
-        'admin-dashboard',
-        'orders-admin-card',
-        'admin-order-edit-card',
-        'summary-orders-card', 
-        'photo-modal'
+        'login-area',               // ✅
+        'worker-dashboard',         // ✅
+        'admin-dashboard',          // ✅
+        'orders-admin-card',        // ✅ Se è un contenitore separato
+        'admin-order-edit-card',    // ✅
+        'summary-orders-card',      // ✅
+        'photo-modal',              // ✅
+        'global-controls'           // 💡 FORSE DA NASCONDERE?
     ];
 
     cardIds.forEach(id => {
