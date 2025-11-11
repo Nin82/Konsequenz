@@ -15,7 +15,7 @@
   <!-- SheetJS per Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- CSS Personalizzato ---->
+  <!-- CSS Personalizzato -->
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -63,13 +63,12 @@
       <p id="login-status" class="status-message status-error hidden"></p>
     </div>
 
-
-<div id="global-controls" class="mb-4">
+<!-- CONTROLLI GLOBALI (visibili dopo il login) -->
+<div id="global-controls" class="hidden mb-4 text-center">
   <button id="open-summary-btn" class="btn-primary py-2 px-4">
-    Riepilogo Ordini
+    📋 Riepilogo Ordini
   </button>
-</div>
-
+</div>	
 
 <div id="worker-dashboard" class="space-y-8 hidden">
     <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
@@ -613,7 +612,7 @@
           <th class="border px-2 py-1 text-left text-sm">Categoria</th>
           <th class="border px-2 py-1 text-left text-sm">Genere</th>
           <th class="border px-2 py-1 text-left text-sm">Stato</th>
-          <th class="border px-2 py-1 text-left text-sm">Assegnato a</th>
+          <th class="border px-2 py-1 text-left text-sm">Ruolo</th>
         </tr>
       </thead>
       <tbody>
@@ -636,4 +635,3 @@
   <script src="app.js" defer></script>
 </body>
 </html>
-
