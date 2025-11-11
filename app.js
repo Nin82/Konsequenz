@@ -134,9 +134,11 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // ====================================================
 
 function hideAllDashboards() {
-    document.getElementById('worker-dashboard').classList.add('hidden');
-    document.getElementById('admin-dashboard').classList.add('hidden');
-    document.getElementById('general-orders-view').classList.add('hidden');
+    const dashboards = ['worker-dashboard', 'admin-dashboard', 'general-orders-view'];
+    dashboards.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.classList.add('hidden');
+    });
 }
 
 function showGeneralOrdersView() {
@@ -164,19 +166,21 @@ function showGeneralOrdersView() {
 
 function showMainDashboard() {
     hideAllDashboards();
-    document.getElementById('worker-dashboard').classList.remove('hidden');
+    const el = document.getElementById('worker-dashboard');
+    if(el) el.classList.remove('hidden');
 }
 
 function showAdminDashboard() {
     hideAllDashboards();
-    document.getElementById('admin-dashboard').classList.remove('hidden');
+    const el = document.getElementById('admin-dashboard');
+    if(el) el.classList.remove('hidden');
 }
 
 function showGeneralOrdersView() {
     console.log("➡️ Apertura vista generale ordini");
     hideAllDashboards();
-    const view = document.getElementById('general-orders-view');
-    if (view) view.classList.remove('hidden');
+    const el = document.getElementById('general-orders-view');
+    if(el) el.classList.remove('hidden');
     loadAllOrdersForGeneralView();
 }
 
@@ -208,11 +212,15 @@ function handleLogout() {
             currentUser = null;
             currentRole = null;
             currentEanInProcess = null;
-            
-            // AGGIUNTA PER NASCONDERE LA VISTA E IL PULSANTE DELLA TAB GENERALE
-            document.getElementById('general-orders-view').style.display = 'none';
-            document.getElementById('show-general-orders-btn').classList.add('hidden');
-            
+
+            // NASCONDI TUTTE LE DASHBOARD
+            hideAllDashboards();
+
+            // NASCONDI PULSANTE "Tutti gli Ordini"
+            const generalOrdersBtn = document.getElementById('show-general-orders-btn');
+            if (generalOrdersBtn) generalOrdersBtn.classList.add('hidden');
+
+            // MOSTRA AREA LOGIN CON MESSAGGIO
             showLoginArea("Logout avvenuto con successo.");
         })
         .catch(error => {
@@ -966,7 +974,7 @@ async function confirmEanInput() {
     scanStatus.className = "status-message status-error";
     scanStatus.classList.remove("hidden");
     actionsArea.classList.add("hidden");
-    photoUploadArea.style.display = 'none';
+    photoUploadArea.classList.add("hidden");
     return;
   }
 
@@ -984,7 +992,7 @@ async function confirmEanInput() {
       scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
       scanStatus.className = "status-message status-error";
       actionsArea.classList.add("hidden");
-      photoUploadArea.style.display = 'none';
+      photoUploadArea.classList.add("hidden");
       return;
     }
 
@@ -993,14 +1001,13 @@ async function confirmEanInput() {
     scanStatus.className = "status-message status-success";
     
     actionsArea.classList.remove("hidden");
+    photoUploadArea.classList.add("hidden"); // default hidden
     if (currentEanDisplay) currentEanDisplay.textContent = eanInput; 
 
     if (currentRole === ROLES.PHOTOGRAPHER) {
-        photoUploadArea.style.display = 'block';
+        photoUploadArea.classList.remove("hidden");
         const uploadEanDisplay = document.getElementById("current-ean-display-upload");
         if(uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
-    } else {
-        photoUploadArea.style.display = 'none';
     }
 
     const map = {
@@ -1040,7 +1047,7 @@ async function confirmEanInput() {
     scanStatus.textContent = "Errore durante la verifica EAN.";
     scanStatus.className = "status-message status-error";
     actionsArea.classList.add("hidden");
-    photoUploadArea.style.display = 'none';
+    photoUploadArea.classList.add("hidden");
   }
 }
 
@@ -1167,7 +1174,7 @@ function showFeedback(message, type) {
  * @param {boolean} showCancelFeedback Se true, mostra un messaggio di annullamento.
  */
 function resetEanActionState(showCancelFeedback = false) {
-    // 1. Nasconde/mostra gli elementi
+    // 1. Nasconde/mostra gli elementi tramite classi
     document.getElementById('ean-actions-area').classList.add('hidden');
     document.getElementById('photo-upload-area').classList.add('hidden');
     document.getElementById('confirm-ean-btn').classList.remove('hidden');
@@ -1180,7 +1187,6 @@ function resetEanActionState(showCancelFeedback = false) {
         showFeedback("Operazione di aggiornamento annullata.", 'info'); 
     }
 }
-
 
 function handlePhotoUploadAndCompletion() {
     alert("Funzione di upload non ancora implementata!");
@@ -1195,15 +1201,17 @@ function closePhotoModal() {
 // FUNZIONI GESTIONE ORDINI (GENERALE/FILTRI)
 // ----------------------------------------------------
 
+
 async function loadAllOrdersForGeneralView(whereClause = "") {
     const loadingEl = document.getElementById('loading-general-orders');
-    loadingEl.textContent = "Caricamento lista completa ordini...";
-    loadingEl.style.display = 'block';
-    
-    // Popola il filtro stati
+    if(loadingEl) {
+        loadingEl.textContent = "Caricamento lista completa ordini...";
+        loadingEl.classList.remove('hidden');
+    }
+
+    // Popola il filtro stati se non è già popolato
     const statusFilter = document.getElementById('filter-status');
-    if (statusFilter.options.length <= 1) { 
-        // Pulisce e aggiunge tutti gli stati possibili
+    if(statusFilter && statusFilter.options.length <= 1) { 
         Object.entries(STATUS).forEach(([key, value]) => {
             const option = document.createElement('option');
             option.value = value;
@@ -1224,13 +1232,16 @@ async function loadAllOrdersForGeneralView(whereClause = "") {
     try {
         const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder);
         renderGeneralOrdersTable(orders);
-        loadingEl.style.display = 'none';
+        if(loadingEl) loadingEl.classList.add('hidden');
     } catch (error) {
         console.error("ERRORE CRITICO in loadAllOrdersForGeneralView:", error);
-        loadingEl.textContent = `ERRORE: Impossibile caricare gli ordini. (Errore: ${error.message}).`;
-        loadingEl.style.color = '#dc2626';
+        if(loadingEl) {
+            loadingEl.textContent = `ERRORE: Impossibile caricare gli ordini. (Errore: ${error.message})`;
+            loadingEl.style.color = '#dc2626';
+        }
     }
 }
+
 
 function applyGeneralOrdersFilters() {
     const eanFilter = document.getElementById('filter-ean').value.trim();
