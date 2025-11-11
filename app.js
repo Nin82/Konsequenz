@@ -188,50 +188,46 @@ function getRoleFromUser(user) {
 }
 
 function handleLoginSuccess(user) {
+    // 1. Aggiorna sidebar
+    document.getElementById('worker-name').textContent = user.name || user.email;
+    document.getElementById('worker-role').textContent = user.role;
+    
+    // 2. Mostra i controlli globali (Bottone Riepilogo Ordini)
+    document.getElementById('global-controls').style.display = 'block';
+
     currentUser = user;
+    currentRole = user.role; 
 
-    getRoleFromUser(user)
-        .then(role => {
-            currentRole = role;
+    // 3. LOGICA DASHBOARD
+    if (currentRole === ROLES.ADMIN) {
+        // Chiude tutto e apre solo l'admin-dashboard
+        showCard('admin-dashboard'); 
+        
+        // La lista degli ordini Admin è spesso un elemento separato che va riattivato
+        const ordersAdminCard = document.getElementById('orders-admin-card');
+        if (ordersAdminCard) {
+            ordersAdminCard.style.display = 'block';
+            ordersAdminCard.classList.remove('hidden');
+        }
 
-            const displayName = user.name || user.email;
-            document.getElementById('worker-name').textContent = displayName;
-            document.getElementById('worker-role').textContent = currentRole;
-
-            // ✅ Nascondi login
-            document.getElementById('login-area').style.display = 'none';
-
-            // ✅ Mostra i controlli globali (bottone "Riepilogo Ordini")
-            document.getElementById('global-controls').classList.remove('hidden');
-
-            if (currentRole === ROLES.ADMIN) {
-                // Dashboard Admin
-                document.getElementById('admin-dashboard').style.display = 'block';
-                document.getElementById('worker-dashboard').style.display = 'none'; 
-                loadUsersAndRoles(); 
-                loadAllOrdersForAdmin();
-            } else if (
-                currentRole === ROLES.PHOTOGRAPHER || 
-                currentRole === ROLES.POST_PRODUCER || 
-                currentRole === ROLES.MAGAZZINO ||
-                currentRole === ROLES.PARTNER ||
-                currentRole === ROLES.FORNITORE
-            ) {
-                // Dashboard Worker generici
-                document.getElementById('admin-dashboard').style.display = 'none'; 
-                document.getElementById('worker-dashboard').style.display = 'block';
-                loadOrdersForUser(currentRole); 
-            } else {
-                showLoginArea("Ruolo utente non autorizzato o non definito.");
-                handleLogout();
-            }
-        })
-        .catch(error => {
-            console.error("Errore critico durante la gestione del ruolo:", error);
-            showLoginArea(`Errore nella verifica del ruolo: ${error.message}`);
-            handleLogout();
-        });
+        loadAdminOrders();
+        
+    } else if (
+        currentRole === ROLES.PHOTOGRAPHER || 
+        currentRole === ROLES.POST_PRODUCER || 
+        currentRole === ROLES.MAGAZZINO ||
+        currentRole === ROLES.PARTNER ||
+        currentRole === ROLES.FORNITORE
+    ) {
+        // Chiude tutto e apre solo la worker-dashboard
+        showCard('worker-dashboard'); 
+        loadOrders();
+        
+    } else {
+        showLoginArea("Ruolo non riconosciuto. Accesso negato.");
+    }
 }
+
 // ----------------------------------------------------
 // FUNZIONI ADMIN (DASHBOARD)
 // ----------------------------------------------------
@@ -1237,25 +1233,10 @@ function populateSummaryOrdersTable(orders) {
 }	
 
 function openSummaryOrdersCard() {
-    // 1. Nasconde tutto il resto (ora include la card di riepilogo)
-    hideAllCards(); 
+    // 🛑 Chiude TUTTO e apre solo la card di riepilogo ordini
+    showCard('summary-orders-card'); 
 	
-    const summaryCard = document.getElementById('summary-orders-card'); 
-    
-    if (summaryCard) {
-        // 🛑 L'AZIONE MANCANTE: forzare la visualizzazione
-        summaryCard.style.display = 'block';
-        summaryCard.classList.remove('hidden'); 
-        
-        // **OPZIONALE MA CONSIGLIATO**: Forza lo z-index
-        summaryCard.style.zIndex = '1000'; 
-        
-    } else {
-        console.error("Elemento #summary-orders-card non trovato. Verificare l'ID nell'HTML.");
-        return;
-    }
-
-    // 3. Resetta i filtri e Carica i dati
+    // ... (Logica dei filtri e loadSummaryOrders())
     const filterStatus = document.getElementById('filter-status');
     const filterRole = document.getElementById('filter-role');
     const filterEan = document.getElementById('filter-ean');
@@ -1267,71 +1248,81 @@ function openSummaryOrdersCard() {
     loadSummaryOrders();
 }
 
-function hideAllCards() {
-    // 🛑 RIPRISTINO: L'array completo e stabile
-    const cardIds = [
-        'login-area',               
-        'worker-dashboard',         
-        'admin-dashboard',          
-        'summary-orders-card',      // DEVE ESSERE QUI per essere nascosta all'avvio!
-        'orders-admin-card',        
-        'admin-order-edit-card',    
-        'photo-modal',              
-        'global-controls'          
-        // 'main-content' (lascia commentato se non ti ha aiutato)
+/**
+ * Nasconde tutti i contenitori principali e mostra solo la card specificata.
+ * Questa funzione sostituisce la logica buggata di hideAllCards().
+ * @param {string} cardId - L'ID dell'elemento da mostrare (es. 'admin-dashboard').
+ */
+function showCard(cardId) {
+    // Lista completa di tutti i contenitori che DEVONO essere chiusi
+    const allContainers = [
+        'login-area',
+        'worker-dashboard',
+        'admin-dashboard',
+        'summary-orders-card',
+        'admin-order-edit-card',
+        'photo-modal',
+        'orders-admin-card' // La lista ordini dentro l'admin dashboard
+        // I contenitori globali come 'global-controls' o 'main-content' li gestiamo separatamente
     ];
-    cardIds.forEach(id => {
+
+    allContainers.forEach(id => {
         const card = document.getElementById(id);
         if (card) {
-            // Usa lo stile inline per forzare la chiusura su tutti
-            card.style.display = 'none'; 
-            // In caso ci sia una classe 'hidden' di Tailwind
-            card.classList.add('hidden'); 	
+            card.style.display = 'none';
+            card.classList.add('hidden'); 
         }
     });
+    
+    // Mostra la card richiesta
+    const cardToShow = document.getElementById(cardId);
+    if (cardToShow) {
+        cardToShow.style.display = 'block';
+        cardToShow.classList.remove('hidden');
+        cardToShow.style.zIndex = '1'; // Resetta lo z-index se necessario
+    }
 }
 
 /**
  * Chiude tutte le card e ripristina la dashboard appropriata 
  * in base al ruolo dell'utente loggato (currentRole).
  */
-function restoreUserInterface() {
-    // 1. Nasconde TUTTO (incluso il Riepilogo Ordini)
-    hideAllCards(); 
 
-    // 2. RIPRISTINA IL CONTROLLO GLOBALE (Il bottone Riepilogo Ordini)
-    // 💡 IMPORTANTE: Questo elemento viene nascosto da hideAllCards() e va riattivato.
+function restoreUserInterface() {
+    
+    // 1. Mostra i controlli globali (bottone Riepilogo Ordini)
     const globalControls = document.getElementById('global-controls');
     if (globalControls) {
         globalControls.style.display = 'block';
     }
     
-    // 3. Determina la dashboard da mostrare
-    
-    // Logica Admin
+    // 2. LOGICA DASHBOARD DI RITORNO
     if (currentRole === ROLES.ADMIN) {
-        document.getElementById('admin-dashboard').style.display = 'block';
-        // 💡 Assicurati che anche la lista degli ordini sia visibile nella dashboard Admin
-        document.getElementById('orders-admin-card').style.display = 'block'; 
-        // Ricarica la lista degli ordini Admin per avere dati freschi
-        loadAdminOrders();
-    } 
-    
-    // Logica Worker (TUTTI I RUOLI INCLUSI)
-    else if (
+        // Chiude tutto e apre solo l'admin-dashboard
+        showCard('admin-dashboard');
+        
+        // Rende visibile la lista ordini Admin nascosta da showCard
+        const ordersAdminCard = document.getElementById('orders-admin-card');
+        if (ordersAdminCard) {
+            ordersAdminCard.style.display = 'block';
+            ordersAdminCard.classList.remove('hidden');
+        }
+        
+        loadAdminOrders(); 
+        
+    } else if (
         currentRole === ROLES.PHOTOGRAPHER || 
         currentRole === ROLES.POST_PRODUCER || 
         currentRole === ROLES.MAGAZZINO ||
         currentRole === ROLES.PARTNER ||
         currentRole === ROLES.FORNITORE
     ) {
-        document.getElementById('worker-dashboard').style.display = 'block';
-        // Ricarica la lista degli ordini del Worker per avere dati freschi
+        // Chiude tutto e apre solo la worker-dashboard
+        showCard('worker-dashboard'); 
         loadOrders();
-    } 
-    
-    // Fallback in caso di stato indefinito
-    else {
+        
+    } else {
+        // Fallback al login
         showLoginArea(); 
     }
 }
