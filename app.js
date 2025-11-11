@@ -88,12 +88,9 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // AUTENTICAZIONE E GESTIONE UTENTI
 // ----------------------------------------------------
 
-// Cerca la tua funzione attuale di login: function [NomeAttuale](event) {...}
-// E rinominala in:
 function handleStandardLogin(event) {
-    event.preventDefault(); // Previeni il ricaricamento della pagina
+  
     
-    // 🛑 AGGIUNGI QUI LA LOGICA DI LOGIN CHE AVEVI PRIMA
     const login = document.getElementById('login').value;
     const password = document.getElementById('password').value;
     
@@ -1250,18 +1247,17 @@ function openSummaryOrdersCard() {
 }
 
 function hideAllCards() {
-    // Lista completa e verificata di TUTTI i contenitori principali e le card
     const cardIds = [
-        'login-area',               // L'area di login
-        'worker-dashboard',         // Dashboard Lavoratori
-        'admin-dashboard',          // Dashboard Admin
-        'orders-admin-card',        // Card Ordini (all'interno di admin-dashboard)
-        'admin-order-edit-card',    // Card Modifica Ordine
-        'summary-orders-card',      // La card di riepilogo (deve essere nascosta)
-        'photo-modal',              // Il modale per le foto
-        'global-controls'           // Il contenitore del bottone "Riepilogo Ordini"
+        'login-area',               
+        'worker-dashboard',         
+        'admin-dashboard',          
+        'orders-admin-card',        
+        'admin-order-edit-card',    
+        'summary-orders-card',      
+        'photo-modal',              
+        'global-controls',
+        'main-content'
     ];
-
     cardIds.forEach(id => {
         const card = document.getElementById(id);
         if (card) {
