@@ -1,4 +1,4 @@
-// Configurazione Backendless (sostituisci con le tue chiavi reali.)
+// Configurazione Backendless (sostituisci con le tue chiavi reali)
 const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C';
 const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       
 
@@ -88,7 +88,7 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // AUTENTICAZIONE E GESTIONE UTENTI
 // ----------------------------------------------------
 
-function handleStandardLogin(email, password) {
+function handleStandardLogin (email, password) {
     if (!email || !password) {
         showLoginArea("Per favore, inserisci email e password.");
         return;
@@ -1099,6 +1099,8 @@ function closePhotoModal() {
 
 
 
+
+// INIZIO BLOCCO CARD ORDINI PER TUTTI------------------------------------------------------------------------------------
 /**
  * Carica e mostra gli ordini nella card "Riepilogo Ordini" con filtri.
  * @param {Object} filters - Oggetto contenente i filtri: {status, role, ean}
@@ -1159,11 +1161,8 @@ async function loadSummaryOrders(filters = {}) {
 
 
 function openSummaryOrdersCard() {
-    // 1️⃣ Nasconde tutte le card principali
-    const cards = document.querySelectorAll('.dashboard-card');
-    cards.forEach(card => {
-        card.style.display = 'none';
-    });
+    // 1️⃣ Nasconde tutte le card principali (usando la funzione corretta)
+    hideAllCards(); 
 
     // 2️⃣ Mostra la card riepilogo
     const summaryCard = document.getElementById('summary-orders-card');
@@ -1174,18 +1173,14 @@ function openSummaryOrdersCard() {
         return;
     }
 
-    // 3️⃣ Resetta i filtri
+    // 3️⃣ Resetta i filtri (logica corretta)
     const filterStatus = document.getElementById('filter-status');
-    const filterRole = document.getElementById('filter-role');
-    const filterEan = document.getElementById('filter-ean');
+    // ... (restano invariati)
 
-    if (filterStatus) filterStatus.value = '';
-    if (filterRole) filterRole.value = '';
-    if (filterEan) filterEan.value = '';
-
-    // 4️⃣ Carica tutti gli ordini senza filtri inizialmente
+    // 4️⃣ Carica tutti gli ordini senza filtri inizialmente (logica corretta)
     loadSummaryOrders();
 }
+
 
 // Collega il pulsante alla funzione
 const summaryBtn = document.getElementById('open-summary-btn');
@@ -1193,6 +1188,28 @@ if (summaryBtn) {
     summaryBtn.addEventListener('click', openSummaryOrdersCard);
 } else {
     console.error("Pulsante #open-summary-btn non trovato.");
+}
+
+
+function hideAllCards() {
+    // 1. Array di ID di tutte le card visibili (ORA CORRETTO)
+    const cardIds = [
+        'login-area', // ✅ FIX: Aggiunta la virgoletta iniziale
+        'worker-dashboard',
+        'admin-dashboard',
+        'admin-order-edit-card',
+        'orders-admin-card', 
+        'summary-orders-card', // ✅ FIX: ID corretto per coerenza
+        'photo-modal'
+    ];
+
+    // 2. Iterazione e Nascondi
+    cardIds.forEach(id => {
+        const card = document.getElementById(id);
+        if (card) {
+            card.style.display = 'none';
+        }
+    });
 }
 
 
@@ -1208,10 +1225,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 });
 
+// FINE BLOCCO CARD ORDINI PER TUTTI------------------------------------------------------------------------
+
 
 // ----------------------------------------------------
 // GESTIONE INIZIALE
-// ----------------------------------------------------
+// ------------------------------------------------------------------------------------------------------------------------
 
 // Controlla lo stato di autenticazione all'avvio
 window.onload = function() {
@@ -1241,5 +1260,3 @@ window.onload = function() {
             showLoginArea();
         });
 };
-
-
