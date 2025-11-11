@@ -24,6 +24,53 @@ const ROLES = {
     POST_PRODUCER: "PostProducer"
 };
 
+// ====================================================
+// NUOVE COSTANTI: COLONNE PER VISTA GENERALE
+// ====================================================
+const GENERAL_ORDER_COLUMNS = [
+    { label: "ID", prop: "objectId" },
+    { label: "Codice Articolo", prop: "productCode" },
+    { label: "EAN Code", prop: "eanCode" },
+    { label: "Style Name", prop: "styleName" },
+    { label: "Style Group", prop: "styleGroup" },
+    { label: "Brand", prop: "brand" },
+    { label: "Colore", prop: "color" },
+    { label: "Taglia", prop: "size" },
+    { label: "Categoria", prop: "category" },
+    { label: "Genere", prop: "gender" },
+    { label: "Provenienza", prop: "provenienza" },
+    { label: "Tipologia", prop: "tipologia" },
+    { label: "Ordine N.", prop: "ordine" },
+    { label: "Data Ordine", prop: "dataOrdine" },
+    { label: "Status", prop: "status" },
+    { label: "Assegnato Foto ID", prop: "assignedToPhotographerId" },
+    { label: "Assegnato Post ID", prop: "assignedToPostProducerId" },
+    { label: "Ultimo Agg.", prop: "lastUpdated" },
+    { label: "Shots", prop: "shots" },
+    { label: "Quantità", prop: "quantity" },
+    { label: "S1 Prog", prop: "s1Prog" },
+    { label: "S2 Prog", prop: "s2Prog" },
+    { label: "Prog On Model", prop: "progOnModel" },
+    { label: "Still Shot (S/N)", prop: "stillShot" },
+    { label: "On Model (S/N)", prop: "onModelShot" },
+    { label: "Priorità", prop: "priority" },
+    { label: "S1 Stylist", prop: "s1Stylist" },
+    { label: "S2 Stylist", prop: "s2Stylist" },
+    { label: "Data Ingresso", prop: "entryDate" },
+    { label: "Data Uscita", prop: "exitDate" },
+    { label: "Collo", prop: "collo" },
+    { label: "Data Reso", prop: "dataReso" },
+    { label: "DDT", prop: "ddt" },
+    { label: "Note Logistica", prop: "noteLogistica" },
+    { label: "Data Presa Post", prop: "dataPresaPost" },
+    { label: "Data Cons. Post", prop: "dataConsegnaPost" },
+    { label: "Calendario (S/N)", prop: "calendario" },
+    { label: "Post Presa", prop: "postPresa" },
+];
+// ====================================================
+// FINE NUOVE COSTANTI
+// ====
+
 // Variabili globali di stato
 let currentUser = null;
 let currentRole = null;
@@ -56,6 +103,8 @@ function showLoginArea(message = "") {
     document.getElementById('login-area').style.display = 'block';
     document.getElementById('worker-dashboard').style.display = 'none';
     document.getElementById('admin-dashboard').style.display = 'none';
+    document.getElementById('show-general-orders-btn').classList.add('hidden');
+    document.getElementById('general-orders-view').style.display = 'none';
     document.getElementById('worker-name').textContent = 'Ospite';
     document.getElementById('worker-role').textContent = 'Non Loggato';
     
@@ -79,6 +128,50 @@ function showStatusMessage(elementId, message, isSuccess = true) {
         el.classList.add('text-red-600', 'bg-red-100');
     }
 }
+
+// ====================================================
+// NUOVE FUNZIONI DI NAVIGAZIONE
+// ====================================================
+
+function hideAllDashboards() {
+    document.getElementById('worker-dashboard').style.display = 'none';
+    document.getElementById('admin-dashboard').style.display = 'none';
+    document.getElementById('general-orders-view').style.display = 'none';
+}
+
+function showGeneralOrdersView() {
+    if (!currentUser) return;
+
+    // Switch UI
+    hideAllDashboards();
+    document.getElementById('general-orders-view').style.display = 'block';
+
+    // Carica i dati (senza filtri iniziali)
+    loadAllOrdersForGeneralView();
+}
+
+function showMainDashboard() {
+    hideAllDashboards();
+    if (currentRole === ROLES.ADMIN) {
+        document.getElementById('admin-dashboard').style.display = 'block';
+        // Usa la tua funzione per ricaricare la dashboard Admin
+        if (typeof loadAllOrdersForAdmin === 'function') {
+            loadAllOrdersForAdmin();
+        }
+    } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+        document.getElementById('worker-dashboard').style.display = 'block';
+        // Usa la tua funzione per ricaricare la dashboard Worker
+        if (typeof loadOrdersForUser === 'function') {
+             loadOrdersForUser(currentRole);
+        }
+    } else {
+        handleLogout();
+    }
+}
+
+// ====================================================
+// FINE NUOVE FUNZIONI DI NAVIGAZIONE
+// ====================================================
 
 // ----------------------------------------------------
 // AUTENTICAZIONE E GESTIONE UTENTI
@@ -108,6 +201,11 @@ function handleLogout() {
             currentUser = null;
             currentRole = null;
             currentEanInProcess = null;
+            
+            // AGGIUNTA PER NASCONDERE LA VISTA E IL PULSANTE DELLA TAB GENERALE
+            document.getElementById('general-orders-view').style.display = 'none';
+            document.getElementById('show-general-orders-btn').classList.add('hidden');
+            
             showLoginArea("Logout avvenuto con successo.");
         })
         .catch(error => {
@@ -166,6 +264,7 @@ function handleLoginSuccess(user) {
             document.getElementById('worker-role').textContent = currentRole;
             
             document.getElementById('login-area').style.display = 'none';
+	    document.getElementById('show-general-orders-btn').classList.remove('hidden');
 
             if (currentRole === ROLES.ADMIN) {
                 document.getElementById('admin-dashboard').style.display = 'block';
@@ -1085,7 +1184,119 @@ function closePhotoModal() {
 }
 
 
+// ----------------------------------------------------
+// FUNZIONI GESTIONE ORDINI (GENERALE/FILTRI)
+// ----------------------------------------------------
 
+async function loadAllOrdersForGeneralView(whereClause = "") {
+    const loadingEl = document.getElementById('loading-general-orders');
+    loadingEl.textContent = "Caricamento lista completa ordini...";
+    loadingEl.style.display = 'block';
+    
+    // Popola il filtro stati
+    const statusFilter = document.getElementById('filter-status');
+    if (statusFilter.options.length <= 1) { 
+        // Pulisce e aggiunge tutti gli stati possibili
+        Object.entries(STATUS).forEach(([key, value]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            statusFilter.appendChild(option);
+        });
+        const waitingPhotoOption = document.createElement('option');
+        waitingPhotoOption.value = STATUS_WAITING_PHOTO;
+        waitingPhotoOption.textContent = STATUS_WAITING_PHOTO;
+        statusFilter.appendChild(waitingPhotoOption);
+    }
+
+    const queryBuilder = Backendless.DataQueryBuilder.create()
+        .setWhereClause(whereClause)
+        .setSortBy(['lastUpdated DESC'])
+        .setPageSize(100); 
+
+    try {
+        const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder);
+        renderGeneralOrdersTable(orders);
+        loadingEl.style.display = 'none';
+    } catch (error) {
+        console.error("ERRORE CRITICO in loadAllOrdersForGeneralView:", error);
+        loadingEl.textContent = `ERRORE: Impossibile caricare gli ordini. (Errore: ${error.message}).`;
+        loadingEl.style.color = '#dc2626';
+    }
+}
+
+function applyGeneralOrdersFilters() {
+    const eanFilter = document.getElementById('filter-ean').value.trim();
+    const statusFilter = document.getElementById('filter-status').value;
+    let clauses = [];
+
+    // Filtro per EAN o Codice Articolo (LIKE per ricerca parziale)
+    if (eanFilter) {
+        clauses.push(`eanCode LIKE '%${eanFilter}%' OR productCode LIKE '%${eanFilter}%'`);
+    }
+
+    // Filtro per Stato (valore esatto)
+    if (statusFilter) {
+        clauses.push(`status = '${statusFilter}'`);
+    }
+
+    const whereClause = clauses.length > 0 ? clauses.join(' AND ') : "";
+    
+    loadAllOrdersForGeneralView(whereClause);
+}
+
+function resetGeneralOrdersFilters() {
+    document.getElementById('filter-ean').value = '';
+    document.getElementById('filter-status').value = '';
+    loadAllOrdersForGeneralView(); 
+}
+
+function renderGeneralOrdersTable(orders) {
+    const tableHead = document.getElementById('general-orders-table-header');
+    const tableBody = document.querySelector('#general-orders-table tbody');
+    tableHead.innerHTML = '';
+    tableBody.innerHTML = '';
+
+    // 1. Popola l'intestazione della tabella
+    GENERAL_ORDER_COLUMNS.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col.label;
+        th.classList.add('px-3', 'py-3', 'text-left', 'text-xs', 'font-medium', 'text-gray-500', 'uppercase', 'tracking-wider', 'border-r', 'last:border-r-0');
+        tableHead.appendChild(th);
+    });
+
+    // 2. Popola il corpo della tabella
+    if (!orders || orders.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="' + GENERAL_ORDER_COLUMNS.length + '" class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">Nessun ordine trovato con i filtri applicati.</td></tr>';
+        return;
+    }
+
+    orders.forEach(order => {
+        const row = tableBody.insertRow();
+        row.classList.add('hover:bg-gray-50');
+
+        GENERAL_ORDER_COLUMNS.forEach(col => {
+            const cell = row.insertCell();
+            let text = order[col.prop] !== undefined && order[col.prop] !== null ? order[col.prop].toString() : '';
+
+            // Formattazione data
+            if (col.prop.toLowerCase().includes('data') || col.prop.toLowerCase().includes('date') || col.prop === 'lastUpdated') {
+                if (text) {
+                    const date = new Date(text);
+                    if (!isNaN(date)) {
+                        text = date.toLocaleDateString('it-IT') + (col.prop === 'lastUpdated' ? ' ' + date.toLocaleTimeString('it-IT') : '');
+                    }
+                }
+            }
+            
+            cell.textContent = text;
+            cell.classList.add('px-3', 'py-3', 'whitespace-nowrap', 'text-sm', 'text-gray-700', 'border-r', 'last:border-r-0');
+        });
+    });
+}
+// ----------------------------------------------------
+// FINE FUNZIONI GESTIONE ORDINI (GENERALE/FILTRI)
+// ----------------------------------------------------
 
 
 
