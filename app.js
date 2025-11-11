@@ -1168,41 +1168,36 @@ async function loadSummaryOrders(filters = {}) {
  * Avvia il caricamento dei dati di riepilogo.
  */
 function openSummaryOrdersCard() {
-    console.log("Apertura card riepilogo ordini..."); // debug
+    // Nascondi tutto tranne la card e i controlli globali
+    hideAllCardsExcept(['summary-orders-card', 'global-controls']);
 
-    // 1️⃣ Nasconde tutto
-    hideAllCards();
-
-    // 2️⃣ Mostra la card riepilogo
     const summaryCard = document.getElementById('summary-orders-card');
-    if (!summaryCard) {
-        console.error("❌ summary-orders-card non trovato!");
-        return;
+    if (summaryCard) {
+        summaryCard.classList.remove('hidden');
+        summaryCard.style.display = 'block';
     }
 
-    summaryCard.classList.remove('hidden');
-    summaryCard.style.display = 'block';
-    
-    // 3️⃣ Pulisce i filtri
-    ['filter-status', 'filter-role', 'filter-ean'].forEach(id => {
+    // Resetta filtri
+    ['filter-status','filter-role','filter-ean'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
 
-    // 4️⃣ Carica i dati
+    // Carica dati
     loadSummaryOrders();
 }
 
+
 function hideAllCards() {
     const cardIds = [
-        'login-area',               // ✅
-        'worker-dashboard',         // ✅
+        //'login-area',               // ✅
+        //'worker-dashboard',         // ✅
         'admin-dashboard',          // ✅
-        'orders-admin-card',        // ✅ Se è un contenitore separato
-        'admin-order-edit-card',    // ✅
-        'summary-orders-card',      // ✅
-        'photo-modal',              // ✅
-        'global-controls'           // 💡 FORSE DA NASCONDERE?
+        //'orders-admin-card',        // ✅ Se è un contenitore separato
+        //'admin-order-edit-card',    // ✅
+        //'summary-orders-card',      // ✅
+        //'photo-modal',              // ✅
+        //'global-controls'           // 💡 FORSE DA NASCONDERE?
     ];
 
     cardIds.forEach(id => {
