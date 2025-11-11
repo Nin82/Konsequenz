@@ -1165,16 +1165,21 @@ async function loadSummaryOrders(filters = {}) {
  * Avvia il caricamento dei dati di riepilogo.
  */
 function openSummaryOrdersCard() {
-    // 1️⃣ Nasconde tutte le card principali, inclusa summary-orders-card (grazie a hideAllCards)
+    // 1️⃣ Nasconde tutto
     hideAllCards(); 
-
+	
+    // 🛑 FIX GENITORE: Mostra il contenitore principale dell'applicazione (SOSTITUISCI 'app-area' con l'ID REALE)
+    document.getElementById('app-area').style.display = 'block'; // O l'ID corretto
+    
     const summaryCard = document.getElementById('summary-orders-card'); 
-    console.log("Elemento card trovato? ", summaryCard);
+    
+    console.log("Elemento card trovato? ", summaryCard); // Risultato: Trovato e corretto
+
     if (summaryCard) {
-        // 🛑 FIX VISIBILITÀ: Rimuove la classe 'hidden' di Tailwind
+        // Rimuove la classe 'hidden' di Tailwind
         summaryCard.classList.remove('hidden'); 
         
-        // 2️⃣ Mostra la card riepilogo
+        // Mostra la card riepilogo
         summaryCard.style.display = 'block';
     } else {
         console.error("Elemento #summary-orders-card non trovato. Verificare l'HTML.");
