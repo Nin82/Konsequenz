@@ -23,21 +23,27 @@
 
   <!-- SIDEBAR -->
   <div id="sidebar" class="hidden md:block">
-    <div class="text-center mb-10">
-      <h1 class="text-3xl font-extrabold text-white">Quiet Propaganda Studio</h1>
-      <p class="text-sm text-gray-400">Workflow Prodotti</p>
+  <div class="text-center mb-10">
     </div>
 
-    <div id="user-info" class="p-3 bg-gray-700 rounded-lg shadow-inner mb-8">
-      <p class="text-xs text-gray-400 mb-1">Utente Corrente:</p>
-      <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
-      <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
-    </div>
-
-    <button id="logout-button" onclick="handleLogout()" class="btn-danger w-full mt-4 py-3 font-semibold shadow-lg">
-      Esci (Logout)
-    </button>
+  <div id="user-info" class="p-3 bg-gray-700 rounded-lg shadow-inner mb-8">
+    <p class="text-xs text-gray-400 mb-1">Utente Corrente:</p>
+    <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
+    <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
   </div>
+
+  <button id="show-main-dashboard-btn" onclick="showMainDashboard()" class="btn-primary w-full mt-4 py-3 font-semibold shadow-lg">
+    La Mia Dashboard
+  </button>
+  
+  <button id="show-general-orders-btn" onclick="showGeneralOrdersView()" class="btn-warning w-full mt-2 py-3 font-semibold shadow-lg hidden">
+    Tutti gli Ordini (Filtri)
+  </button>
+
+  <button id="logout-button" onclick="handleLogout()" class="btn-danger w-full mt-4 py-3 font-semibold shadow-lg"> 
+    Esci (Logout)
+  </button>
+</div>
 
   <!-- MAIN CONTENT -->
   <div id="main-content">
@@ -548,6 +554,37 @@
   <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
 </div>
 
+
+<div id="general-orders-view" class="space-y-8 hidden">
+    <h2 class="text-3xl font-bold text-gray-800 mb-6">Visualizzazione Ordini Completa</h2>
+
+    <div class="card p-6">
+        <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Lista Completa Ordini (Tutte le Colonne)</h3>
+        
+        <div class="mb-4 p-4 border rounded-md bg-gray-50 flex flex-wrap gap-4 items-center">
+            <input type="text" id="filter-ean" placeholder="Filtra per EAN o Codice Articolo" class="p-2 border rounded-md flex-grow" />
+            
+            <select id="filter-status" class="p-2 border rounded-md">
+                <option value="">Tutti gli Stati</option>
+                </select>
+            
+            <button onclick="applyGeneralOrdersFilters()" class="btn-primary py-2 px-4">Applica Filtri</button>
+            <button onclick="resetGeneralOrdersFilters()" class="btn-secondary py-2 px-4">Reset Filtri</button>
+        </div>
+        <p id="loading-general-orders" class="text-gray-500 p-4 hidden">Caricamento lista completa ordini...</p>
+        
+        <div class="overflow-x-auto max-h-[70vh] border rounded-md">
+            <table id="general-orders-table" class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr id="general-orders-table-header" class="bg-gray-100 sticky top-0 z-10">
+                        </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        </div>
+    </div>
 
 </div>
 
