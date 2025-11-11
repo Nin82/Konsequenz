@@ -21,11 +21,7 @@ const STATUS = {
 const ROLES = {
     ADMIN: "Admin",
     PHOTOGRAPHER: "Photographer",
-    POST_PRODUCER: "PostProducer",
-    MAGAZZINO: "Magazzino",
-    PARTNER: "Partner",
-    FORNITORE: "Fornitore"		
-	
+    POST_PRODUCER: "PostProducer"
 };
 
 // Variabili globali di stato
@@ -89,59 +85,30 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // ----------------------------------------------------
 
 function handleStandardLogin(email, password) {
-    
-    // 🛑 IL CODICE DEVE INIZIARE QUI. NESSUN 'event' O 'preventDefault'
-    
-    // Verifiche rapide
     if (!email || !password) {
-        showLoginArea("Inserisci sia l'email che la password.");
-        return; 
+        showLoginArea("Per favore, inserisci email e password.");
+        return;
     }
-
-    // 🛑 Modificato: La variabile 'login' è ora 'email'
-    const loginValue = email.trim(); 
-    const passwordValue = password.trim();
-
-    // 🛑 Aggiorna lo stato di login prima della chiamata
-    const loginStatus = document.getElementById('login-status');
-    if (loginStatus) {
-        loginStatus.textContent = 'Accesso in corso...';
-        loginStatus.classList.remove('hidden', 'status-error');
-        loginStatus.classList.add('status-info');
-        loginStatus.style.display = 'block';
-    }
-
-
-    Backendless.UserService.login(loginValue, passwordValue, true) 
+    
+    document.getElementById('login-status').textContent = "Accesso in corso...";
+    Backendless.UserService.login(email, password, true)
         .then(user => {
-            // Se il login va a buon fine, handleLoginSuccess mostrerà la dashboard
             handleLoginSuccess(user);
         })
         .catch(error => {
             console.error("Errore di Login:", error);
-            // Mostra l'errore di login nell'area di status
-            const message = error.message || "Credenziali non valide. Riprova.";
-            showLoginArea(message);
+            const message = error.message || "Credenziali non valide o errore di sistema.";
+            showLoginArea("Accesso Fallito: " + message);
         });
 }
 
 function handleLogout() {
     Backendless.UserService.logout()
         .then(() => {
-            // 🛑 AGGIUNTO: Nasconde tutte le dashboard e le card attive
-            hideAllCards(); 
-            
             currentUser = null;
             currentRole = null;
             currentEanInProcess = null;
-            
-            // Mostra solo l'area di login
             showLoginArea("Logout avvenuto con successo.");
-            
-            // 💡 Aggiungi anche l'aggiornamento dell'header per un'interfaccia pulita
-            document.getElementById('worker-name').textContent = 'Ospite';
-            document.getElementById('worker-role').textContent = 'Non Loggato';
-
         })
         .catch(error => {
             console.error("Errore di Logout:", error);
@@ -188,45 +155,37 @@ function getRoleFromUser(user) {
 }
 
 function handleLoginSuccess(user) {
-    // 1. Aggiorna sidebar
-    document.getElementById('worker-name').textContent = user.name || user.email;
-    document.getElementById('worker-role').textContent = user.role;
-    
-    // 2. Mostra i controlli globali (Bottone Riepilogo Ordini)
-    document.getElementById('global-controls').style.display = 'block';
-
     currentUser = user;
-    currentRole = user.role; 
+    
+    getRoleFromUser(user)
+        .then(role => {
+            currentRole = role;
+            
+            const displayName = user.name || user.email;
+            document.getElementById('worker-name').textContent = displayName;
+            document.getElementById('worker-role').textContent = currentRole;
+            
+            document.getElementById('login-area').style.display = 'none';
 
-    // 3. LOGICA DASHBOARD
-    if (currentRole === ROLES.ADMIN) {
-        // Chiude tutto e apre solo l'admin-dashboard
-        showCard('admin-dashboard'); 
-        
-        // La lista degli ordini Admin è spesso un elemento separato che va riattivato
-        const ordersAdminCard = document.getElementById('orders-admin-card');
-        if (ordersAdminCard) {
-            ordersAdminCard.style.display = 'block';
-            ordersAdminCard.classList.remove('hidden');
-        }
-
-        // 🛑 CORREZIONE: Usa il nome della tua funzione esistente
-        loadAllOrdersForAdmin();
-        
-    } else if (
-        currentRole === ROLES.PHOTOGRAPHER || 
-        currentRole === ROLES.POST_PRODUCER || 
-        currentRole === ROLES.MAGAZZINO ||
-        currentRole === ROLES.PARTNER ||
-        currentRole === ROLES.FORNITORE
-    ) {
-        // Chiude tutto e apre solo la worker-dashboard
-        showCard('worker-dashboard'); 
-        loadOrders();
-        
-    } else {
-        showLoginArea("Ruolo non riconosciuto. Accesso negato.");
-    }
+            if (currentRole === ROLES.ADMIN) {
+                document.getElementById('admin-dashboard').style.display = 'block';
+                document.getElementById('worker-dashboard').style.display = 'none'; 
+                loadUsersAndRoles(); 
+		loadAllOrdersForAdmin();
+            } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+                document.getElementById('admin-dashboard').style.display = 'none'; 
+                document.getElementById('worker-dashboard').style.display = 'block';
+                loadOrdersForUser(currentRole); 
+            } else {
+                showLoginArea("Ruolo utente non autorizzato o non definito.");
+                handleLogout();
+            }
+        })
+        .catch(error => {
+            console.error("Errore critico durante la gestione del ruolo:", error);
+            showLoginArea(`Errore nella verifica del ruolo: ${error.message}`);
+            handleLogout();
+        });
 }
 
 // ----------------------------------------------------
@@ -1129,223 +1088,10 @@ function closePhotoModal() {
 
 
 
-// INIZIO BLOCCO CARD ORDINI PER TUTTI------------------------------------------------------------------------------------
-
-/**
- * Carica e visualizza il riepilogo degli ordini, applicando i filtri.
- * Gestisce l'errore di autorizzazione (401) mostrando un feedback all'utente.
- * @param {object} filters - Oggetto contenente filtri (status, role, ean).
- */
-async function loadSummaryOrders(filters = {}) {
-    const summaryTableBody = document.querySelector('#summary-orders-card tbody');
-    if (!summaryTableBody) return;
-
-    // 1. Mostra il messaggio di caricamento (assicura che la card abbia altezza)
-    summaryTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">Caricamento ordini in corso...</td></tr>';
-
-    try {
-        const whereClauses = [];
-
-        // 2. LOGICA FILTRI (Usa l'operatore LIKE per le ricerche parziali)
-        if (filters.status) {
-            whereClauses.push(`status = '${filters.status}'`);
-        }
-        
-        // Il filtro Ruolo (Role) viene applicato sul campo 'assignedTo'
-        if (filters.role) {
-            whereClauses.push(`assignedTo = '${filters.role}'`);
-        }
-        
-        // Il filtro EAN/Codice Articolo (EAN) viene applicato con LIKE per corrispondenza parziale
-        if (filters.ean) {
-            // Cerca in due campi: ean e codiceArticolo
-            const eanQuery = `(ean LIKE '%${filters.ean}%' OR codiceArticolo LIKE '%${filters.ean}%')`;
-            whereClauses.push(eanQuery);
-        }
-
-        // 3. Costruzione della Query Backendless
-        const queryBuilder = Backendless.DataQueryBuilder.create();
-        
-        if (whereClauses.length > 0) {
-            queryBuilder.setWhereClause(whereClauses.join(' AND '));
-        }
-
-        // 4. Esecuzione della Chiamata API CRITICA
-        const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder);
-        
-        // 5. Popolamento (Assumi che questa funzione esista e generi l'HTML)
-        populateSummaryOrdersTable(orders);
-
-    } catch (error) {
-        console.error("ERRORE CARICAMENTO RIEPILOGO:", error);
-
-        // 6. GESTIONE DELL'ERRORE DI AUTORIZZAZIONE (401)
-        let errorMessage = "Impossibile caricare i dati. Errore sconosciuto.";
-        
-        if (error.message && error.message.includes("Not existing user token")) {
-            // L'errore 401 è stato catturato!
-            errorMessage = "Sessione scaduta o non valida. Effettua nuovamente il login per aggiornare i dati.";
-        } else if (error.message) {
-            errorMessage = `ERRORE: ${error.message}`;
-        }
-
-        summaryTableBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-red-600 font-bold">
-                    ${errorMessage}
-                </td>
-            </tr>`;
-    }
-}
-
-
-/**
- * 💡 FUNZIONE PRESUNTA: Devi assicurarti che questa funzione esista in app.txt
- * Popola la tabella di riepilogo con i dati ricevuti dal server.
- * @param {Array<Object>} orders - L'array di oggetti ordine da visualizzare.
- */
-function populateSummaryOrdersTable(orders) {
-    const summaryTableBody = document.querySelector('#summary-orders-card tbody');
-    if (!summaryTableBody) return;
-
-    if (orders.length === 0) {
-        summaryTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">Nessun ordine trovato con i filtri selezionati.</td></tr>';
-        return;
-    }
-
-    let html = '';
-    orders.forEach(order => {
-        // Generazione delle righe HTML per la tabella di riepilogo
-        html += `
-            <tr class="hover:bg-gray-50">
-                <td class="border px-2 py-1 text-sm">${order.ean || 'N/D'}</td>
-                <td class="border px-2 py-1 text-sm">${order.codiceArticolo || 'N/D'}</td>
-                <td class="border px-2 py-1 text-sm">${order.brand || 'N/D'}</td>
-                <td class="border px-2 py-1 text-sm">${order.stile || 'N/D'}</td>
-                <td class="border px-2 py-1 text-sm">${order.categoria || 'N/D'}</td>
-                <td class="border px-2 py-1 text-sm">${order.genere || 'N/D'}</td>
-                <td class="border px-2 py-1 text-sm status-${order.status ? order.status.replace(/\s/g, '-') : 'nd'}">${order.status || 'N/D'}</td>
-                <td class="border px-2 py-1 text-sm">${order.assignedTo || 'N/D'}</td>
-            </tr>
-        `;
-    });
-
-    summaryTableBody.innerHTML = html;
-}	
-
-function openSummaryOrdersCard() {
-    // 🛑 Chiude TUTTO e apre solo la card di riepilogo ordini
-    showCard('summary-orders-card'); 
-	
-    // ... (Logica dei filtri e loadSummaryOrders())
-    const filterStatus = document.getElementById('filter-status');
-    const filterRole = document.getElementById('filter-role');
-    const filterEan = document.getElementById('filter-ean');
-
-    if (filterStatus) filterStatus.value = '';
-    if (filterRole) filterRole.value = '';
-    if (filterEan) filterEan.value = '';
-
-    loadSummaryOrders();
-}
-
-/**
- * Nasconde tutti i contenitori principali e mostra solo la card specificata.
- * Questa funzione sostituisce la logica buggata di hideAllCards().
- * @param {string} cardId - L'ID dell'elemento da mostrare (es. 'admin-dashboard').
- */
-function showCard(cardId) {
-    // Lista completa di tutti i contenitori che DEVONO essere chiusi
-    const allContainers = [
-        'login-area',
-        'worker-dashboard',
-        'admin-dashboard',
-        'summary-orders-card',
-        'admin-order-edit-card',
-        'photo-modal',
-        'orders-admin-card' // La lista ordini dentro l'admin dashboard
-        // I contenitori globali come 'global-controls' o 'main-content' li gestiamo separatamente
-    ];
-
-    allContainers.forEach(id => {
-        const card = document.getElementById(id);
-        if (card) {
-            card.style.display = 'none';
-            card.classList.add('hidden'); 
-        }
-    });
-    
-    // Mostra la card richiesta
-    const cardToShow = document.getElementById(cardId);
-    if (cardToShow) {
-        cardToShow.style.display = 'block';
-        cardToShow.classList.remove('hidden');
-        cardToShow.style.zIndex = '1'; // Resetta lo z-index se necessario
-    }
-}
-
-/**
- * Chiude tutte le card e ripristina la dashboard appropriata 
- * in base al ruolo dell'utente loggato (currentRole).
- */
-
-function restoreUserInterface() {
-    
-    // 1. Assicurati che i controlli globali (bottone Riepilogo) siano visibili
-    const globalControls = document.getElementById('global-controls');
-    if (globalControls) {
-        globalControls.style.display = 'block';
-    }
-    
-    // 2. LOGICA DASHBOARD DI RITORNO
-    if (currentRole === ROLES.ADMIN) {
-        // Chiude tutto e apre solo l'admin-dashboard
-        showCard('admin-dashboard');
-        
-        // Rende visibile la lista ordini Admin (che è un figlio)
-        const ordersAdminCard = document.getElementById('orders-admin-card');
-        if (ordersAdminCard) {
-            ordersAdminCard.style.display = 'block';
-            ordersAdminCard.classList.remove('hidden');
-        }
-        
-        // 🛑 CARICA GLI ORDINI ADMIN CON IL NOME CORRETTO
-        loadAllOrdersForAdmin(); 
-        
-    } else if (
-        currentRole === ROLES.PHOTOGRAPHER || 
-        currentRole === ROLES.POST_PRODUCER || 
-        currentRole === ROLES.MAGAZZINO ||
-        currentRole === ROLES.PARTNER ||
-        currentRole === ROLES.FORNITORE
-    ) {
-        // Chiude tutto e apre solo la worker-dashboard
-        showCard('worker-dashboard'); 
-        loadOrders();
-        
-    } else {
-        // Fallback al login in caso di ruolo indefinito
-        showLoginArea(); 
-    }
-}
-
-// Event listener bottone Riepilogo
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('open-summary-btn').onclick = openSummaryOrdersCard;
-  document.getElementById('apply-filters-btn').onclick = () => {
-    const status = document.getElementById('filter-status').value;
-    const role = document.getElementById('filter-role').value;
-    const ean = document.getElementById('filter-ean').value.trim();
-    loadSummaryOrders({ status, role, ean });
-  };
-});
-
-// FINE BLOCCO CARD ORDINI PER TUTTI------------------------------------------------------------------------
-
 
 // ----------------------------------------------------
 // GESTIONE INIZIALE
-// ------------------------------------------------------------------------------------------------------------------------
+// ----------------------------------------------------
 
 // Controlla lo stato di autenticazione all'avvio
 window.onload = function() {
