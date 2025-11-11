@@ -210,7 +210,8 @@ function handleLoginSuccess(user) {
             ordersAdminCard.classList.remove('hidden');
         }
 
-        loadAdminOrders();
+        // 🛑 CORREZIONE: Usa il nome della tua funzione esistente
+        loadAllOrdersForAdmin();
         
     } else if (
         currentRole === ROLES.PHOTOGRAPHER || 
@@ -1290,7 +1291,7 @@ function showCard(cardId) {
 
 function restoreUserInterface() {
     
-    // 1. Mostra i controlli globali (bottone Riepilogo Ordini)
+    // 1. Assicurati che i controlli globali (bottone Riepilogo) siano visibili
     const globalControls = document.getElementById('global-controls');
     if (globalControls) {
         globalControls.style.display = 'block';
@@ -1301,14 +1302,15 @@ function restoreUserInterface() {
         // Chiude tutto e apre solo l'admin-dashboard
         showCard('admin-dashboard');
         
-        // Rende visibile la lista ordini Admin nascosta da showCard
+        // Rende visibile la lista ordini Admin (che è un figlio)
         const ordersAdminCard = document.getElementById('orders-admin-card');
         if (ordersAdminCard) {
             ordersAdminCard.style.display = 'block';
             ordersAdminCard.classList.remove('hidden');
         }
         
-        loadAdminOrders(); 
+        // 🛑 CARICA GLI ORDINI ADMIN CON IL NOME CORRETTO
+        loadAllOrdersForAdmin(); 
         
     } else if (
         currentRole === ROLES.PHOTOGRAPHER || 
@@ -1322,7 +1324,7 @@ function restoreUserInterface() {
         loadOrders();
         
     } else {
-        // Fallback al login
+        // Fallback al login in caso di ruolo indefinito
         showLoginArea(); 
     }
 }
