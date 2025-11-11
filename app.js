@@ -1168,11 +1168,27 @@ async function loadSummaryOrders(filters = {}) {
  * Avvia il caricamento dei dati di riepilogo.
  */
 function openSummaryOrdersCard() {
-    // 1️⃣ Nasconde TUTTI i contenitori principali
-    hideAllCards(); 
+    // 1️⃣ NASCONDIAMO SOLO LA CLASSE 'hidden' E MOSTRIAMO
+    // Abbiamo rimosso: hideAllCards(); 
 	
     const summaryCard = document.getElementById('summary-orders-card'); 
     
+    // Per un test pulito, nascondi esplicitamente gli altri contenitori principali
+    // (Non avendo hideAllCards, devi nascondere almeno l'elemento che la copre,
+    // che è quasi sempre la login-area all'inizio).
+    const loginArea = document.getElementById('login-area');
+    if (loginArea) loginArea.style.display = 'none';
+
+    const workerDashboard = document.getElementById('worker-dashboard');
+    if (workerDashboard) workerDashboard.style.display = 'none';
+
+    const adminDashboard = document.getElementById('admin-dashboard');
+    if (adminDashboard) adminDashboard.style.display = 'none';
+    
+    const globalControls = document.getElementById('global-controls');
+    if (globalControls) globalControls.style.display = 'none';
+
+
     if (summaryCard) {
         // Rimuove la classe 'hidden' di Tailwind
         summaryCard.classList.remove('hidden'); 
@@ -1180,21 +1196,21 @@ function openSummaryOrdersCard() {
         // 2️⃣ Mostra la card riepilogo
         summaryCard.style.display = 'block';
 
-        // 🛑 NUOVE RIGHE CRITICHE: FORZA LA VISUALIZZAZIONE
-        summaryCard.style.position = 'fixed'; // Usa 'fixed' per coprire anche lo scroll
+        // Manteniamo la forzatura CSS estrema per assicurarci che appaia
+        summaryCard.style.position = 'fixed'; 
         summaryCard.style.top = '50%';        
         summaryCard.style.left = '50%';
-        summaryCard.style.transform = 'translate(-50%, -50%)'; // Centra
-        summaryCard.style.width = '80%';     // Assicurati che abbia una dimensione
-        summaryCard.style.height = '80%';    // Assicurati che abbia un'altezza
-        summaryCard.style.zIndex = '100';    // Mettila sopra tutto
+        summaryCard.style.transform = 'translate(-50%, -50%)'; 
+        summaryCard.style.width = '80%';     
+        summaryCard.style.height = '80%';    
+        summaryCard.style.zIndex = '100';    
 
     } else {
         console.error("Elemento #summary-orders-card non trovato. Verificare l'HTML.");
         return;
     }
 
-    // 3️⃣ Resetta i filtri e Carica i dati (la tua logica originale)
+    // 3️⃣ Resetta i filtri e Carica i dati (mantenuti intatti)
     const filterStatus = document.getElementById('filter-status');
     const filterRole = document.getElementById('filter-role');
     const filterEan = document.getElementById('filter-ean');
@@ -1310,3 +1326,4 @@ window.onload = function() {
             showLoginArea();
         });
 };
+
