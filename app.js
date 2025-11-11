@@ -21,9 +21,9 @@ const STATUS = {
 const ROLES = {
     ADMIN: "Admin",
     PHOTOGRAPHER: "Photographer",
-    POST_PRODUCER: "PostProducer"
+    POST_PRODUCER: "PostProducer",
     MAGAZZINO: "Magazzino",
-    PARTNER: "Partner"
+    PARTNER: "Partner",
     FORNITORE: "Fornitore"		
 	
 };
@@ -1241,4 +1241,5 @@ window.onload = function() {
             showLoginArea();
         });
 };
+
 
