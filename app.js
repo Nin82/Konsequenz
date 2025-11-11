@@ -88,39 +88,40 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // AUTENTICAZIONE E GESTIONE UTENTI
 // ----------------------------------------------------
 
-function handleStandardLogin(event) {
-    // Gestione del crash 'preventDefault' (che hai risolto)
-    if (event && typeof event.preventDefault === 'function') {
-        event.preventDefault(); 
-    }
+function handleStandardLogin(email, password) {
     
-    // 🛑 NUOVA CORREZIONE: VERIFICA L'ESISTENZA DEGLI ELEMENTI
-    const loginElement = document.getElementById('login');
-    const passwordElement = document.getElementById('password');
-
-    // Se uno dei due non esiste, usciamo per evitare il crash
-    if (!loginElement || !passwordElement) {
-        console.error("ERRORE CRITICO: Input 'login' o 'password' non trovati nell'HTML.");
-        return; 
-    }
-
-    const login = loginElement.value;
-    const password = passwordElement.value;
+    // 🛑 IL CODICE DEVE INIZIARE QUI. NESSUN 'event' O 'preventDefault'
     
-    // Controlliamo anche che i campi non siano vuoti prima di chiamare Backendless
-    if (!login || !password) {
+    // Verifiche rapide
+    if (!email || !password) {
         showLoginArea("Inserisci sia l'email che la password.");
         return; 
     }
 
-    // ... (restante LOGICA DI LOGIN)
-    Backendless.UserService.login(login, password, true) 
+    // 🛑 Modificato: La variabile 'login' è ora 'email'
+    const loginValue = email.trim(); 
+    const passwordValue = password.trim();
+
+    // 🛑 Aggiorna lo stato di login prima della chiamata
+    const loginStatus = document.getElementById('login-status');
+    if (loginStatus) {
+        loginStatus.textContent = 'Accesso in corso...';
+        loginStatus.classList.remove('hidden', 'status-error');
+        loginStatus.classList.add('status-info');
+        loginStatus.style.display = 'block';
+    }
+
+
+    Backendless.UserService.login(loginValue, passwordValue, true) 
         .then(user => {
+            // Se il login va a buon fine, handleLoginSuccess mostrerà la dashboard
             handleLoginSuccess(user);
         })
         .catch(error => {
             console.error("Errore di Login:", error);
-            showLoginArea(`Credenziali non valide: ${error.message}`);
+            // Mostra l'errore di login nell'area di status
+            const message = error.message || "Credenziali non valide. Riprova.";
+            showLoginArea(message);
         });
 }
 
