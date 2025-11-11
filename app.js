@@ -134,8 +134,8 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // ====================================================
 
 function hideAllDashboards() {
-    document.getElementById('worker-dashboard').style.display = 'none';
-    document.getElementById('admin-dashboard').style.display = 'none';
+    document.getElementById('worker-dashboard').classList.add('hidden');
+    document.getElementById('admin-dashboard').classList.add('hidden');
     document.getElementById('general-orders-view').classList.add('hidden');
 }
 
@@ -161,6 +161,24 @@ function showGeneralOrdersView() {
 // ====================================================
 // FINE NUOVE FUNZIONI DI NAVIGAZIONE
 // ====================================================
+
+function showMainDashboard() {
+    hideAllDashboards();
+    document.getElementById('worker-dashboard').classList.remove('hidden');
+}
+
+function showAdminDashboard() {
+    hideAllDashboards();
+    document.getElementById('admin-dashboard').classList.remove('hidden');
+}
+
+function showGeneralOrdersView() {
+    console.log("➡️ Apertura vista generale ordini");
+    hideAllDashboards();
+    const view = document.getElementById('general-orders-view');
+    if (view) view.classList.remove('hidden');
+    loadAllOrdersForGeneralView();
+}
 
 // ----------------------------------------------------
 // AUTENTICAZIONE E GESTIONE UTENTI
