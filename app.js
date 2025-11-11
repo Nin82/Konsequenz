@@ -1160,18 +1160,28 @@ async function loadSummaryOrders(filters = {}) {
 }
 
 
+/**
+ * Nasconde tutte le card dell'interfaccia e mostra la card Riepilogo Ordini.
+ * Avvia il caricamento dei dati di riepilogo.
+ */
 function openSummaryOrdersCard() {
-     hideAllCards(); 
+    // 1️⃣ Nasconde tutte le card principali, inclusa summary-orders-card (grazie a hideAllCards)
+    hideAllCards(); 
 
     const summaryCard = document.getElementById('summary-orders-card'); 
     
     if (summaryCard) {
+        // 🛑 FIX VISIBILITÀ: Rimuove la classe 'hidden' di Tailwind
+        summaryCard.classList.remove('hidden'); 
+        
+        // 2️⃣ Mostra la card riepilogo
         summaryCard.style.display = 'block';
     } else {
-        console.error("Elemento #summary-orders-card non trovato, verifica l'HTML.");
+        console.error("Elemento #summary-orders-card non trovato. Verificare l'HTML.");
         return;
     }
 
+    // 3️⃣ Resetta i filtri per una visualizzazione pulita all'apertura
     const filterStatus = document.getElementById('filter-status');
     const filterRole = document.getElementById('filter-role');
     const filterEan = document.getElementById('filter-ean');
@@ -1180,16 +1190,9 @@ function openSummaryOrdersCard() {
     if (filterRole) filterRole.value = '';
     if (filterEan) filterEan.value = '';
 
-
+    // 4️⃣ Carica tutti gli ordini senza filtri (chiama la funzione asincrona di caricamento)
+    // Se loadSummaryOrders() è definita altrove (e lo è), va solo chiamata qui:
     loadSummaryOrders();
-}
-
-// Collega il pulsante alla funzione
-const summaryBtn = document.getElementById('open-summary-btn');
-if (summaryBtn) {
-    summaryBtn.addEventListener('click', openSummaryOrdersCard);
-} else {
-    console.error("Pulsante #open-summary-btn non trovato.");
 }
 
 
@@ -1212,6 +1215,42 @@ function hideAllCards() {
     });
 }
 
+
+/**
+ * Chiude tutte le card e ripristina la dashboard appropriata 
+ * in base al ruolo dell'utente loggato (currentRole).
+ */
+function restoreUserInterface() {
+    // 1. Nasconde TUTTO (incluso il Riepilogo Ordini)
+    hideAllCards(); 
+
+    // 2. Determina la dashboard da mostrare
+    
+    // Logica Admin
+    if (currentRole === ROLES.ADMIN) {
+        document.getElementById('admin-dashboard').style.display = 'block';
+        // 💡 Assicurati che anche la lista degli ordini sia visibile nella dashboard Admin
+        document.getElementById('orders-admin-card').style.display = 'block'; 
+        // Non ricarichiamo i dati qui, assumendo che siano già stati caricati o che vengano ricaricati su bisogno.
+    } 
+    
+    // Logica Worker generici
+    else if (
+        currentRole === ROLES.PHOTOGRAPHER || 
+        currentRole === ROLES.POST_PRODUCER || 
+        currentRole === ROLES.MAGAZZINO ||
+        currentRole === ROLES.PARTNER ||
+        currentRole === ROLES.FORNITORE
+    ) {
+        document.getElementById('worker-dashboard').style.display = 'block';
+        // Non ricarichiamo gli ordini qui, a meno che non sia strettamente necessario
+    } 
+    
+    // Fallback in caso di stato indefinito o errore
+    else {
+        showLoginArea(); 
+    }
+}
 
 // Event listener bottone Riepilogo
 document.addEventListener('DOMContentLoaded', () => {
