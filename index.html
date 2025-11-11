@@ -22,43 +22,48 @@
 <body class="min-h-screen">
 
   <!-- SIDEBAR -->
+<!-- SIDEBAR -->
 <div id="sidebar" class="hidden md:flex flex-col bg-gray-900 text-white p-6 min-h-screen w-72 shadow-2xl">
 
   <!-- Titolo -->
-  <h1 class="text-3xl font-extrabold text-center mb-10 tracking-wide">
+  <h1 class="text-3xl font-extrabold text-center mb-8 tracking-wide">
     Quiet Propaganda Studio
   </h1>
 
-  <!-- Info utente -->
-  <div id="user-info" class="p-4 bg-gray-800 rounded-lg shadow-inner mb-8">
-    <p class="text-xs text-gray-400 mb-1">Utente Corrente:</p>
-    <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
-    <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
-  </div>
+  <!-- Contenuto sotto il titolo -->
+  <div class="flex flex-col items-stretch space-y-6">
 
-  <!-- Pulsanti di navigazione -->
-  <div class="space-y-3">
-    <button id="show-main-dashboard-btn" 
-            onclick="showMainDashboard()" 
-            class="btn-primary w-full py-3 font-semibold shadow-lg">
-      La Mia Dashboard
-    </button>
+    <!-- Info utente -->
+    <div id="user-info" class="p-4 bg-gray-800 rounded-lg shadow-inner">
+      <p class="text-xs text-gray-400 mb-1">Utente Corrente:</p>
+      <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
+      <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
+    </div>
 
-    <button id="show-general-orders-btn" 
-            onclick="showGeneralOrdersView()" 
-            class="btn-warning w-full py-3 font-semibold shadow-lg hidden">
-      Tutti gli Ordini (Filtri)
-    </button>
+    <!-- Pulsanti di navigazione -->
+    <div class="flex flex-col space-y-3">
+      <button id="show-main-dashboard-btn" 
+              onclick="showMainDashboard()" 
+              class="btn-primary w-full py-3 font-semibold shadow-lg">
+        La Mia Dashboard
+      </button>
 
-    <button id="logout-button" 
-            onclick="handleLogout()" 
-            class="btn-danger w-full py-3 font-semibold shadow-lg mt-6"> 
-      Esci (Logout)
-    </button>
+      <button id="show-general-orders-btn" 
+              onclick="showGeneralOrdersView()" 
+              class="btn-warning w-full py-3 font-semibold shadow-lg hidden">
+        Tutti gli Ordini (Filtri)
+      </button>
+
+      <button id="logout-button" 
+              onclick="handleLogout()" 
+              class="btn-danger w-full py-3 font-semibold shadow-lg">
+        Esci (Logout)
+      </button>
+    </div>
+
   </div>
 
 </div>
-
   <!-- MAIN CONTENT -->
   <div id="main-content">
 
