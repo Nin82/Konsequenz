@@ -1114,91 +1114,127 @@ function closePhotoModal() {
 
 
 // INIZIO BLOCCO CARD ORDINI PER TUTTI------------------------------------------------------------------------------------
+
 /**
- * Carica e mostra gli ordini nella card "Riepilogo Ordini" con filtri.
- * @param {Object} filters - Oggetto contenente i filtri: {status, role, ean}
+ * Carica e visualizza il riepilogo degli ordini, applicando i filtri.
+ * Gestisce l'errore di autorizzazione (401) mostrando un feedback all'utente.
+ * @param {object} filters - Oggetto contenente filtri (status, role, ean).
  */
 async function loadSummaryOrders(filters = {}) {
-    const tbody = document.getElementById('summary-orders-table').querySelector('tbody');
-    tbody.innerHTML = ''; // svuota la tabella prima di riempirla
+    const summaryTableBody = document.querySelector('#summary-orders-card tbody');
+    if (!summaryTableBody) return;
+
+    // 1. Mostra il messaggio di caricamento (assicura che la card abbia altezza)
+    summaryTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">Caricamento ordini in corso...</td></tr>';
 
     try {
-        // Configurazione della query Backendless
-        let whereClauses = [];
+        const whereClauses = [];
 
+        // 2. LOGICA FILTRI (Usa l'operatore LIKE per le ricerche parziali)
         if (filters.status) {
-            whereClauses.push(`stato = '${filters.status}'`);
+            whereClauses.push(`status = '${filters.status}'`);
         }
+        
+        // Il filtro Ruolo (Role) viene applicato sul campo 'assignedTo'
         if (filters.role) {
-            whereClauses.push(`assegnatoARuolo = '${filters.role}'`);
+            whereClauses.push(`assignedTo = '${filters.role}'`);
         }
+        
+        // Il filtro EAN/Codice Articolo (EAN) viene applicato con LIKE per corrispondenza parziale
         if (filters.ean) {
-            whereClauses.push(`EAN LIKE '%${filters.ean}%'`);
+            // Cerca in due campi: ean e codiceArticolo
+            const eanQuery = `(ean LIKE '%${filters.ean}%' OR codiceArticolo LIKE '%${filters.ean}%')`;
+            whereClauses.push(eanQuery);
         }
 
-        const whereClause = whereClauses.length > 0 ? whereClauses.join(' AND ') : '';
-
-        // Recupero dati da Backendless
-        const result = await Backendless.Data.of("Orders").find({ where: whereClause });
-
-        if (result.length === 0) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td colspan="8" class="text-center py-2">Nessun ordine trovato</td>`;
-            tbody.appendChild(tr);
-            return;
+        // 3. Costruzione della Query Backendless
+        const queryBuilder = Backendless.DataQueryBuilder.create();
+        
+        if (whereClauses.length > 0) {
+            queryBuilder.setWhereClause(whereClauses.join(' AND '));
         }
 
-        // Popola la tabella
-        result.forEach(order => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="border px-2 py-1 text-sm">${order.EAN || ''}</td>
-                <td class="border px-2 py-1 text-sm">${order.codiceArticolo || ''}</td>
-                <td class="border px-2 py-1 text-sm">${order.brand || ''}</td>
-                <td class="border px-2 py-1 text-sm">${order.stile || ''}</td>
-                <td class="border px-2 py-1 text-sm">${order.categoria || ''}</td>
-                <td class="border px-2 py-1 text-sm">${order.genere || ''}</td>
-                <td class="border px-2 py-1 text-sm">${order.stato || ''}</td>
-                <td class="border px-2 py-1 text-sm">${order.assegnatoARuolo || ''}</td>
-            `;
-            tbody.appendChild(tr);
-        });
+        // 4. Esecuzione della Chiamata API CRITICA
+        const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder);
+        
+        // 5. Popolamento (Assumi che questa funzione esista e generi l'HTML)
+        populateSummaryOrdersTable(orders);
 
     } catch (error) {
-        console.error("Errore caricamento ordini:", error);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="8" class="text-center py-2 text-red-600">Errore nel caricamento degli ordini</td>`;
-        tbody.appendChild(tr);
+        console.error("ERRORE CARICAMENTO RIEPILOGO:", error);
+
+        // 6. GESTIONE DELL'ERRORE DI AUTORIZZAZIONE (401)
+        let errorMessage = "Impossibile caricare i dati. Errore sconosciuto.";
+        
+        if (error.message && error.message.includes("Not existing user token")) {
+            // L'errore 401 è stato catturato!
+            errorMessage = "Sessione scaduta o non valida. Effettua nuovamente il login per aggiornare i dati.";
+        } else if (error.message) {
+            errorMessage = `ERRORE: ${error.message}`;
+        }
+
+        summaryTableBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-red-600 font-bold">
+                    ${errorMessage}
+                </td>
+            </tr>`;
     }
 }
 
 
 /**
- * Nasconde tutte le card dell'interfaccia e mostra la card Riepilogo Ordini.
- * Avvia il caricamento dei dati di riepilogo.
+ * 💡 FUNZIONE PRESUNTA: Devi assicurarti che questa funzione esista in app.txt
+ * Popola la tabella di riepilogo con i dati ricevuti dal server.
+ * @param {Array<Object>} orders - L'array di oggetti ordine da visualizzare.
  */
-function openSummaryOrdersCard() {
-    // 1️⃣ Nascondiamo le dashboard e la login area PRIMA di mostrare la card riepilogo
+function populateSummaryOrdersTable(orders) {
+    const summaryTableBody = document.querySelector('#summary-orders-card tbody');
+    if (!summaryTableBody) return;
+
+    if (orders.length === 0) {
+        summaryTableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">Nessun ordine trovato con i filtri selezionati.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    orders.forEach(order => {
+        // Generazione delle righe HTML per la tabella di riepilogo
+        html += `
+            <tr class="hover:bg-gray-50">
+                <td class="border px-2 py-1 text-sm">${order.ean || 'N/D'}</td>
+                <td class="border px-2 py-1 text-sm">${order.codiceArticolo || 'N/D'}</td>
+                <td class="border px-2 py-1 text-sm">${order.brand || 'N/D'}</td>
+                <td class="border px-2 py-1 text-sm">${order.stile || 'N/D'}</td>
+                <td class="border px-2 py-1 text-sm">${order.categoria || 'N/D'}</td>
+                <td class="border px-2 py-1 text-sm">${order.genere || 'N/D'}</td>
+                <td class="border px-2 py-1 text-sm status-${order.status ? order.status.replace(/\s/g, '-') : 'nd'}">${order.status || 'N/D'}</td>
+                <td class="border px-2 py-1 text-sm">${order.assignedTo || 'N/D'}</td>
+            </tr>
+        `;
+    });
+
+    summaryTableBody.innerHTML = html;
+}	
+
+function function openSummaryOrdersCard() {
+    // 1️⃣ Nasconde TUTTI i contenitori principali
     hideAllCards(); 
 	
     const summaryCard = document.getElementById('summary-orders-card'); 
     
+    // Per un test pulito, assicurati che la dashboard worker/admin sia nascosta
+    const workerDashboard = document.getElementById('worker-dashboard');
+    if (workerDashboard) workerDashboard.style.display = 'none';
+    const adminDashboard = document.getElementById('admin-dashboard');
+    if (adminDashboard) adminDashboard.style.display = 'none';
+
     if (summaryCard) {
         summaryCard.classList.remove('hidden'); 
-        
-        // 2️⃣ MANTENIAMO SOLO display: 'block'
+        // 2️⃣ Usa SOLO 'block' per la visualizzazione corretta
         summaryCard.style.display = 'block';
 
-        // 🛑 RIMUOVI TUTTE QUESTE RIGHE CHE CAUSAVANO L'ANOMALIA:
-        // summaryCard.style.position = 'fixed'; 
-        // summaryCard.style.top = '50%';        
-        // summaryCard.style.left = '50%';
-        // summaryCard.style.transform = 'translate(-50%, -50%)'; 
-        // summaryCard.style.width = '80%';     
-        // summaryCard.style.height = '80%';    
-        // summaryCard.style.zIndex = '100';    
-
-    } else {
+          } else {
         console.error("Elemento #summary-orders-card non trovato.");
         return;
     }
