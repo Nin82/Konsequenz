@@ -672,8 +672,11 @@ async function saveAdminOrderUpdates() {
 document.addEventListener("DOMContentLoaded", () => {
   const toggleUsers = document.getElementById('toggle-users-card');
   const toggleImport = document.getElementById('toggle-import-card');
+  const toggleStats = document.getElementById('toggle-stats-card'); // 👈 nuovo toggle
+
   const usersCard = document.getElementById('card-users');
   const importCard = document.getElementById('card-import');
+  const statsSection = document.getElementById('admin-stats-section'); // 👈 nuova sezione target
 
   // === Card Gestione Utenti ===
   if (toggleUsers && usersCard) {
@@ -700,6 +703,20 @@ document.addEventListener("DOMContentLoaded", () => {
     toggleImport.addEventListener('change', () => {
       importCard.style.display = toggleImport.checked ? 'block' : 'none';
       localStorage.setItem('showImportCard', toggleImport.checked);
+    });
+  }
+
+  // === Sezione Riepilogo Ordini ===
+  if (toggleStats && statsSection) {
+    const savedStatsVisibility = localStorage.getItem('showStatsSection');
+    if (savedStatsVisibility !== null) {
+      toggleStats.checked = savedStatsVisibility === 'true';
+      statsSection.style.display = toggleStats.checked ? 'block' : 'none';
+    }
+
+    toggleStats.addEventListener('change', () => {
+      statsSection.style.display = toggleStats.checked ? 'block' : 'none';
+      localStorage.setItem('showStatsSection', toggleStats.checked);
     });
   }
 });
@@ -757,80 +774,6 @@ function showAdminFeedback(message, type = 'info') {
 /**
  * Carica tutti gli ordini da Backendless e li mostra nella tabella Admin
  */
-async function loadAllOrdersForAdmin() {
-  const loadingEl = document.getElementById('loading-admin-orders');
-  const table = document.getElementById('admin-orders-table');
-  const tbody = table.querySelector('tbody');
-
-  loadingEl.textContent = "Caricamento ordini in corso...";
-  loadingEl.style.display = "block";
-  loadingEl.style.color = "#111"; // colore testo normale
-  tbody.innerHTML = "";
-  table.classList.add('hidden');
-
-  try {
-    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find({
-      sortBy: ['lastUpdated DESC'],
-      pageSize: 100
-    });
-
-    if (!orders || orders.length === 0) {
-      loadingEl.textContent = "Nessun ordine trovato.";
-      table.classList.add('hidden');
-      return;
-    }
-
-    orders.forEach(order => {
-      const tr = document.createElement('tr');
-      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
-
-      tr.innerHTML = `
-        <td class="px-4 py-2">${order.productCode || ''}</td>
-        <td class="px-4 py-2">${order.eanCode || ''}</td>
-        <td class="px-4 py-2">${order.brand || ''}</td>
-        <td class="px-4 py-2">${order.color || ''}</td>
-        <td class="px-4 py-2">${order.size || ''}</td>
-        <td class="px-4 py-2">
-          ${Array.isArray(order.driveLinks) && order.driveLinks.length > 0
-            ? order.driveLinks.map(raw => {
-                const link = escapeHTML(raw.trim());
-                return `
-                  <a href="${link}" target="_blank"
-                     class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
-                     ${link}
-                  </a>`;
-              }).join('')
-            : '<span class="text-gray-400 italic">Nessun link</span>'}
-        </td>
-        <td class="px-4 py-2">
-          <button class="btn-primary px-3 py-1 text-sm" data-oid="${order.objectId}">
-            Modifica
-          </button>
-        </td>
-      `;
-
-      tbody.appendChild(tr);
-    });
-
-    tbody.querySelectorAll('button[data-oid]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const oid = btn.getAttribute('data-oid');
-        const order = orders.find(o => o.objectId === oid);
-        if (order) handleAdminEdit(order);
-      });
-    });
-
-    loadingEl.style.display = 'none';
-    table.classList.remove('hidden');
-  } catch (err) {
-    console.error("Errore durante il caricamento ordini:", err);
-    tbody.innerHTML = "";
-    loadingEl.textContent = "Errore durante il caricamento ordini.";
-    loadingEl.style.color = "#b91c1c"; // rosso
-    loadingEl.style.display = 'block';
-    table.classList.add('hidden');
-  }
-}
 
 async function loadAdminDashboard() {
   const dash = document.getElementById("admin-dashboard");
@@ -914,60 +857,63 @@ function escapeHTML(str) {
 function handleAdminEdit(order) {
   if (!order) return;
 
-  // Mostra un prompt per aggiornare i campi principali
-  const newProductCode = prompt("Codice Articolo:", order.productCode || "");
-  if (newProductCode === null) return;
+  // Nascondi la tabella principale
+  const ordersCard = document.getElementById('orders-admin-card');
+  if (ordersCard) ordersCard.classList.add('hidden');
 
-  const newEanCode = prompt("EAN:", order.eanCode || "");
-  if (newEanCode === null) return;
+  // Mostra la card di modifica
+  const editCard = document.getElementById('admin-order-edit-card');
+  editCard.classList.remove('hidden');
 
-  const newBrand = prompt("Brand:", order.brand || "");
-  if (newBrand === null) return;
+  // Mostra EAN in intestazione
+  document.getElementById('admin-ean-display').textContent = order.eanCode || order.productCode || '';
 
-  const newColor = prompt("Colore:", order.color || "");
-  if (newColor === null) return;
-
-  const newSize = prompt("Taglia:", order.size || "");
-  if (newSize === null) return;
-
-  const newStatus = prompt(
-    "Stato (In attesa foto / In attesa post-produzione / Completato):",
-    order.status || ""
-  );
-  if (newStatus === null) return;
-
-  const updatedOrder = {
-    objectId: order.objectId,
-    productCode: newProductCode.trim(),
-    eanCode: newEanCode.trim(),
-    brand: newBrand.trim(),
-    color: newColor.trim(),
-    size: newSize.trim(),
-    status: newStatus.trim(),
-    lastUpdated: new Date(),
+  // 🔹 Mappa dei campi HTML → proprietà Backendless
+  const fieldMap = {
+    "admin-field-productCode": "productCode",
+    "admin-field-eanCode": "eanCode",
+    "admin-field-styleName": "styleName",
+    "admin-field-styleGroup": "styleGroup",
+    "admin-field-brand": "brand",
+    "admin-field-color": "color",
+    "admin-field-size": "size",
+    "admin-field-category": "category",
+    "admin-field-gender": "gender",
+    "admin-field-shots": "shots",
+    "admin-field-quantity": "quantity",
+    "admin-field-s1Prog": "s1Prog",
+    "admin-field-s2Prog": "s2Prog",
+    "admin-field-progOnModel": "progOnModel",
+    "admin-field-stillShot": "stillShot",
+    "admin-field-onModelShot": "onModelShot",
+    "admin-field-priority": "priority",
+    "admin-field-s1Stylist": "s1Stylist",
+    "admin-field-s2Stylist": "s2Stylist",
+    "admin-field-provenienza": "provenienza",
+    "admin-field-tipologia": "tipologia",
+    "admin-field-ordine": "ordine",
+    "admin-field-dataOrdine": "dataOrdine",
+    "admin-field-entryDate": "entryDate",
+    "admin-field-exitDate": "exitDate",
+    "admin-field-collo": "collo",
+    "admin-field-dataReso": "dataReso",
+    "admin-field-ddt": "ddt",
+    "admin-field-noteLogistica": "noteLogistica",
+    "admin-field-dataPresaPost": "dataPresaPost",
+    "admin-field-dataConsegnaPost": "dataConsegnaPost",
+    "admin-field-calendario": "calendario",
+    "admin-field-postpresa": "postPresa"
   };
 
-  Backendless.Data.of(ORDER_TABLE_NAME)
-    .save(updatedOrder)
-    .then(() => {
-      showFeedback("Ordine aggiornato con successo!");
-      loadAllOrdersForAdmin();
-    })
-    .catch((error) => {
-      console.error("Errore aggiornamento ordine:", error);
-      showFeedback("Errore durante l'aggiornamento ordine.", true);
-    });
+  // Popola tutti i campi
+  Object.entries(fieldMap).forEach(([fieldId, prop]) => {
+    const input = document.getElementById(fieldId);
+    if (input) input.value = order[prop] || '';
+  });
+
+  // Salva l’oggetto corrente in memoria globale
+  currentAdminOrder = order;
 }
-
-function closeAdminEditCard() {
-    const ordersCard = document.getElementById('orders-admin-card');
-    if (ordersCard) ordersCard.style.display = 'block';
-
-    // Ricarica la lista ordini admin
-    loadAllOrdersForAdmin();
-}
-
-
 
 
 // ----------------------------------------------------
