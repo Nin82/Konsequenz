@@ -225,19 +225,39 @@
 
                 </div>
                 
-                <p id="update-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
-            </div>
+        <p id="update-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
+          </div>
 
             <div id="photo-upload-area" class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
-                <h4 class="font-bold text-lg mb-3 text-green-700">EAN: <span id="current-ean-display-upload"></span></h4>
-                <label for="photo-files" class="block text-sm font-medium text-gray-700 mb-2">Carica Immagini (.jpg/.png):</label>
-                <input type="file" id="photo-files" multiple accept="image/*" class="w-full mb-4" />
-                <div class="flex space-x-3">
-                    <button onclick="handlePhotoUploadAndCompletion()" class="btn-success flex-grow py-2">Upload & Completa</button>
-                    <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">Annulla</button>
-                </div>
-                <p id="upload-status-message" class="status-message status-success hidden"></p>
-            </div>
+  <h4 class="font-bold text-lg mb-3 text-green-700">
+    EAN: <span id="current-ean-display-upload"></span>
+  </h4>
+
+  <label for="photo-drive-links" class="block text-sm font-medium text-gray-700 mb-2">
+    Inserisci link Google Drive (uno per riga):
+  </label>
+
+  <!-- Campo di testo per i link -->
+  <textarea
+    id="photo-drive-links"
+    placeholder="https://drive.google.com/..."
+    class="w-full p-2 border border-green-300 rounded-md h-32 mb-4 resize-y"></textarea>
+
+  <div class="flex space-x-3">
+    <button
+      onclick="handlePhotoUploadAndCompletion()"
+      class="btn-success flex-grow py-2">
+      Salva Link & Completa
+    </button>
+    <button
+      onclick="cancelAdminOrderEdit()"
+      class="btn-secondary py-2 px-4">
+      Annulla
+    </button>
+  </div>
+
+  <p id="upload-status-message" class="status-message status-success hidden mt-3"></p>
+</div>
         </div>
 
 
@@ -368,15 +388,16 @@
   <div class="overflow-x-auto">
     <table id="admin-orders-table" class="min-w-full divide-y divide-gray-200">
       <thead>
-        <tr>
-          <th>Codice Articolo</th>
-          <th>EAN</th>
-          <th>Brand</th>
-          <th>Colore</th>
-          <th>Taglia</th>
-          <th>Azioni</th>
-        </tr>
-      </thead>
+  <tr>
+    <th>Codice Articolo</th>
+    <th>EAN</th>
+    <th>Brand</th>
+    <th>Colore</th>
+    <th>Taglia</th>
+    <th>Link Foto</th>
+    <th>Azioni</th>
+  </tr>
+</thead>
       <tbody></tbody>
     </table>
   </div>
