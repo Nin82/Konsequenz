@@ -29,7 +29,9 @@ let currentUser = null;
 let currentRole = null;
 let currentEanInProcess = null;
 let currentAdminOrder = null;
-
+let currentOrderObjectId = null;
+let currentOrderEanCode = null;
+	
 
 // Inizializzazione di Backendless
 Backendless.initApp(APPLICATION_ID, API_KEY);
@@ -776,55 +778,54 @@ document.addEventListener("DOMContentLoaded", () => {
     { toggleId: 'toggle-import-card', cardId: 'card-import', storageKey: 'showImportCard' }
   ];
 
-  toggles.forEach(({ toggleId, cardId, storageKey }) => {
-    const toggle = document.getElementById(toggleId);
-    const card = document.getElementById(cardId);
-    if (!toggle || !card) return;
-
-    // Ripristina stato da localStorage
-    const savedState = localStorage.getItem(storageKey);
-    if (savedState !== null) {
-      toggle.checked = savedState === 'true';
-      card.style.display = toggle.checked ? 'block' : 'none';
-    }
-
-    // Gestione toggle
-    toggle.addEventListener('change', () => {
-      card.style.display = toggle.checked ? 'block' : 'none';
-      localStorage.setItem(storageKey, toggle.checked);
-    });
-  });
+  toggles.forEach(({ toggleId, cardId, storageKey }) => initToggleCard(toggleId, cardId, storageKey));
 });
+
+function initToggleCard(toggleId, cardId, storageKey) {
+  const toggle = document.getElementById(toggleId);
+  const card = document.getElementById(cardId);
+  if (!toggle || !card) return;
+
+  // Ripristina stato da localStorage
+  const savedState = localStorage.getItem(storageKey);
+  if (savedState !== null) {
+    toggle.checked = savedState === 'true';
+    card.classList.toggle('hidden', !toggle.checked);
+  }
+
+  // Gestione toggle
+  toggle.addEventListener('change', () => {
+    card.classList.toggle('hidden', !toggle.checked);
+    localStorage.setItem(storageKey, toggle.checked);
+  });
+}
 
 
 function cancelAdminOrderEdit() {
     const editCard = document.getElementById('admin-order-edit-card');
     const ordersCard = document.getElementById('orders-admin-card');
-
     if (!editCard) return;
 
-    // Nasconde card modifica
-    editCard.classList.add('hidden');
-    currentAdminOrder = null;
+    // Nasconde card modifica con animazione
+    hideCard('admin-order-edit-card', () => {
+        // Reset campi
+        const fields = editCard.querySelectorAll('input, textarea, select');
+        fields.forEach(f => {
+            if (f.tagName === 'SELECT') f.selectedIndex = 0;
+            else f.value = '';
+        });
 
-    // Mostra di nuovo la lista ordini
-    if (ordersCard) ordersCard.classList.remove('hidden');
+        // Reset feedback
+        const feedbackEls = editCard.querySelectorAll('.status-message, .feedback');
+        feedbackEls.forEach(el => {
+            el.textContent = '';
+            el.style.display = 'none';
+        });
 
-    // Pulisce tutti i campi della card di modifica
-    const fields = editCard.querySelectorAll('input, textarea, select');
-    fields.forEach(f => {
-        if (f.tagName === 'SELECT') {
-            f.selectedIndex = 0;
-        } else {
-            f.value = '';
-        }
-    });
+        // Mostra lista ordini
+        if (ordersCard) showCard('orders-admin-card');
 
-    // Rimuove eventuali messaggi di feedback residui
-    const feedbackEls = editCard.querySelectorAll('.status-message, .feedback');
-    feedbackEls.forEach(el => {
-        el.textContent = '';
-        el.style.display = 'none';
+        currentAdminOrder = null;
     });
 }
 
@@ -935,7 +936,7 @@ async function loadAllOrdersForAdmin() {
         loadingEl.style.display = 'none';
         table.classList.remove('hidden');
     } catch (err) {
-        console.error(err);
+        console.error(err);cancelAdminOrderEdit
         loadingEl.textContent = "Errore durante il caricamento ordini.";
     }
 }
@@ -943,21 +944,25 @@ async function loadAllOrdersForAdmin() {
 function handleAdminEdit(order) {
     if (!order) return;
 
-    // 1️⃣ Nascondi lista ordini
     const ordersCard = document.getElementById('orders-admin-card');
-    if (ordersCard) ordersCard.style.display = 'none';
 
-    // 2️⃣ Popola form/modale con i dati dell'ordine
+    // Nasconde lista ordini
+    if (ordersCard) hideCard('orders-admin-card');
+
+    // Mostra card modifica
+    showCard('admin-order-edit-card');
+
+    // Popola form/modale
     openAdminOrderCard(order);
 
-    // 3️⃣ Override dei pulsanti Salva / Annulla nella modale
+    // Override pulsanti Salva / Annulla
     const saveBtn = document.getElementById('admin-order-save-btn');
     const cancelBtn = document.getElementById('admin-order-cancel-btn');
 
     if (saveBtn) {
         saveBtn.onclick = async () => {
-            await saveAdminOrderUpdates(); // salva le modifiche su Backendless
-            cancelAdminOrderEdit(); // chiude e resetta la card
+            await saveAdminOrderUpdates();
+            cancelAdminOrderEdit();
         };
     }
 
@@ -991,34 +996,101 @@ function closeAdminEditCard() {
 
 
 // ----------------------------------------------------
+// FUNZIONI GENERICHE PER MOSTRA/NASCONDI CARD
+// ----------------------------------------------------
+
+/**
+ * Mostra una card con animazione.
+ * @param {string} cardId ID della card da mostrare
+ */
+function showCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    card.classList.remove('hidden');
+    // Forza il reflow per trigger CSS transition se serve
+    card.offsetHeight;
+    card.style.opacity = '1';
+}
+
+/**
+ * Nasconde una card con animazione.
+ * @param {string} cardId ID della card da nascondere
+ * @param {Function} callback Funzione opzionale da chiamare al termine dell'animazione
+ */
+function hideCard(cardId, callback) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    card.style.opacity = '0';
+    setTimeout(() => {
+        card.classList.add('hidden');
+        if (callback) callback();
+    }, 300); // tempo in ms della transizione CSS
+}
+// ----------------------------------------------------
 // FUNZIONI WORKER (DASHBOARD)
+// ----------------------------------------------------
+
+// ----------------------------------------------------
+// CARICAMENTO ORDINI PER UTENTI WORKER (Photographer/PostProducer)
 // ----------------------------------------------------
 
 function loadOrdersForUser(role) {
     const tableBody = document.querySelector('#orders-table tbody');
     const loadingText = document.getElementById('loading-orders');
 
-    loadingText.textContent = `Caricamento ordini per il ruolo ${role}...`;
+    // 1. Controlli Iniziali e Sicurezza
+    if (!currentUser || !currentUser.objectId) { 
+        console.error("Utente non loggato o ID mancante per il filtro.");
+        // Assicurati che showLoginArea sia definita
+        if (typeof showLoginArea === 'function') showLoginArea("Sessione scaduta o utente non identificato.");
+        return;
+    }
+
+    loadingText.textContent = `Caricamento coda di lavoro per ${role}...`;
     tableBody.innerHTML = '';
     
-    let whereClause = '';
+    let statusClause = '';
+    let userFilterField = ''; // Il campo nella tabella Orders che lega l'ordine all'utente
+
     if (role === ROLES.PHOTOGRAPHER) {
-        whereClause = `status = '${STATUS_WAITING_PHOTO}'`; // 💡 USA LA NUOVA COSTANTE
+        // Il fotografo vede ordini:
+        // 1. In attesa foto (nuovi ordini)
+        // 2. Rifiutati/Ritorna a foto (ordini che deve rifare)
+        statusClause = `status = '${STATUS_WAITING_PHOTO}' OR status = '${STATUS.REJECTED}'`;
+        // Filtra per se stesso. Assumiamo che ci sia un campo 'photographerId'
+        userFilterField = 'photographerId.objectId'; 
+    
     } else if (role === ROLES.POST_PRODUCER) {
-        whereClause = `status = '${STATUS.WAITING_POST_PRODUCTION}'`;
+        // Il post producer vede ordini:
+        // 1. In attesa post-produzione (l'ordine gli arriva dal fotografo)
+        // 2. In post-produzione (se sta lavorando attivamente)
+        statusClause = `status = '${STATUS.WAITING_POST_PRODUCTION}' OR status = '${STATUS.IN_POST_PROCESS}'`;
+        // Filtra per se stesso. Assumiamo che ci sia un campo 'postProducerId'
+        userFilterField = 'postProducerId.objectId';
+        
     } else {
         tableBody.innerHTML = '<tr><td colspan="11">Ruolo non valido per la visualizzazione ordini.</td></tr>';
         return;
     }
 
+    // 2. Costruzione Query con Filtro di Sicurezza
+    // 💡 JOIN CLAUSE: Filtra sia per Stato che per l'ID dell'utente loggato.
+    const whereClause = `(${statusClause}) AND (${userFilterField} = '${currentUser.objectId}')`;
+
     const queryBuilder = Backendless.DataQueryBuilder.create()
         .setWhereClause(whereClause)
         .setSortBy(['lastUpdated DESC'])
         .setPageSize(50);
+        
+    // 💡 Assicurati di includere le relazioni necessarie se usi campi collegati!
+    // Esempio: .setRelated(['photographerId', 'postProducerId']); 
+
     Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder)
         .then(orders => {
             if (!orders || orders.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="11">Nessun ordine da visualizzare.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="11">Nessun ordine da visualizzare nella tua coda di lavoro.</td></tr>';
                 loadingText.textContent = '';
                 return;
             }
@@ -1026,9 +1098,12 @@ function loadOrdersForUser(role) {
             loadingText.textContent = '';
             document.getElementById('worker-role-display-queue').textContent = role;
 
+            // 3. Popolamento Tabella
             orders.forEach(order => {
                 const row = tableBody.insertRow();
+                row.classList.add('hover:bg-gray-100'); // Aggiunto hover per UX
 
+                // Popola le celle con i dati dell'ordine
                 row.insertCell().textContent = order.productCode || '';
                 row.insertCell().textContent = order.eanCode || '';
                 row.insertCell().textContent = order.styleName || '';
@@ -1040,15 +1115,29 @@ function loadOrdersForUser(role) {
                 row.insertCell().textContent = order.gender || '';
                 row.insertCell().textContent = order.status || '';
                 
+                // 4. Cella Azioni (Dinamica per Ruolo)
                 const actionCell = row.insertCell();
-                actionCell.classList.add('action-cell');
+                actionCell.classList.add('action-cell', 'whitespace-nowrap');
 
-                const viewBtn = document.createElement('button');
-                viewBtn.textContent = 'Visualizza Foto';
-                viewBtn.className = 'btn-primary text-xs py-1 px-2';
-                viewBtn.onclick = () => openPhotoModal(order.eanCode);
+                let actionBtn;
+                if (role === ROLES.PHOTOGRAPHER) {
+                    // Il fotografo deve aprire un modale per l'Upload
+                    actionBtn = document.createElement('button');
+                    actionBtn.textContent = 'Carica Foto';
+                    actionBtn.className = 'btn-success text-xs py-1 px-2';
+                    // Assumiamo che openPhotoUploadModal sia definita
+                    actionBtn.onclick = () => openPhotoUploadModal(order.objectId, order.eanCode); 
+                    
+                } else if (role === ROLES.POST_PRODUCER) {
+                    // Il post producer deve visualizzare e agire sulla foto caricata
+                    actionBtn = document.createElement('button');
+                    actionBtn.textContent = 'Lavora Ordine';
+                    actionBtn.className = 'btn-primary text-xs py-1 px-2';
+                    // Assumiamo che openPostProductionModal sia definita
+                    actionBtn.onclick = () => openPostProductionModal(order.objectId, order.eanCode, order.photoUrl);
+                }
 
-                actionCell.appendChild(viewBtn);
+                if (actionBtn) actionCell.appendChild(actionBtn);
             });
         })
         .catch(error => {
@@ -1058,12 +1147,11 @@ function loadOrdersForUser(role) {
         });
 }
 
-
 async function confirmEanInput() {
     const eanInputEl = document.getElementById("ean-input");
     const scanStatus = document.getElementById("scan-status");
     const actionsArea = document.getElementById("ean-actions-area");
-    const photoUploadArea = document.getElementById("photo-upload-area");
+    // ❌ Rimosso photoUploadArea e current-ean-display-upload perché obsoleti (la logica di foto è ora nel modale)
     const currentEanDisplay = document.getElementById("current-ean-display");
 
     if (!eanInputEl) return;
@@ -1072,50 +1160,56 @@ async function confirmEanInput() {
     // ❌ Input vuoto
     if (!eanInput) {
         scanStatus.textContent = "Inserisci un codice EAN o un Codice Articolo!";
-        scanStatus.className = "status-message status-error";
+        scanStatus.className = "status-message status-error p-2 rounded mt-2";
         scanStatus.classList.remove("hidden");
         if (actionsArea) actionsArea.classList.add("hidden");
-        if (photoUploadArea) photoUploadArea.style.display = 'none';
         return;
     }
 
     try {
         // 🔄 Stato in corso
         scanStatus.textContent = "Verifica in corso...";
-        scanStatus.className = "status-message status-info";
+        scanStatus.className = "status-message status-info p-2 rounded mt-2";
         scanStatus.classList.remove("hidden");
 
         const query = Backendless.DataQueryBuilder.create()
+            // 💡 È sempre buona pratica caricare l'assegnazione utente (photographerId/postProducerId)
+            // Se la logica di assegnazione è qui, puoi aggiungerla: .setRelated(['photographerId', 'postProducerId']);
             .setWhereClause(`eanCode='${eanInput}' OR productCode='${eanInput}'`);
 
-        const orders = await Backendless.Data.of("Orders").find(query);
+        const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query); // Usa ORDER_TABLE_NAME
 
         if (!orders || orders.length === 0) {
             scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
-            scanStatus.className = "status-message status-error";
+            scanStatus.className = "status-message status-error p-2 rounded mt-2";
             if (actionsArea) actionsArea.classList.add("hidden");
-            if (photoUploadArea) photoUploadArea.style.display = 'none';
             return;
         }
 
         const order = orders[0];
+        
+        // 1. Verifica Ruolo e Assegnazione (Sicurezza)
+        if (currentRole === ROLES.PHOTOGRAPHER && order.photographerId.objectId !== currentUser.objectId) {
+            scanStatus.textContent = `❌ Ordine ${eanInput} non assegnato a te come fotografo.`;
+            scanStatus.className = "status-message status-error p-2 rounded mt-2";
+            if (actionsArea) actionsArea.classList.add("hidden");
+            return;
+        }
+        if (currentRole === ROLES.POST_PRODUCER && order.postProducerId.objectId !== currentUser.objectId) {
+            scanStatus.textContent = `❌ Ordine ${eanInput} non assegnato a te come post-producer.`;
+            scanStatus.className = "status-message status-error p-2 rounded mt-2";
+            if (actionsArea) actionsArea.classList.add("hidden");
+            return;
+        }
+
+
+        // 2. Successo e visualizzazione
         scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
-        scanStatus.className = "status-message status-success";
+        scanStatus.className = "status-message status-success p-2 rounded mt-2";
         if (actionsArea) actionsArea.classList.remove("hidden");
         if (currentEanDisplay) currentEanDisplay.textContent = eanInput;
 
-        // 📸 Mostra area foto solo per PHOTOGRAPHER
-        if (photoUploadArea) {
-            if (currentRole === ROLES.PHOTOGRAPHER) {
-                photoUploadArea.style.display = 'block';
-                const uploadEanDisplay = document.getElementById("current-ean-display-upload");
-                if (uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
-            } else {
-                photoUploadArea.style.display = 'none';
-            }
-        }
-
-        // 📝 Popola campi
+        // 3. Popola campi (mapping corretto)
         const map = {
             "field-shots": "shots",
             "field-quantity": "quantity",
@@ -1130,8 +1224,6 @@ async function confirmEanInput() {
             "field-provenienza": "provenienza",
             "field-tipologia": "tipologia",
             "field-ordine": "ordine",
-            "field-data-ordine": "dataOrdine",
-            "field-entry-date": "entryDate",
             "field-exit-date": "exitDate",
             "field-collo": "collo",
             "field-data-reso": "dataReso",
@@ -1141,6 +1233,8 @@ async function confirmEanInput() {
             "field-data-consegna-post": "dataConsegnaPost",
             "field-calendario": "calendario",
             "field-postpresa": "postPresa"
+            // Nota: Rimosso dataOrdine e entryDate perché non erano presenti nel tuo HTML,
+            // e ci sono alcuni campi non mappati in questa lista, verifica il DB.
         };
 
         Object.entries(map).forEach(([inputId, key]) => {
@@ -1148,17 +1242,16 @@ async function confirmEanInput() {
             if (el) el.value = order[key] || "";
         });
 
-        // 🔖 Salva EAN corrente
-        currentEanInProcess = { objectId: order.objectId, ean: eanInput };
+        // 4. Salva EAN e Object ID corrente per le azioni successive (es. saveEanUpdates)
+        currentEanInProcess = { objectId: order.objectId, ean: order.eanCode }; 
+        
     } catch (err) {
-        console.error(err);
-        scanStatus.textContent = "Errore durante la verifica EAN.";
-        scanStatus.className = "status-message status-error";
+        console.error("Errore durante la verifica EAN:", err);
+        scanStatus.textContent = "Errore durante la verifica EAN o l'accesso ai dati.";
+        scanStatus.className = "status-message status-error p-2 rounded mt-2";
         if (actionsArea) actionsArea.classList.add("hidden");
-        if (photoUploadArea) photoUploadArea.style.display = 'none';
     }
 }
-
 
 // 💾 Salva i dati operativi aggiornati su Backendless
 async function saveEanUpdates() {
@@ -1284,24 +1377,109 @@ function resetEanActionState(showCancelFeedback = false) {
 }
 
 
-function handlePhotoUploadAndCompletion() {
-    alert("Funzione di upload non ancora implementata!");
-}
-
-function openPhotoModal(eanCode) {
-    const modal = document.getElementById('photo-modal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        document.getElementById('modal-ean-title').textContent = eanCode || '';
-        const modalContent = document.getElementById('photo-modal-content');
-        if (modalContent) {
-            modalContent.innerHTML = `<p>Caricamento foto per EAN: ${eanCode}...</p>`;
+async function handlePhotoUploadAndCompletion(orderObjectId, eanCode, linkInputId) {
+    // 1. Recupera il link e gli elementi UI
+    const linkInput = document.getElementById(linkInputId);
+    if (!linkInput) {
+        console.error("Input link non trovato.");
+        return;
+    }
+    const photoLink = linkInput.value.trim();
+    const statusEl = document.getElementById('photo-upload-status');
+    
+    if (!photoLink) {
+        // Assicurati che showStatusMessage sia definita
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage('photo-upload-status', 'Per favore, inserisci il link del file fotografico.', false);
         }
+        return;
+    }
+
+    // Verifica base del formato URL (opzionale, ma consigliata)
+    if (!photoLink.startsWith('http')) {
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage('photo-upload-status', 'Il link deve essere un URL valido (deve iniziare con http o https).', false);
+        }
+        return;
+    }
+
+    // Mostra stato di lavorazione
+    if (typeof showStatusMessage === 'function') {
+        showStatusMessage('photo-upload-status', `Aggiornamento ordine ${eanCode} in corso...`, true);
     } else {
-        console.warn("Elemento #photo-modal non trovato.");
+        console.warn("Funzione showStatusMessage non definita. Impossibile mostrare lo stato.");
+    }
+
+    try {
+        // 2. Aggiornamento dello Stato dell'Ordine su Backendless
+        const orderData = {
+            objectId: orderObjectId,
+            // 💡 SALVA IL LINK AL DB ESTERNO nel campo che prima conteneva l'URL Backendless
+            photoUrl: photoLink, 
+            status: STATUS.WAITING_POST_PRODUCTION, // Sposta l'ordine alla Post-Produzione
+            photoUploadDate: new Date(),
+            fotografo: currentUser.name || currentUser.email // Salva chi ha completato il task
+        };
+
+        await Backendless.Data.of(ORDER_TABLE_NAME).save(orderData);
+        
+        // 3. Successo e aggiornamento UI
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage('photo-upload-status', `Link salvato e ordine ${eanCode} passato in Post-Produzione!`, true);
+        }
+
+        // Ricarica la lista ordini per il Photographer per rimuovere l'ordine completato
+        if (typeof loadOrdersForUser === 'function') {
+            loadOrdersForUser(ROLES.PHOTOGRAPHER); 
+        }
+        
+        // Assumiamo che closeModal esista
+        if (typeof closeModal === 'function') {
+            closeModal('photo-modal'); 
+        }
+
+    } catch (error) {
+        console.error("Errore salvataggio link o aggiornamento ordine:", error);
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage('photo-upload-status', `Errore durante l'aggiornamento: ${error.message}`, false);
+        }
     }
 }
+function openPhotoUploadModal(objectId, eanCode) {
+    // 1. Salva le variabili globali (NECESSARIE per handlePhotoUploadAndCompletion)
+    currentOrderObjectId = objectId;
+    currentOrderEanCode = eanCode;
+    
+    const modal = document.getElementById('photo-modal');
+    if (!modal) {
+        console.warn("Elemento #photo-modal non trovato.");
+        return;
+    }
+    
+    const linkInput = document.getElementById('photo-link-input');
+    
+    // 2. Aggiorna l'UI del modale (Titolo, pulizia campi e stato)
+    document.getElementById('modal-ean-title').textContent = eanCode || '';
+    
+    // Pulisce il campo input del link
+    if (linkInput) linkInput.value = '';
 
+    // Pulisce il messaggio di stato (se showStatusMessage è definita)
+    if (typeof showStatusMessage === 'function') {
+        showStatusMessage('photo-upload-status', '', true); 
+    }
+    
+    // 3. Mostra il modale
+    modal.classList.remove('hidden');
+}
+
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
 
 // ----------------------------------------------------
 // FUNZIONE PER LA VISTA GENERALE DI TUTTI GLI ORDINI
