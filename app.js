@@ -42,13 +42,16 @@ const ROLES = {
 // 🔧 CONFIGURAZIONE RUOLI (colonne dinamiche + azioni per tabella worker)
 const ROLE_CONFIG = {
   [ROLES.ADMIN]: {
-    filter: "",
-    columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
-    actions: order => `
-      <button class="btn-primary px-3 py-1 text-sm" data-oid="${order.objectId}">
-        Modifica
-      </button>`
-  },
+  filter: "",
+  columns: ["productCode", "eanCode", "brand", "color", "size", "status", "assignedToEmail", "driveLinks"],
+  actions: order => `
+    <button class="btn-primary px-3 py-1 text-sm mr-2" data-oid="${order.objectId}">
+      Modifica
+    </button>
+    <button class="btn-secondary px-3 py-1 text-sm" onclick="openAssignOrderModal('${order.objectId}')">
+      Assegna
+    </button>`
+},
 
  [ROLES.PHOTOGRAPHER]: {
   filter: `status = '${STATUS.WAITING_PHOTO}'`,
@@ -1634,6 +1637,48 @@ async function loadAdminDashboard() {
   }
 }
 
+
+// =====================================================
+// 🔔 FUNZIONE NOTIFICA VISIVA (TOAST)
+// =====================================================
+function showToast(message, type = "info") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  // Crea il div del toast
+  const toast = document.createElement("div");
+  toast.className = `
+    px-4 py-2 rounded-lg shadow-lg text-white font-medium text-sm animate-fade-in-down
+    ${type === "success" ? "bg-green-600" : ""}
+    ${type === "error" ? "bg-red-600" : ""}
+    ${type === "info" ? "bg-blue-600" : ""}
+  `;
+  toast.textContent = message;
+
+  container.appendChild(toast);
+
+  // Rimuovi automaticamente dopo 3 secondi
+  setTimeout(() => {
+    toast.classList.add("animate-fade-out-up");
+    setTimeout(() => toast.remove(), 500);
+  }, 3000);
+}
+
+// 🔄 Animazioni CSS semplici
+const style = document.createElement("style");
+style.textContent = `
+@keyframes fade-in-down {
+  0% { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-out-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+.animate-fade-in-down { animation: fade-in-down 0.3s ease-out; }
+.animate-fade-out-up { animation: fade-out-up 0.5s ease-in; }
+`;
+document.head.appendChild(style);
 // ----------------------------------------------------
 // GESTIONE INIZIALE – RIPRISTINO SESSIONE
 // ----------------------------------------------------
@@ -1662,3 +1707,4 @@ window.onload = function() {
       showLoginArea();
     });
 };
+
