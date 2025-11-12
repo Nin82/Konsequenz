@@ -71,6 +71,46 @@ const ROLE_CONFIG = {
   }
 };
 
+// =====================================================
+// CONFIGURAZIONE DEI CAMPI MODIFICABILI PER UTENTE
+// =====================================================
+const EDITABLE_FIELDS = [
+  { key: "productCode", label: "Codice Articolo", type: "stringa" },
+  { key: "eanCode", label: "Ean Code", type: "stringa" },
+  { key: "styleName", label: "Style Name", type: "stringa" },
+  { key: "styleGroup", label: "Style Group", type: "stringa" },
+  { key: "brand", label: "Brand", type: "stringa" },
+  { key: "color", label: "Colore", type: "stringa" },
+  { key: "size", label: "Taglia", type: "stringa" },
+  { key: "category", label: "Categoria", type: "stringa" },
+  { key: "gender", label: "Genere", type: "stringa" },
+  { key: "shots", label: "N. Scatti", type: "numero" },
+  { key: "quantity", label: "Qta", type: "numero" },
+  { key: "s1Prog", label: "s1-Prog", type: "stringa" },
+  { key: "s2Prog", label: "s2-Prog", type: "stringa" },
+  { key: "progOnModel", label: "Prog. on-m", type: "stringa" },
+  { key: "stillShot", label: "Scatto Still (S/N)", type: "boolean" },
+  { key: "onModelShot", label: "Scatto On Model (S/N)", type: "boolean" },
+  { key: "priority", label: "Priorità", type: "stringa" },
+  { key: "s1Stylist", label: "s1-Stylist", type: "stringa" },
+  { key: "s2Stylist", label: "s2-Stylist", type: "stringa" },
+  { key: "provenienza", label: "provenienza", type: "stringa" },
+  { key: "tipologia", label: "tipologia", type: "stringa" },
+  { key: "ordine", label: "Ordine", type: "numero" },
+  { key: "dataOrdine", label: "Data ordine", type: "data" },
+  { key: "entryDate", label: "Entry Date", type: "data" },
+  { key: "exitDate", label: "Exit Date", type: "data" },
+  { key: "collo", label: "Collo", type: "numero" },
+  { key: "dataReso", label: "Data Reso", type: "data" },
+  { key: "ddt", label: "DDT N.", type: "stringa" },
+  { key: "noteLogistica", label: "Note Logistica", type: "stringa" },
+  { key: "dataPresaPost", label: "Data Presa in Carico Post", type: "data" },
+  { key: "dataConsegnaPost", label: "Data Consegna Post", type: "data" },
+  { key: "calendario", label: "Calendario", type: "boolean" },
+  { key: "postPresa", label: "Post-presa in carico", type: "stringa" }
+];
+
+
 // ➕ RUOLO AGGIUNTIVO (fuori dall’oggetto ROLE_CONFIG)
 ROLE_CONFIG.QUALITY_CHECKER = {
   filter: `status = 'In approvazione'`,
@@ -259,6 +299,7 @@ function renderUsersTable(users) {
   const tableBody = document.querySelector('#users-table tbody');
   tableBody.innerHTML = '';
   const loadingUsersEl = document.getElementById('loading-users');
+
   if (!users || users.length === 0) {
     loadingUsersEl.textContent = "Nessun utente trovato (a parte te, Admin).";
     loadingUsersEl.style.display = 'block';
@@ -266,8 +307,9 @@ function renderUsersTable(users) {
   }
 
   loadingUsersEl.style.display = 'none';
+
   users.forEach(user => {
-    // ✅ evita errore se currentUser è nullo
+    // ✅ Evita errore se currentUser è nullo
     if (currentUser && user.objectId === currentUser.objectId) return;
 
     const row = tableBody.insertRow();
@@ -279,30 +321,155 @@ function renderUsersTable(users) {
     const actionCell = row.insertCell();
     actionCell.classList.add('action-cell');
 
+    // 🔽 Select per assegnare ruolo
     const roleSelect = document.createElement('select');
     roleSelect.className = 'w-1/2 p-2 border border-gray-300 rounded-md text-sm';
-    Object.values(ROLES).filter(r => r !== ROLES.ADMIN).forEach(role => {
-      const option = document.createElement('option');
-      option.value = role;
-      option.textContent = role;
-      if (user.role === role) {
-        option.selected = true;
-      }
-      roleSelect.appendChild(option);
-    });
+    Object.values(ROLES)
+      .filter(r => r !== ROLES.ADMIN)
+      .forEach(role => {
+        const option = document.createElement('option');
+        option.value = role;
+        option.textContent = role;
+        if (user.role === role) {
+          option.selected = true;
+        }
+        roleSelect.appendChild(option);
+      });
+
+    // 💾 Bottone salva ruolo
     const saveButton = document.createElement('button');
     saveButton.textContent = 'Salva Ruolo';
     saveButton.className = 'btn-success text-xs py-1 px-2 mr-2';
     saveButton.onclick = () => updateRole(user.objectId, roleSelect.value);
+
+    // 🗑️ Bottone elimina utente
     const deleteButton = document.createElement('button');
     deleteButton.textContent = 'Elimina';
     deleteButton.className = 'btn-danger text-xs py-1 px-2';
     deleteButton.onclick = () => deleteUser(user.objectId, user.email);
 
+    // ⚙️ NUOVO – Bottone configurazione permessi
+    const permissionsButton = document.createElement('button');
+    permissionsButton.textContent = 'Configura Permessi';
+    permissionsButton.className = 'btn-secondary text-xs py-1 px-2 ml-2';
+    permissionsButton.onclick = () => openPermissionsModal(user.objectId);
+
+    // Append di tutti gli elementi
     actionCell.appendChild(roleSelect);
     actionCell.appendChild(saveButton);
     actionCell.appendChild(deleteButton);
+    actionCell.appendChild(permissionsButton);
   });
+}
+
+
+// ===============================
+// GESTIONE PERMESSI UTENTE (editableFields)
+// ===============================
+
+// elenco completo e coerente con i tuoi campi Orders
+const ALL_ORDER_FIELDS = [
+  "productCode","eanCode","styleName","styleGroup","brand","color","size","category","gender",
+  "shots","quantity","s1Prog","s2Prog","progOnModel","stillShot","onModelShot","priority",
+  "s1Stylist","s2Stylist","provenienza","tipologia","ordine","dataOrdine","entryDate","exitDate",
+  "collo","dataReso","ddt","noteLogistica","dataPresaPost","dataConsegnaPost","calendario","postPresa"
+];
+
+let selectedUserForPermissions = null;
+
+/** Apre il modale e costruisce le checkbox in base ai permessi attuali dell'utente */
+async function openPermissionsModal(userId) {
+  selectedUserForPermissions = userId;
+
+  const modal = document.getElementById("permissions-modal");
+  const list = document.getElementById("permissions-list");
+  if (!modal || !list) {
+    console.error("permissions-modal o permissions-list non trovati nell'HTML.");
+    return;
+  }
+
+  // pulizia
+  list.innerHTML = "";
+
+  try {
+    // recupera l'utente per leggere editableFields
+    const user = await Backendless.Data.of(USER_TABLE_NAME).findById(userId);
+    const currentPerms = Array.isArray(user.editableFields) ? user.editableFields : [];
+
+    // costruzione dinamica delle checkbox
+    ALL_ORDER_FIELDS.forEach(field => {
+      const isChecked = currentPerms.includes(field);
+
+      const label = document.createElement("label");
+      label.className = "flex items-center gap-2 text-sm";
+
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.className = "perm-checkbox";
+      input.value = field;
+      if (isChecked) input.checked = true;
+
+      const span = document.createElement("span");
+      span.textContent = field;
+
+      label.appendChild(input);
+      label.appendChild(span);
+      list.appendChild(label);
+    });
+
+    // mostra modale
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+  } catch (err) {
+    console.error("Errore apertura modale permessi:", err);
+    if (typeof showAdminFeedback === "function") {
+      showAdminFeedback("Errore nel recupero permessi utente.", "error");
+    } else {
+      alert("Errore nel recupero permessi utente.");
+    }
+  }
+}
+
+/** Chiude il modale dei permessi */
+function closePermissionsModal() {
+  const modal = document.getElementById("permissions-modal");
+  const list = document.getElementById("permissions-list");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+  if (list) list.innerHTML = "";
+  selectedUserForPermissions = null;
+}
+
+/** Salva i permessi selezionati su Backendless (colonna Users.editableFields) */
+async function saveUserPermissions() {
+  if (!selectedUserForPermissions) return;
+
+  const checked = Array.from(document.querySelectorAll(".perm-checkbox:checked"));
+  const selectedFields = checked.map(cb => cb.value);
+
+  try {
+    await Backendless.Data.of(USER_TABLE_NAME).save({
+      objectId: selectedUserForPermissions,
+      editableFields: selectedFields
+    });
+
+    if (typeof showAdminFeedback === "function") {
+      showAdminFeedback("Permessi aggiornati con successo ✅", "success");
+    } else {
+      alert("Permessi aggiornati con successo ✅");
+    }
+
+    closePermissionsModal();
+  } catch (err) {
+    console.error("Errore salvataggio permessi:", err);
+    if (typeof showAdminFeedback === "function") {
+      showAdminFeedback("Errore durante il salvataggio dei permessi ❌", "error");
+    } else {
+      alert("Errore durante il salvataggio dei permessi ❌");
+    }
+  }
 }
 
 function loadUsersAndRoles() {
@@ -362,28 +529,48 @@ function handleUserCreation() {
   const email = document.getElementById('new-user-email').value.trim();
   const password = document.getElementById('new-user-password').value;
   const role = document.getElementById('new-user-role').value;
+
   if (!email || !password || !role) {
     showStatusMessage('user-creation-status', 'Per favore, compila tutti i campi per il nuovo utente.', false);
     return;
   }
 
-  Backendless.UserService.register({ email, password })
-    .then(newUser => {
-      const userUpdate = { objectId: newUser.objectId, role };
-      return Backendless.Data.of(USER_TABLE_NAME).save(userUpdate);
-    })
-    .then(() => {
-      showStatusMessage('user-creation-status', `Utente ${email} creato e ruolo ${role} assegnato con successo.`, true);
-      document.getElementById('new-user-email').value = '';
-      document.getElementById('new-user-password').value = '';
-      document.getElementById('new-user-role').value = '';
-      loadUsersAndRoles();
-    })
-    .catch(error => {
-      console.error("Errore creazione utente:", error);
-      showStatusMessage('user-creation-status', `Creazione Utente Fallita: ${error.message}`, false);
-    });
+  // 🔹 Raccogli i campi selezionati nei checkbox
+  const checkedBoxes = document.querySelectorAll('#editable-fields-container input[type="checkbox"]:checked');
+  const editableFields = Array.from(checkedBoxes).map(cb => cb.value);
+
+  Backendless.UserService.register({
+    email: email,
+    password: password
+  })
+  .then(newUser => {
+    // 🔹 Aggiorniamo anche il ruolo e i campi modificabili
+    const userUpdate = {
+      objectId: newUser.objectId,
+      role: role,
+      editableFields: editableFields // 👈 nuovo campo array
+    };
+
+    return Backendless.Data.of(USER_TABLE_NAME).save(userUpdate);
+  })
+  .then(() => {
+    showStatusMessage('user-creation-status', `Utente ${email} creato con successo e ruolo ${role} assegnato.`, true);
+
+    // Reset form
+    document.getElementById('new-user-email').value = '';
+    document.getElementById('new-user-password').value = '';
+    document.getElementById('new-user-role').value = '';
+    document.querySelectorAll('#editable-fields-container input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+    // Ricarica lista utenti
+    loadUsersAndRoles();
+  })
+  .catch(error => {
+    console.error("Errore creazione utente:", error);
+    showStatusMessage('user-creation-status', `Creazione Utente Fallita: ${error.message}`, false);
+  });
 }
+
 
 // =====================================================
 // PARTE 3 – FUNZIONI ADMIN (ORDINI: LISTA, EDIT, IMPORT)
@@ -520,7 +707,8 @@ function handleAdminEdit(order) {
   editCard.classList.remove('hidden');
 
   // Mostra EAN in intestazione
-  document.getElementById('admin-ean-display').textContent = order.eanCode || order.productCode || '';
+  document.getElementById('admin-ean-display').textContent =
+    order.eanCode || order.productCode || '';
 
   // Mappa dei campi HTML → proprietà Backendless
   const fieldMap = {
@@ -563,6 +751,30 @@ function handleAdminEdit(order) {
   Object.entries(fieldMap).forEach(([fieldId, prop]) => {
     const input = document.getElementById(fieldId);
     if (input) input.value = order[prop] || '';
+  });
+
+  // ✅  Permessi di modifica in base al ruolo e ai campi consentiti
+  const isAdmin = currentRole === ROLES.ADMIN;
+  let allowedFields = [];
+
+  if (!isAdmin && currentUser && Array.isArray(currentUser.editableFields)) {
+    allowedFields = currentUser.editableFields;
+  }
+
+  Object.entries(fieldMap).forEach(([fieldId, prop]) => {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+
+    // Admin → tutto abilitato
+    if (isAdmin) {
+      input.disabled = false;
+      input.classList.remove('opacity-50');
+    } else {
+      // Ruoli non admin → controlla permesso
+      const canEdit = allowedFields.includes(prop);
+      input.disabled = !canEdit;
+      input.classList.toggle('opacity-50', !canEdit);
+    }
   });
 
   // Salva l’oggetto corrente in memoria globale
@@ -1158,6 +1370,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const usersCard = document.getElementById('card-users');
   const importCard = document.getElementById('card-import');
   const statsSection = document.getElementById('admin-stats-section');
+
+  // === Render dinamico checkbox "Campi modificabili" nella creazione utente ===
+  const editableFieldsContainer = document.getElementById('editable-fields-container');
+  if (editableFieldsContainer && typeof EDITABLE_FIELDS !== "undefined") {
+    editableFieldsContainer.innerHTML = '';
+    EDITABLE_FIELDS.forEach(f => {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" value="${f.key}">
+          <span>${f.label}</span>
+        </label>`;
+      editableFieldsContainer.appendChild(div);
+    });
+  }
+
 
   // Card Gestione Utenti
   if (toggleUsers && usersCard) {
