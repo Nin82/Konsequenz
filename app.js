@@ -113,28 +113,45 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // AUTENTICAZIONE E GESTIONE UTENTI
 // ----------------------------------------------------
 
-function handleStandardLogin(email, password) {
-    const status = document.getElementById('login-status');
+async function handleStandardLogin() {
+    // 💡 Usa gli ID corretti mostrati nel tuo HTML
+    const email = document.getElementById('user-email').value;
+    const password = document.getElementById('user-password').value;
+    
+    const statusEl = document.getElementById('login-status');
+    const loginButton = document.querySelector('.btn-primary'); // Trova il bottone per disabilitarlo
 
     if (!email || !password) {
-        showLoginArea("Per favore, inserisci email e password.");
+        if (statusEl) {
+            statusEl.textContent = "Per favore, inserisci email e password.";
+            statusEl.classList.remove('hidden');
+        }
         return;
     }
 
-    if (status) {
-        status.textContent = "Accesso in corso...";
-        status.classList.remove('hidden');
+    if (statusEl) {
+        statusEl.textContent = "Accesso in corso...";
+        statusEl.classList.remove('hidden');
     }
+    if (loginButton) loginButton.disabled = true;
 
-    Backendless.UserService.login(email, password, true)
-        .then(user => {
-            handleLoginSuccess(user);
-        })
-        .catch(error => {
-            console.error("Errore di Login:", error);
-            const message = error.message || "Credenziali non valide o errore di sistema.";
-            showLoginArea("Accesso fallito: " + message);
-        });
+    try {
+        const user = await Backendless.UserService.login(email, password, true);
+        
+        // Chiamata alla funzione di successo (che deve esistere in app.txt)
+        handleLoginSuccess(user); 
+
+    } catch (error) {
+        console.error("Errore di Login:", error);
+        const message = error.message || "Credenziali non valide o errore di sistema.";
+        
+        if (statusEl) {
+            statusEl.textContent = "Accesso fallito: " + message;
+            statusEl.classList.remove('hidden');
+            statusEl.classList.add('status-error'); // Assicurati che lo stile errore sia applicato
+        }
+        if (loginButton) loginButton.disabled = false;
+    }
 }
 
 function handleLogout() {
