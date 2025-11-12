@@ -50,15 +50,15 @@ const ROLE_CONFIG = {
       </button>`
   },
 
-  [ROLES.PHOTOGRAPHER]: {
-    filter: `status = '${STATUS.WAITING_PHOTO}'`,
-    columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
-    actions: order => `
-      <button class="btn-success px-3 py-1 text-sm"
-              onclick="startPhotoUpload && startPhotoUpload('${order.objectId}', '${order.eanCode}')">
-        Carica Link
-      </button>`
-  },
+ [ROLES.PHOTOGRAPHER]: {
+  filter: `status = '${STATUS.WAITING_PHOTO}'`,
+  columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
+  actions: order => `
+    <button class="btn-success px-3 py-1 text-sm"
+            onclick="openWorkerOrderEditor('${order.objectId}')">
+      Modifica
+    </button>`
+},
 
   [ROLES.POST_PRODUCER]: {
     filter: `status = '${STATUS.WAITING_POST_PRODUCTION}'`,
@@ -675,7 +675,7 @@ function highlightUpdatedRow(objectId) {
 }
 
 /** Carica tutti gli ordini nella tabella Admin */
-async function loadAllOrdersForAdmin() {
+async function loadAllOrdersForAdmin(highlightId = null) {
   const loadingEl = document.getElementById('loading-admin-orders');
   const table = document.getElementById('admin-orders-table');
   const tbody = table.querySelector('tbody');
@@ -700,19 +700,24 @@ async function loadAllOrdersForAdmin() {
 
     orders.forEach(order => {
       const tr = document.createElement('tr');
-      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
-      tr.dataset.objectid = order.objectId;
+      tr.classList.add('hover:bg-gray-100', 'cursor-pointer', 'transition-all', 'duration-500');
+
+      // ✨ evidenzia se è quello appena aggiornato
+      if (highlightId && order.objectId === highlightId) {
+        tr.classList.add('bg-green-100');
+        setTimeout(() => tr.classList.remove('bg-green-100'), 1500);
+      }
 
       tr.innerHTML = `
-        <td class="px-4 py-2">${escapeHTML(order.productCode)}</td>
-        <td class="px-4 py-2">${escapeHTML(order.eanCode)}</td>
-        <td class="px-4 py-2">${escapeHTML(order.brand)}</td>
-        <td class="px-4 py-2">${escapeHTML(order.color)}</td>
-        <td class="px-4 py-2">${escapeHTML(order.size)}</td>
+        <td class="px-4 py-2">${order.productCode || ''}</td>
+        <td class="px-4 py-2">${order.eanCode || ''}</td>
+        <td class="px-4 py-2">${order.brand || ''}</td>
+        <td class="px-4 py-2">${order.color || ''}</td>
+        <td class="px-4 py-2">${order.size || ''}</td>
         <td class="px-4 py-2">
           ${Array.isArray(order.driveLinks) && order.driveLinks.length > 0
             ? order.driveLinks.map(raw => {
-                const link = escapeHTML(String(raw).trim());
+                const link = escapeHTML(raw.trim());
                 return `
                   <a href="${link}" target="_blank"
                      class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
@@ -731,7 +736,6 @@ async function loadAllOrdersForAdmin() {
       tbody.appendChild(tr);
     });
 
-    // bind pulsanti Modifica → maschera completa
     tbody.querySelectorAll('button[data-oid]').forEach(btn => {
       btn.addEventListener('click', () => {
         const oid = btn.getAttribute('data-oid');
@@ -751,6 +755,7 @@ async function loadAllOrdersForAdmin() {
     table.classList.add('hidden');
   }
 }
+
 
 /** Apre la card di modifica completa per Admin e popola i campi */
 async function handleAdminEdit(order) {
@@ -844,57 +849,58 @@ async function handleAdminEdit(order) {
   currentAdminOrder = order;
 }
 
+async function openWorkerOrderEditor(orderId) {
+  try {
+    const order = await Backendless.Data.of(ORDER_TABLE_NAME).findById(orderId);
+    if (!order) {
+      showToast("❌ Ordine non trovato!", "error");
+      return;
+    }
+
+    // Apre la stessa maschera usata dagli admin
+    handleAdminEdit(order);
+
+    // Disabilita i campi non permessi in base ai permessi del fotografo
+    applyFieldPermissions('admin-order-edit-card');
+
+    showToast(`📸 Modifica ordine ${order.eanCode || order.productCode}`, "info");
+  } catch (err) {
+    console.error("Errore durante l'apertura dell'ordine:", err);
+    showToast("Errore durante l'apertura dell'ordine.", "error");
+  }
+}
+
+
+
 /**
  * Abilita o disabilita i campi in base ai permessi dell'utente loggato
  */
-function applyFieldPermissions(containerId) {
-  if (!currentUser || !Array.isArray(currentUser.editableFields)) return;
-
-  const allowed = currentUser.editableFields;
-  const inputs = document.querySelectorAll(`#${containerId} input, #${containerId} select, #${containerId} textarea`);
-
-  inputs.forEach(el => {
-    const fieldName = el.id.replace(/^admin-field-|^field-/, ""); // rimuove prefissi
-    if (allowed.includes(fieldName)) {
-      el.disabled = false;
-      el.classList.remove("opacity-50", "cursor-not-allowed");
-    } else {
-      el.disabled = true;
-      el.classList.add("opacity-50", "cursor-not-allowed");
-    }
-  });
-}
 
 
 /** Salva aggiornamenti della card Admin */
 async function saveAdminOrderUpdates() {
   if (!currentAdminOrder) return;
 
-  const status = document.getElementById("admin-update-feedback");
   const container = document.getElementById("admin-order-fields");
-
   if (!container) {
     console.error("❌ ERRORE: elemento #admin-order-fields non trovato.");
     return;
   }
 
-  status.textContent = "💾 Salvataggio in corso...";
-  status.className = "status-message status-info";
-  status.classList.remove("hidden");
+  showToast("💾 Salvataggio in corso...", "info");
 
   try {
-    // Prepara l’oggetto aggiornato
     const updated = { objectId: currentAdminOrder.objectId };
 
     container.querySelectorAll("input, select, textarea").forEach(input => {
       const key = input.id.replace("admin-field-", "");
       let val = input.value;
 
-      // conversioni tipo automatiche
       if (input.type === "number") {
         val = val ? Number(val) : null;
       } else if (input.type === "date") {
-        val = val ? new Date(val) : null;
+        // salva come stringa ISO breve (yyyy-MM-dd)
+        val = val ? new Date(val).toISOString().split("T")[0] : null;
       } else if (input.tagName === "SELECT" && (val === "true" || val === "false")) {
         val = val === "true";
       }
@@ -902,27 +908,57 @@ async function saveAdminOrderUpdates() {
       updated[key] = val;
     });
 
-    // Salva su Backendless
-    await Backendless.Data.of("Orders").save(updated);
+    // salva su Backendless
+    await Backendless.Data.of(ORDER_TABLE_NAME).save(updated);
+    showToast("✅ Modifiche salvate con successo!", "success");
 
-    status.textContent = "✅ Modifiche salvate con successo!";
-    status.className = "status-message status-success";
+    // aggiorna in memoria locale
+    Object.assign(currentAdminOrder, updated);
 
-    // Attendi un momento per mostrare feedback visivo
+    // chiude la maschera e aggiorna la vista in base al ruolo
     setTimeout(async () => {
-      // Nascondi la card di edit
       document.getElementById("admin-order-edit-card").classList.add("hidden");
-      // Mostra di nuovo la tabella ordini
-      document.getElementById("orders-admin-card").classList.remove("hidden");
 
-      // Ricarica gli ordini aggiornati
-      await loadAllOrdersForAdmin();
+      if (currentRole === ROLES.ADMIN) {
+        document.getElementById("orders-admin-card").classList.remove("hidden");
+        await loadAllOrdersForAdmin(updated.objectId); // evidenzia riga aggiornata
+      } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+        // ricarica ordini del worker
+        await loadOrdersForUser(currentRole, updated.objectId);
+      }
+
     }, 800);
   } catch (err) {
     console.error("❌ Errore durante il salvataggio:", err);
-    status.textContent = "Errore durante il salvataggio: " + err.message;
-    status.className = "status-message status-error";
+    showToast("Errore durante il salvataggio: " + err.message, "error");
   }
+}
+function showToast(message, type = "info") {
+  const existing = document.getElementById("toast-message");
+  if (existing) existing.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "toast-message";
+  toast.textContent = message;
+
+  const colors = {
+    success: "bg-green-600",
+    error: "bg-red-600",
+    info: "bg-blue-600"
+  };
+
+  toast.className = `
+    fixed top-4 right-4 z-50 text-white px-5 py-3 rounded-lg shadow-lg 
+    transition-opacity duration-500 ${colors[type] || colors.info}
+  `;
+
+  document.body.appendChild(toast);
+
+  // Dissolve automaticamente
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 500);
+  }, 2500);
 }
 
 function applyFieldPermissions(containerId) {
@@ -1152,101 +1188,57 @@ function closePhotoModal() {
 async function confirmEanInput() {
   const eanInput = document.getElementById("ean-input").value.trim();
   const scanStatus = document.getElementById("scan-status");
-  const actionsArea = document.getElementById("ean-actions-area");
-  const photoUploadArea = document.getElementById("photo-upload-area");
-  const currentEanDisplay = document.getElementById("current-ean-display");
 
   if (!eanInput) {
     scanStatus.textContent = "Inserisci un codice EAN o un Codice Articolo!";
     scanStatus.className = "status-message status-error";
     scanStatus.classList.remove("hidden");
-    actionsArea.classList.add("hidden");
-    photoUploadArea.style.display = "none";
     return;
   }
 
   try {
-    scanStatus.textContent = "Verifica in corso...";
+    scanStatus.textContent = "🔍 Verifica in corso...";
     scanStatus.className = "status-message status-info";
     scanStatus.classList.remove("hidden");
 
     const query = Backendless.DataQueryBuilder.create().setWhereClause(
       `eanCode='${eanInput}' OR productCode='${eanInput}'`
     );
-    const orders = await Backendless.Data.of("Orders").find(query);
+    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query);
 
     if (!orders || orders.length === 0) {
       scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
       scanStatus.className = "status-message status-error";
-      actionsArea.classList.add("hidden");
-      photoUploadArea.style.display = "none";
       return;
     }
 
     const order = orders[0];
-    scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
+
+    // ✅ Mostra stato trovato
+    scanStatus.textContent = `✅ Codice ${eanInput} trovato!`;
     scanStatus.className = "status-message status-success";
+   document.getElementById("ean-input").classList.add("border-green-400");
+   setTimeout(() => document.getElementById("ean-input").classList.remove("border-green-400"), 1500);
 
-    // Mostra l'area operativa
-    actionsArea.classList.remove("hidden");
-    if (currentEanDisplay) currentEanDisplay.textContent = eanInput;
+    // 🔥 Usa la stessa maschera di editing dell'Admin
+    handleAdminEdit(order);
 
-    // Gestione visibilità area upload foto
-    if (currentRole === ROLES.PHOTOGRAPHER) {
-      photoUploadArea.style.display = "block";
-      const uploadEanDisplay = document.getElementById("current-ean-display-upload");
-      if (uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
-    } else {
-      photoUploadArea.style.display = "none";
-    }
+    // ✅ Applica permessi dinamici in base al ruolo corrente
+    applyFieldPermissions("admin-order-edit-card");
 
-    // Mappa dei campi operativi
-    const map = {
-      "field-shots": "shots",
-      "field-quantity": "quantity",
-      "field-s1-prog": "s1Prog",
-      "field-s2-prog": "s2Prog",
-      "field-prog-on-model": "progOnModel",
-      "field-still-shot": "stillShot",
-      "field-onmodel-shot": "onModelShot",
-      "field-priority": "priority",
-      "field-s1-stylist": "s1Stylist",
-      "field-s2-stylist": "s2Stylist",
-      "field-provenienza": "provenienza",
-      "field-tipologia": "tipologia",
-      "field-ordine": "ordine",
-      "field-data-ordine": "dataOrdine",
-      "field-entry-date": "entryDate",
-      "field-exit-date": "exitDate",
-      "field-collo": "collo",
-      "field-data-reso": "dataReso",
-      "field-ddt": "ddt",
-      "field-note-logistica": "noteLogistica",
-      "field-data-presa-post": "dataPresaPost",
-      "field-data-consegna-post": "dataConsegnaPost",
-      "field-calendario": "calendario",
-      "field-postpresa": "postPresa",
-    };
+    // 🔔 Notifica visiva
+    showToast(`✏️ Modifica ordine ${order.eanCode || order.productCode}`, "info");
 
-    // Popola i campi del form
-    Object.entries(map).forEach(([inputId, key]) => {
-      const el = document.getElementById(inputId);
-      if (el) el.value = order[key] || "";
-    });
-
-    // ✅ Applica i permessi dinamici in base all’utente loggato
-    applyFieldPermissions("ean-actions-area");
-
-    // Salva lo stato corrente
+    // Salva in memoria l’ordine corrente
     currentEanInProcess = { objectId: order.objectId, ean: eanInput };
   } catch (err) {
     console.error("Errore durante la verifica EAN:", err);
     scanStatus.textContent = "Errore durante la verifica EAN.";
     scanStatus.className = "status-message status-error";
-    actionsArea.classList.add("hidden");
-    photoUploadArea.style.display = "none";
+    showToast("❌ Errore durante la verifica EAN.", "error");
   }
 }
+
 /**
  * Salva gli aggiornamenti dell'ordine corrente (solo campi autorizzati)
  */
@@ -1449,84 +1441,63 @@ async function updateOrderStatus(orderId, newStatus, successMessage = "Ordine ag
 // ----------------------------------------------------
 // LISTA ORDINI PER RUOLO (WORKER TABLE DINAMICA)
 // ----------------------------------------------------
-async function loadOrdersForUser(role) {
-  const config = ROLE_CONFIG[role] || ROLE_CONFIG[ROLES.ADMIN];
-  const loadingEl = document.getElementById('loading-orders');
-  const table = document.getElementById('orders-table');
-  const tbody = table.querySelector('tbody');
+async function loadOrdersForUser(role, highlightId = null) {
+  const container = document.getElementById("worker-orders-list");
+  if (!container) return;
 
-  loadingEl.textContent = "Caricamento ordini in corso...";
-  loadingEl.style.display = "block";
-  loadingEl.style.color = "#111";
-  tbody.innerHTML = "";
-  table.classList.add('hidden');
+  container.innerHTML = "<p class='text-gray-500'>Caricamento ordini in corso...</p>";
 
   try {
+    const config = ROLE_CONFIG[role];
     const query = Backendless.DataQueryBuilder.create();
-    query.setSortBy(["lastUpdated DESC"]);
-    query.setPageSize(100);
 
     if (config.filter) query.setWhereClause(config.filter);
+    query.setSortBy(["lastUpdated DESC"]);
 
     const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query);
 
     if (!orders || orders.length === 0) {
-      loadingEl.textContent = "Nessun ordine disponibile.";
-      table.classList.add('hidden');
+      container.innerHTML = "<p class='text-gray-500'>Nessun ordine disponibile.</p>";
       return;
     }
 
-    // Intestazione dinamica
-    const thead = table.querySelector('thead');
-    if (thead) {
-      thead.innerHTML = `
-        <tr>
-          ${config.columns.map(col => `<th class="px-4 py-2 capitalize">${col}</th>`).join('')}
-          <th class="px-4 py-2">Azioni</th>
-        </tr>`;
-    }
+    const table = document.createElement("table");
+    table.className = "min-w-full border border-gray-300 divide-y divide-gray-200";
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr class="bg-gray-100 text-left">
+        ${config.columns.map(c => `<th class="px-4 py-2">${c}</th>`).join("")}
+        <th class="px-4 py-2">Azioni</th>
+      </tr>`;
+    table.appendChild(thead);
 
-    // Righe
+    const tbody = document.createElement("tbody");
+
     orders.forEach(order => {
-      const tr = document.createElement('tr');
-      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
+      const tr = document.createElement("tr");
+      tr.classList.add("hover:bg-gray-50", "transition-all", "duration-500");
 
-      const colsHtml = config.columns.map(col => {
-        if (col === "driveLinks") {
-          if (Array.isArray(order.driveLinks) && order.driveLinks.length > 0) {
-            return `
-              <td class="px-4 py-2">
-                ${order.driveLinks
-                  .map(raw => {
-                    const link = escapeHTML(String(raw).trim());
-                    return `
-                      <a href="${link}" target="_blank"
-                         class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
-                        ${link}
-                      </a>`;
-                  })
-                  .join('')}
-              </td>`;
-          } else {
-            return `<td class="px-4 py-2 text-gray-400 italic">Nessun link</td>`;
-          }
-        }
-        return `<td class="px-4 py-2">${escapeHTML(order[col] || '')}</td>`;
-      }).join('');
+      if (highlightId && order.objectId === highlightId) {
+        tr.classList.add("bg-green-100");
+        setTimeout(() => tr.classList.remove("bg-green-100"), 1500);
+      }
 
-      tr.innerHTML = `${colsHtml}<td class="px-4 py-2">${config.actions(order)}</td>`;
+      tr.innerHTML = `
+        ${config.columns
+          .map(c => `<td class="px-4 py-2">${order[c] ?? ""}</td>`)
+          .join("")}
+        <td class="px-4 py-2">${config.actions(order)}</td>
+      `;
+
       tbody.appendChild(tr);
     });
 
-    loadingEl.style.display = "none";
-    table.classList.remove('hidden');
+    table.appendChild(tbody);
+    container.innerHTML = "";
+    container.appendChild(table);
   } catch (err) {
-    console.error("Errore durante il caricamento ordini:", err);
-    tbody.innerHTML = "";
-    loadingEl.textContent = "Errore durante il caricamento ordini.";
-    loadingEl.style.color = "#b91c1c";
-    loadingEl.style.display = "block";
-    table.classList.add('hidden');
+    console.error("Errore caricamento ordini per worker:", err);
+    container.innerHTML = `<p class='text-red-600'>Errore durante il caricamento.</p>`;
   }
 }
 
