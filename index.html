@@ -22,48 +22,23 @@
 <body class="min-h-screen">
 
   <!-- SIDEBAR -->
-<!-- SIDEBAR -->
-<div id="sidebar" class="hidden md:flex flex-col bg-gray-900 text-white p-6 min-h-screen w-72 shadow-2xl">
+  <div id="sidebar" class="hidden md:block">
+    <div class="text-center mb-10">
+      <h1 class="text-3xl font-extrabold text-white">Quiet Propaganda Studio</h1>
+      <p class="text-sm text-gray-400">Workflow Prodotti</p>
+    </div>
 
-  <!-- Titolo -->
-  <h1 class="text-3xl font-extrabold text-center mb-8 tracking-wide">
-    Quiet Propaganda Studio
-  </h1>
-
-  <!-- Contenuto sotto il titolo -->
-  <div class="flex flex-col items-stretch space-y-6">
-
-    <!-- Info utente -->
-    <div id="user-info" class="p-4 bg-gray-800 rounded-lg shadow-inner">
+    <div id="user-info" class="p-3 bg-gray-700 rounded-lg shadow-inner mb-8">
       <p class="text-xs text-gray-400 mb-1">Utente Corrente:</p>
       <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
       <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
     </div>
 
-    <!-- Pulsanti di navigazione -->
-    <div class="flex flex-col space-y-3">
-      <button id="show-main-dashboard-btn" 
-              onclick="showMainDashboard()" 
-              class="btn-primary w-full py-3 font-semibold shadow-lg">
-        La Mia Dashboard
-      </button>
-
-      <button id="show-general-orders-btn" 
-        onclick="showGeneralOrdersView()" 
-        class="btn-warning w-full py-3 font-semibold shadow-lg">
-           Tutti gli Ordini (Filtri)
-       </button>
-
-      <button id="logout-button" 
-              onclick="handleLogout()" 
-              class="btn-danger w-full py-3 font-semibold shadow-lg">
-        Esci (Logout)
-      </button>
-    </div>
-
+    <button id="logout-button" onclick="handleLogout()" class="btn-danger w-full mt-4 py-3 font-semibold shadow-lg">
+      Esci (Logout)
+    </button>
   </div>
 
-</div>
   <!-- MAIN CONTENT -->
   <div id="main-content">
 
@@ -74,17 +49,17 @@
     </header>
 
     <!-- LOGIN AREA -->
-   <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
-    <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
-    <div class="space-y-4 mb-6">
+    <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
+      <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
+      <div class="space-y-4 mb-6">
         <input type="email" id="user-email" placeholder="Email" value="nino_glli@yahoo.it" />
         <input type="password" id="user-password" placeholder="Password" />
-    </div>
-    <button onclick="handleStandardLogin()" class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
+      </div>
+      <button onclick="handleStandardLogin(document.getElementById('user-email').value, document.getElementById('user-password').value)" class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
 
-    <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Password Dimenticata?</button>
-    <p id="login-status" class="status-message status-error hidden"></p>
-</div>
+      <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Password Dimenticata?</button>
+      <p id="login-status" class="status-message status-error hidden"></p>
+    </div>
 
 <div id="worker-dashboard" class="space-y-8 hidden">
     <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
@@ -574,58 +549,9 @@
 </div>
 
 
-<div id="general-orders-view" class="p-6 hidden">
-    <h2 class="text-3xl font-bold text-gray-800 mb-6">Tutti gli Ordini nel Sistema</h2>
-
-    <div class="card p-6">
-        <div class="flex justify-between items-center mb-4 border-b pb-2">
-            <h3 class="text-xl font-semibold text-indigo-700">Lista Completa Ordini</h3>
-            <button onclick="showMainDashboard()" class="btn-secondary py-1 px-3 text-sm">
-                &leftarrow; Torna alla Dashboard
-            </button>
-        </div>
-        
-        <div class="mb-4 p-4 border rounded-md bg-gray-50 flex flex-wrap gap-4 items-center">
-            <input type="text" id="filter-ean" placeholder="Filtra per EAN o Codice Articolo" class="p-2 border rounded-md flex-grow" />
-            
-            <select id="filter-status" class="p-2 border rounded-md">
-                <option value="">Tutti gli Stati</option>
-            </select>
-            
-            <button onclick="applyGeneralOrdersFilters()" class="btn-primary py-2 px-4">Applica Filtri</button>
-            <button onclick="resetGeneralOrdersFilters()" class="btn-secondary py-2 px-4">Reset Filtri</button>
-        </div>
-        
-        <p id="loading-general-orders" class="text-gray-500 p-4">In attesa di caricamento...</p>
-        
-        <div class="overflow-x-auto max-h-[70vh] border rounded-md">
-            <table id="general-orders-table" class="min-w-full divide-y divide-gray-200">
-                <thead>
-                    <tr id="general-orders-table-header" class="bg-gray-100 sticky top-0 z-10 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <th class="px-4 py-2">Codice Articolo</th>
-                        <th class="px-4 py-2">EAN Code</th>
-                        <th class="px-4 py-2">Style Name</th>
-                        <th class="px-4 py-2">Brand</th>
-                        <th class="px-4 py-2">Categoria</th>
-                        <th class="px-4 py-2">Stato</th>
-                        <th class="px-4 py-2 text-center">Azioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-
-
-
-
 </div>
 
   <!-- JS principale -->
   <script src="app.js" defer></script>
 </body>
 </html>
-
