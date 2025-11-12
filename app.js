@@ -842,69 +842,104 @@ function closeAdminEditCard() {
 // FUNZIONI WORKER (DASHBOARD)
 // ----------------------------------------------------
 
-function loadOrdersForUser(role) {
-    const tableBody = document.querySelector('#orders-table tbody');
-    const loadingText = document.getElementById('loading-orders');
+async function loadOrdersForUser(role) {
+  const loadingEl = document.getElementById('loading-orders');
+  const table = document.getElementById('orders-table');
+  const tbody = table.querySelector('tbody');
 
-    loadingText.textContent = `Caricamento ordini per il ruolo ${role}...`;
-    tableBody.innerHTML = '';
-    
-    let whereClause = '';
+  loadingEl.textContent = "Caricamento ordini in corso...";
+  loadingEl.style.display = "block";
+  loadingEl.style.color = "#111";
+  tbody.innerHTML = "";
+  table.classList.add('hidden');
+
+  try {
+    let query = Backendless.DataQueryBuilder.create();
+    query.setSortBy(["lastUpdated DESC"]);
+    query.setPageSize(100);
+
+    // Filtra gli ordini in base al ruolo
     if (role === ROLES.PHOTOGRAPHER) {
-        whereClause = `status = '${STATUS_WAITING_PHOTO}'`; // 💡 USA LA NUOVA COSTANTE
+      query.setWhereClause(`status = '${STATUS.WAITING_PHOTO}'`);
     } else if (role === ROLES.POST_PRODUCER) {
-        whereClause = `status = '${STATUS.WAITING_POST_PRODUCTION}'`;
+      query.setWhereClause(`status = '${STATUS.WAITING_POST_PRODUCTION}'`);
     } else {
-        tableBody.innerHTML = '<tr><td colspan="11">Ruolo non valido per la visualizzazione ordini.</td></tr>';
-        return;
+      query.setWhereClause(""); // altri ruoli = tutti gli ordini
     }
 
-    const queryBuilder = Backendless.DataQueryBuilder.create()
-        .setWhereClause(whereClause)
-        .setSortBy(['lastUpdated DESC'])
-        .setPageSize(50);
-    Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder)
-        .then(orders => {
-            if (!orders || orders.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="11">Nessun ordine da visualizzare.</td></tr>';
-                loadingText.textContent = '';
-                return;
-            }
+    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query);
 
-            loadingText.textContent = '';
-            document.getElementById('worker-role-display-queue').textContent = role;
+    if (!orders || orders.length === 0) {
+      loadingEl.textContent = "Nessun ordine disponibile.";
+      table.classList.add('hidden');
+      return;
+    }
 
-            orders.forEach(order => {
-                const row = tableBody.insertRow();
+    // Popola tabella per i ruoli diversi
+    orders.forEach(order => {
+      const tr = document.createElement('tr');
+      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
 
-                row.insertCell().textContent = order.productCode || '';
-                row.insertCell().textContent = order.eanCode || '';
-                row.insertCell().textContent = order.styleName || '';
-                row.insertCell().textContent = order.styleGroup || '';
-                row.insertCell().textContent = order.brand || '';
-                row.insertCell().textContent = order.color || '';
-                row.insertCell().textContent = order.size || '';
-                row.insertCell().textContent = order.category || '';
-                row.insertCell().textContent = order.gender || '';
-                row.insertCell().textContent = order.status || '';
-                
-                const actionCell = row.insertCell();
-                actionCell.classList.add('action-cell');
+      // colonna azione dinamica in base al ruolo
+      let actionCell = "";
 
-                const viewBtn = document.createElement('button');
-                viewBtn.textContent = 'Visualizza Foto';
-                viewBtn.className = 'btn-primary text-xs py-1 px-2';
-                viewBtn.onclick = () => openPhotoModal(order.eanCode);
+      if (role === ROLES.PHOTOGRAPHER) {
+        actionCell = `
+          <button class="btn-success px-3 py-1 text-sm"
+                  onclick="startPhotoUpload('${order.objectId}', '${order.eanCode}')">
+            Carica Link
+          </button>`;
+      } else if (role === ROLES.POST_PRODUCER) {
+        actionCell = `
+          <button class="btn-primary px-3 py-1 text-sm"
+                  onclick="markAsCompleted('${order.objectId}')">
+            Segna come completato
+          </button>`;
+      } else {
+        actionCell = '<span class="text-gray-500 italic">Nessuna azione</span>';
+      }
 
-                actionCell.appendChild(viewBtn);
-            });
-        })
-        .catch(error => {
-            console.error("Errore nel caricamento ordini:", error);
-            tableBody.innerHTML = `<tr><td colspan="11">Errore nel caricamento ordini: ${error.message}</td></tr>`;
-            loadingText.textContent = '';
-        });
+      tr.innerHTML = `
+        <td class="px-4 py-2">${order.productCode || ''}</td>
+        <td class="px-4 py-2">${order.eanCode || ''}</td>
+        <td class="px-4 py-2">${order.brand || ''}</td>
+        <td class="px-4 py-2">${order.color || ''}</td>
+        <td class="px-4 py-2">${order.size || ''}</td>
+        <td class="px-4 py-2">${order.status || ''}</td>
+        <td class="px-4 py-2">
+          ${
+            Array.isArray(order.driveLinks) && order.driveLinks.length > 0
+              ? order.driveLinks
+                  .map(raw => {
+                    const link = escapeHTML(raw.trim());
+                    return `
+                      <a href="${link}" target="_blank"
+                         class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
+                        ${link}
+                      </a>`;
+                  })
+                  .join('')
+              : '<span class="text-gray-400 italic">Nessun link</span>'
+          }
+        </td>
+        <td class="px-4 py-2">${actionCell}</td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    loadingEl.style.display = "none";
+    table.classList.remove('hidden');
+  } catch (err) {
+    console.error("Errore durante il caricamento ordini:", err);
+    tbody.innerHTML = "";
+    loadingEl.textContent = "Errore durante il caricamento ordini.";
+    loadingEl.style.color = "#b91c1c";
+    loadingEl.style.display = "block";
+    table.classList.add('hidden');
+  }
 }
+
 
 function openPhotoModal(eanCode) {
     document.getElementById('photo-modal').style.display = 'block';
