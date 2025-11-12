@@ -1,6 +1,6 @@
 // Configurazione Backendless (sostituisci con le tue chiavi reali)
 const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C';
-const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       
+const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';
 
 // Nomi delle tabelle
 const USER_TABLE_NAME = "Users";
@@ -8,20 +8,79 @@ const ORDER_TABLE_NAME = "Orders";
 const STORAGE_CONTAINER_NAME = "product_photos";
 
 // STATI ORDINE
-const STATUS_WAITING_PHOTO = "In attesa foto"; // 💡 NUOVA COSTANTE STRINGA SEPARATA (SOLUZIONE AL BLOCCO)
+const STATUS_WAITING_PHOTO = "In attesa foto";
 const STATUS = {
-    IN_PHOTO_PROCESS: "Fotografia in corso",
-    WAITING_POST_PRODUCTION: "In attesa post-produzione",
-    IN_POST_PROCESS: "Post-produzione in corso",
-    COMPLETED: "Completato",
-    REJECTED: "Rifiutato/Ritorna a foto"
+  WAITING_PHOTO: STATUS_WAITING_PHOTO,
+  IN_PHOTO_PROCESS: "Fotografia in corso",
+  WAITING_POST_PRODUCTION: "In attesa post-produzione",
+  IN_POST_PROCESS: "Post-produzione in corso",
+  COMPLETED: "Completato",
+  REJECTED: "Rifiutato/Ritorna a foto"
+};
+
+// 🎨 CONFIGURAZIONE COLORI STATI
+const STATUS_COLORS = {
+  [STATUS.WAITING_PHOTO]: "bg-yellow-100 text-yellow-700 border-yellow-300",
+  [STATUS.WAITING_POST_PRODUCTION]: "bg-blue-100 text-blue-700 border-blue-300",
+  [STATUS.IN_POST_PROCESS]: "bg-amber-100 text-amber-700 border-amber-300",
+  "In approvazione": "bg-purple-100 text-purple-700 border-purple-300",
+  [STATUS.COMPLETED]: "bg-green-100 text-green-700 border-green-300",
+  [STATUS.REJECTED]: "bg-red-100 text-red-700 border-red-300",
+  DEFAULT: "bg-gray-100 text-gray-600 border-gray-300"
 };
 
 // Ruoli Utente (Devono coincidere con i ruoli Backendless)
 const ROLES = {
-    ADMIN: "Admin",
-    PHOTOGRAPHER: "Photographer",
-    POST_PRODUCER: "PostProducer"
+  ADMIN: "Admin",
+  PHOTOGRAPHER: "Photographer",
+  POST_PRODUCER: "PostProducer"
+};
+
+// 🔧 CONFIGURAZIONE RUOLI
+const ROLE_CONFIG = {
+  [ROLES.ADMIN]: {
+    filter: "",
+    columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
+    actions: order => `
+      <button class="btn-primary px-3 py-1 text-sm" data-oid="${order.objectId}">
+        Modifica
+      </button>`
+  },
+
+  [ROLES.PHOTOGRAPHER]: {
+    filter: `status = '${STATUS.WAITING_PHOTO}'`,
+    columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
+    actions: order => `
+      <button class="btn-success px-3 py-1 text-sm"
+              onclick="startPhotoUpload('${order.objectId}', '${order.eanCode}')">
+        Carica Link
+      </button>`
+  },
+
+  [ROLES.POST_PRODUCER]: {
+    filter: `status = '${STATUS.WAITING_POST_PRODUCTION}'`,
+    columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
+    actions: order => `
+      <button class="btn-primary px-3 py-1 text-sm"
+              onclick="updateOrderStatus('${order.objectId}', '${STATUS.COMPLETED}', 'Ordine completato con successo ✅')">
+        Segna come completato
+      </button>`
+  }
+};
+
+// ➕ RUOLO AGGIUNTIVO (fuori dall’oggetto ROLE_CONFIG)
+ROLE_CONFIG.QUALITY_CHECKER = {
+  filter: `status = 'In approvazione'`,
+  columns: ["productCode", "eanCode", "brand", "status", "driveLinks"],
+  actions: order => `
+    <button class="btn-success px-3 py-1 text-sm mr-2"
+            onclick="updateOrderStatus('${order.objectId}', 'Approvato', 'Ordine approvato ✅')">
+      Approva
+    </button>
+    <button class="btn-danger px-3 py-1 text-sm"
+            onclick="updateOrderStatus('${order.objectId}', 'Respinto', 'Ordine respinto ❌')">
+      Rifiuta
+    </button>`
 };
 
 // Variabili globali di stato
@@ -154,11 +213,11 @@ function getRoleFromUser(user) {
         });
 }
 
-function handleLoginSuccess(user) {
+async function handleLoginSuccess(user) {
     currentUser = user;
     
     getRoleFromUser(user)
-        .then(role => {
+        .then(async role => {   // 👈 aggiungi async qui per usare await sotto
             currentRole = role;
             
             const displayName = user.name || user.email;
@@ -170,13 +229,17 @@ function handleLoginSuccess(user) {
             if (currentRole === ROLES.ADMIN) {
                 document.getElementById('admin-dashboard').style.display = 'block';
                 document.getElementById('worker-dashboard').style.display = 'none'; 
+
                 loadUsersAndRoles(); 
-		loadAllOrdersForAdmin();
-            } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+                await loadAllOrdersForAdmin();   // ✅ carica tabella ordini
+                await loadAdminDashboard();      // ✅ carica riepilogo e grafico
+            } 
+            else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
                 document.getElementById('admin-dashboard').style.display = 'none'; 
                 document.getElementById('worker-dashboard').style.display = 'block';
                 loadOrdersForUser(currentRole); 
-            } else {
+            } 
+            else {
                 showLoginArea("Ruolo utente non autorizzato o non definito.");
                 handleLogout();
             }
@@ -769,6 +832,73 @@ async function loadAllOrdersForAdmin() {
   }
 }
 
+async function loadAdminDashboard() {
+  const dash = document.getElementById("admin-dashboard");
+  const container = document.getElementById("admin-stats");
+  const chartEl = document.getElementById("admin-stats-chart");
+  container.innerHTML = "";
+
+  try {
+    // recupera tutti gli ordini
+    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find();
+
+    // calcola conteggio per stato
+    const counts = {};
+    orders.forEach(o => {
+      const st = o.status || "Sconosciuto";
+      counts[st] = (counts[st] || 0) + 1;
+    });
+
+    // genera i box colorati
+    Object.entries(counts).forEach(([status, count]) => {
+      const color = STATUS_COLORS[status] || STATUS_COLORS.DEFAULT;
+      const div = document.createElement("div");
+      div.className = `p-4 border rounded-lg text-center ${color}`;
+      div.innerHTML = `<p class="font-semibold">${status}</p><p class="text-2xl font-bold">${count}</p>`;
+      container.appendChild(div);
+    });
+
+    // Mostra sezione dashboard
+    dash.classList.remove("hidden");
+
+    // 🔹 Crea grafico (usa Chart.js disponibile via CDN)
+    if (window.Chart) {
+      const ctx = chartEl.getContext("2d");
+      const labels = Object.keys(counts);
+      const data = Object.values(counts);
+      const colors = labels.map(l => {
+        const c = STATUS_COLORS[l] || STATUS_COLORS.DEFAULT;
+        const match = c.match(/text-([a-z]+)-(\d+)/);
+        return match ? match[1] : "gray";
+      });
+
+      // distrugge grafico precedente se esiste
+      if (window._adminChart) window._adminChart.destroy();
+
+      window._adminChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Numero ordini",
+            data,
+            backgroundColor: colors.map(c => `var(--tw-${c}-400, #9ca3af)`)
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, precision: 0 } }
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Errore caricamento dashboard:", err);
+  }
+}
+
+
+
 function escapeHTML(str) {
   return str.replace(/[&<>"']/g, match => ({
     '&': '&amp;',
@@ -778,6 +908,8 @@ function escapeHTML(str) {
     "'": '&#39;'
   }[match]));
 }
+
+
 
 function handleAdminEdit(order) {
   if (!order) return;
@@ -843,6 +975,7 @@ function closeAdminEditCard() {
 // ----------------------------------------------------
 
 async function loadOrdersForUser(role) {
+  const config = ROLE_CONFIG[role] || ROLE_CONFIG[ROLES.ADMIN];
   const loadingEl = document.getElementById('loading-orders');
   const table = document.getElementById('orders-table');
   const tbody = table.querySelector('tbody');
@@ -854,18 +987,11 @@ async function loadOrdersForUser(role) {
   table.classList.add('hidden');
 
   try {
-    let query = Backendless.DataQueryBuilder.create();
+    const query = Backendless.DataQueryBuilder.create();
     query.setSortBy(["lastUpdated DESC"]);
     query.setPageSize(100);
 
-    // Filtra gli ordini in base al ruolo
-    if (role === ROLES.PHOTOGRAPHER) {
-      query.setWhereClause(`status = '${STATUS.WAITING_PHOTO}'`);
-    } else if (role === ROLES.POST_PRODUCER) {
-      query.setWhereClause(`status = '${STATUS.WAITING_POST_PRODUCTION}'`);
-    } else {
-      query.setWhereClause(""); // altri ruoli = tutti gli ordini
-    }
+    if (config.filter) query.setWhereClause(config.filter);
 
     const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query);
 
@@ -875,41 +1001,28 @@ async function loadOrdersForUser(role) {
       return;
     }
 
-    // Popola tabella per i ruoli diversi
+    // 🔹 genera intestazione tabella dinamica
+    const thead = table.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          ${config.columns.map(col => `<th class="px-4 py-2 capitalize">${col}</th>`).join('')}
+          <th class="px-4 py-2">Azioni</th>
+        </tr>`;
+    }
+
+    // 🔹 genera righe
     orders.forEach(order => {
       const tr = document.createElement('tr');
       tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
 
-      // colonna azione dinamica in base al ruolo
-      let actionCell = "";
-
-      if (role === ROLES.PHOTOGRAPHER) {
-        actionCell = `
-          <button class="btn-success px-3 py-1 text-sm"
-                  onclick="startPhotoUpload('${order.objectId}', '${order.eanCode}')">
-            Carica Link
-          </button>`;
-      } else if (role === ROLES.POST_PRODUCER) {
-        actionCell = `
-          <button class="btn-primary px-3 py-1 text-sm"
-                  onclick="markAsCompleted('${order.objectId}')">
-            Segna come completato
-          </button>`;
-      } else {
-        actionCell = '<span class="text-gray-500 italic">Nessuna azione</span>';
-      }
-
-      tr.innerHTML = `
-        <td class="px-4 py-2">${order.productCode || ''}</td>
-        <td class="px-4 py-2">${order.eanCode || ''}</td>
-        <td class="px-4 py-2">${order.brand || ''}</td>
-        <td class="px-4 py-2">${order.color || ''}</td>
-        <td class="px-4 py-2">${order.size || ''}</td>
-        <td class="px-4 py-2">${order.status || ''}</td>
-        <td class="px-4 py-2">
-          ${
-            Array.isArray(order.driveLinks) && order.driveLinks.length > 0
-              ? order.driveLinks
+      // costruzione dinamica delle colonne
+      const colsHtml = config.columns.map(col => {
+        if (col === "driveLinks") {
+          if (Array.isArray(order.driveLinks) && order.driveLinks.length > 0) {
+            return `
+              <td class="px-4 py-2">
+                ${order.driveLinks
                   .map(raw => {
                     const link = escapeHTML(raw.trim());
                     return `
@@ -918,13 +1031,16 @@ async function loadOrdersForUser(role) {
                         ${link}
                       </a>`;
                   })
-                  .join('')
-              : '<span class="text-gray-400 italic">Nessun link</span>'
+                  .join('')}
+              </td>`;
+          } else {
+            return `<td class="px-4 py-2 text-gray-400 italic">Nessun link</td>`;
           }
-        </td>
-        <td class="px-4 py-2">${actionCell}</td>
-      `;
+        }
+        return `<td class="px-4 py-2">${order[col] || ''}</td>`;
+      }).join('');
 
+      tr.innerHTML = `${colsHtml}<td class="px-4 py-2">${config.actions(order)}</td>`;
       tbody.appendChild(tr);
     });
 
@@ -940,6 +1056,92 @@ async function loadOrdersForUser(role) {
   }
 }
 
+
+async function markAsCompleted(orderId) {
+  if (!orderId) return;
+
+  const confirmComplete = confirm("Vuoi davvero segnare questo ordine come COMPLETATO?");
+  if (!confirmComplete) return;
+
+  const statusEl = document.getElementById('loading-orders');
+  statusEl.textContent = "Aggiornamento in corso...";
+  statusEl.style.display = "block";
+  statusEl.style.color = "#111";
+
+  try {
+    // 🔹 Aggiorna l'ordine su Backendless
+    const updatedOrder = {
+      objectId: orderId,
+      status: STATUS.COMPLETED,
+      completedAt: new Date(),
+      lastUpdated: new Date()
+    };
+
+    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
+
+    // 🔹 Feedback utente
+    statusEl.textContent = "Ordine completato con successo ✅";
+    statusEl.style.color = "#16a34a"; // verde tailwind-600
+
+    // 🔹 Ricarica tabella corrente senza refresh pagina
+    setTimeout(() => {
+      statusEl.style.display = "none";
+      loadOrdersForUser(currentRole);
+    }, 1200);
+  } catch (error) {
+    console.error("Errore durante il completamento ordine:", error);
+    statusEl.textContent = "Errore durante l'aggiornamento ordine ❌";
+    statusEl.style.color = "#b91c1c";
+  }
+}
+
+/**
+ * 🔄 Aggiorna lo stato di un ordine in Backendless
+ * @param {string} orderId - objectId dell'ordine
+ * @param {string} newStatus - nuovo stato (es. STATUS.COMPLETED)
+ * @param {string} successMessage - messaggio da mostrare dopo l'aggiornamento
+ */
+async function updateOrderStatus(orderId, newStatus, successMessage = "Ordine aggiornato con successo!") {
+  if (!orderId) return;
+
+  const confirmAction = confirm(`Vuoi impostare lo stato su "${newStatus}"?`);
+  if (!confirmAction) return;
+
+  const statusEl = document.getElementById('loading-orders');
+  statusEl.textContent = "Aggiornamento in corso...";
+  statusEl.style.display = "block";
+  statusEl.style.color = "#111";
+
+  try {
+    // 🔹 prepara i dati per l'update
+    const updatedOrder = {
+      objectId: orderId,
+      status: newStatus,
+      lastUpdated: new Date()
+    };
+
+    // se il nuovo stato è "Completato", aggiunge la data di completamento
+    if (newStatus === STATUS.COMPLETED) {
+      updatedOrder.completedAt = new Date();
+    }
+
+    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
+
+    // 🔹 feedback visivo
+    statusEl.textContent = successMessage;
+    statusEl.style.color = "#16a34a"; // verde tailwind-600
+
+    // 🔹 ricarica tabella dopo breve delay
+    setTimeout(() => {
+      statusEl.style.display = "none";
+      loadOrdersForUser(currentRole);
+    }, 1200);
+  } catch (error) {
+    console.error("Errore durante l'aggiornamento ordine:", error);
+    statusEl.textContent = "Errore durante l'aggiornamento ordine ❌";
+    statusEl.style.color = "#b91c1c";
+  }
+}
 
 function openPhotoModal(eanCode) {
     document.getElementById('photo-modal').style.display = 'block';
