@@ -373,6 +373,7 @@ function renderUsersTable(users) {
 
 // === GESTIONE PERMESSI DINAMICI CREAZIONE UTENTE ===
 
+
 // Campi modificabili possibili (coerenti con Backendless)
 const EDITABLE_FIELD_OPTIONS = [
   "shots", "quantity", "s1Prog", "s2Prog", "progOnModel",
@@ -383,31 +384,36 @@ const EDITABLE_FIELD_OPTIONS = [
 ];
 
 // Popola i checkbox dei campi editabili quando viene selezionato un ruolo
-document.getElementById("new-user-role").addEventListener("change", e => {
-  const role = e.target.value;
+document.addEventListener("DOMContentLoaded", () => {
+  const roleSelect = document.getElementById("new-user-role");
   const section = document.getElementById("editable-fields-section");
   const container = document.getElementById("editable-fields-container");
 
-  // Admin non ha limiti, quindi niente check
-  if (role === ROLES.ADMIN) {
-    section.classList.add("hidden");
+  if (!roleSelect || !section || !container) return; // sicurezza
+
+  roleSelect.addEventListener("change", e => {
+    const role = e.target.value;
+
+    // Se Admin, nascondi
+    if (role === "Admin") {
+      section.classList.add("hidden");
+      container.innerHTML = "";
+      return;
+    }
+
+    // Mostra la sezione e genera le check
+    section.classList.remove("hidden");
     container.innerHTML = "";
-    return;
-  }
 
-  // Mostra la sezione dei campi
-  section.classList.remove("hidden");
-
-  // Genera dinamicamente le checkbox
-  container.innerHTML = "";
-  EDITABLE_FIELD_OPTIONS.forEach(field => {
-    const label = document.createElement("label");
-    label.className = "flex items-center space-x-2";
-    label.innerHTML = `
-      <input type="checkbox" class="editable-field-checkbox" value="${field}">
-      <span>${field}</span>
-    `;
-    container.appendChild(label);
+    EDITABLE_FIELD_OPTIONS.forEach(field => {
+      const label = document.createElement("label");
+      label.className = "flex items-center space-x-2";
+      label.innerHTML = `
+        <input type="checkbox" class="editable-field-checkbox" value="${field}">
+        <span>${field}</span>
+      `;
+      container.appendChild(label);
+    });
   });
 });
 
@@ -747,69 +753,91 @@ async function loadAllOrdersForAdmin() {
 }
 
 /** Apre la card di modifica completa per Admin e popola i campi */
-function handleAdminEdit(order) {
+async function handleAdminEdit(order) {
   if (!order) return;
 
-  // Nascondi la tabella principale
+  // Nascondi tabella principale
   const ordersCard = document.getElementById('orders-admin-card');
   if (ordersCard) ordersCard.classList.add('hidden');
 
-  // Mostra la card di modifica
+  // Mostra maschera di modifica
   const editCard = document.getElementById('admin-order-edit-card');
   editCard.classList.remove('hidden');
 
-  // Mostra EAN in intestazione
+  // Mostra intestazione EAN
   document.getElementById('admin-ean-display').textContent =
     order.eanCode || order.productCode || '';
 
-  // Mappa dei campi HTML → proprietà Backendless
-  const fieldMap = {
-    "admin-field-productCode": "productCode",
-    "admin-field-eanCode": "eanCode",
-    "admin-field-styleName": "styleName",
-    "admin-field-styleGroup": "styleGroup",
-    "admin-field-brand": "brand",
-    "admin-field-color": "color",
-    "admin-field-size": "size",
-    "admin-field-category": "category",
-    "admin-field-gender": "gender",
-    "admin-field-shots": "shots",
-    "admin-field-quantity": "quantity",
-    "admin-field-s1Prog": "s1Prog",
-    "admin-field-s2Prog": "s2Prog",
-    "admin-field-progOnModel": "progOnModel",
-    "admin-field-stillShot": "stillShot",
-    "admin-field-onModelShot": "onModelShot",
-    "admin-field-priority": "priority",
-    "admin-field-s1Stylist": "s1Stylist",
-    "admin-field-s2Stylist": "s2Stylist",
-    "admin-field-provenienza": "provenienza",
-    "admin-field-tipologia": "tipologia",
-    "admin-field-ordine": "ordine",
-    "admin-field-dataOrdine": "dataOrdine",
-    "admin-field-entryDate": "entryDate",
-    "admin-field-exitDate": "exitDate",
-    "admin-field-collo": "collo",
-    "admin-field-dataReso": "dataReso",
-    "admin-field-ddt": "ddt",
-    "admin-field-noteLogistica": "noteLogistica",
-    "admin-field-dataPresaPost": "dataPresaPost",
-    "admin-field-dataConsegnaPost": "dataConsegnaPost",
-    "admin-field-calendario": "calendario",
-    "admin-field-postpresa": "postPresa"
+  const container = document.getElementById("admin-order-edit-fields");
+  container.innerHTML = ""; // pulisci prima
+
+  // Lista dei campi con tipo (testo, numero, data, booleano)
+  const fields = {
+    productCode: "text",
+    eanCode: "text",
+    styleName: "text",
+    styleGroup: "text",
+    brand: "text",
+    color: "text",
+    size: "text",
+    category: "text",
+    gender: "text",
+    shots: "number",
+    quantity: "number",
+    s1Prog: "text",
+    s2Prog: "text",
+    progOnModel: "text",
+    stillShot: "boolean",
+    onModelShot: "boolean",
+    priority: "text",
+    s1Stylist: "text",
+    s2Stylist: "text",
+    provenienza: "text",
+    tipologia: "text",
+    ordine: "number",
+    dataOrdine: "date",
+    entryDate: "date",
+    exitDate: "date",
+    collo: "number",
+    dataReso: "date",
+    ddt: "text",
+    noteLogistica: "text",
+    dataPresaPost: "date",
+    dataConsegnaPost: "date",
+    calendario: "boolean",
+    postPresa: "text"
   };
 
-  // Popola tutti i campi
-  Object.entries(fieldMap).forEach(([fieldId, prop]) => {
-    const input = document.getElementById(fieldId);
-    if (input) input.value = order[prop] || '';
-  });
+  // Genera campi dinamicamente
+  for (const [key, type] of Object.entries(fields)) {
+    const value = order[key] || "";
+    let inputHTML = "";
 
-  // ✅ Subito dopo il popolamento dei campi:
-  // applica i permessi dinamici dell'utente loggato
-  applyFieldPermissions('admin-order-edit-card');
+    if (type === "boolean") {
+      inputHTML = `
+        <select id="admin-field-${key}" class="border rounded p-2 w-full">
+          <option value="true" ${value === true ? "selected" : ""}>Sì</option>
+          <option value="false" ${value === false ? "selected" : ""}>No</option>
+        </select>
+      `;
+    } else {
+      inputHTML = `<input type="${type}" id="admin-field-${key}" value="${value}" class="border rounded p-2 w-full">`;
+    }
 
-  // Infine salva l'oggetto in memoria globale
+    const fieldEl = document.createElement("div");
+    fieldEl.innerHTML = `
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        ${key}
+      </label>
+      ${inputHTML}
+    `;
+    container.appendChild(fieldEl);
+  }
+
+  // Applica permessi dinamici (chi può modificare cosa)
+  applyFieldPermissions("admin-order-edit-card");
+
+  // Salva ordine attuale
   currentAdminOrder = order;
 }
 
@@ -908,6 +936,72 @@ async function saveAdminOrderUpdates() {
     showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
   }
 }
+
+
+function applyFieldPermissions(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const isAdmin = currentRole === ROLES.ADMIN;
+  let allowed = [];
+
+  if (!isAdmin && currentUser && Array.isArray(currentUser.editableFields)) {
+    allowed = currentUser.editableFields;
+  }
+
+  container.querySelectorAll("input, select, textarea").forEach(input => {
+    const fieldKey = input.id.replace("admin-field-", "");
+    const canEdit = isAdmin || allowed.includes(fieldKey);
+
+    input.disabled = !canEdit;
+    input.classList.toggle("opacity-50", !canEdit);
+  });
+}
+
+async function saveAdminOrderChanges() {
+  if (!currentAdminOrder) return;
+
+  const status = document.getElementById("admin-edit-status");
+  status.textContent = "Salvataggio in corso...";
+  status.className = "status-message status-info";
+  status.classList.remove("hidden");
+
+  try {
+    const container = document.getElementById("admin-order-edit-fields");
+    const updated = { objectId: currentAdminOrder.objectId };
+
+    container.querySelectorAll("input, select").forEach(input => {
+      const key = input.id.replace("admin-field-", "");
+      if (input.type === "number") updated[key] = Number(input.value) || 0;
+      else if (input.type === "date") updated[key] = input.value ? new Date(input.value) : null;
+      else if (input.type === "select-one" && (input.value === "true" || input.value === "false"))
+        updated[key] = input.value === "true";
+      else updated[key] = input.value;
+    });
+
+    await Backendless.Data.of("Orders").save(updated);
+
+    status.textContent = "✅ Modifiche salvate con successo!";
+    status.className = "status-message status-success";
+
+    // Ricarica lista ordini
+    await loadAllOrdersForAdmin();
+
+    // Torna alla tabella
+    document.getElementById('admin-order-edit-card').classList.add('hidden');
+    document.getElementById('orders-admin-card').classList.remove('hidden');
+  } catch (err) {
+    console.error("Errore salvataggio ordine:", err);
+    status.textContent = "❌ Errore durante il salvataggio: " + err.message;
+    status.className = "status-message status-error";
+  }
+}
+
+function cancelAdminOrderEdit() {
+  document.getElementById('admin-order-edit-card').classList.add('hidden');
+  document.getElementById('orders-admin-card').classList.remove('hidden');
+}
+
 
 function cancelAdminOrderEdit() {
   const editCard = document.getElementById('admin-order-edit-card');
