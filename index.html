@@ -300,16 +300,27 @@
         </div>
       </div>
 
-      <!-- Modifica Ordine Admin -->
-      <div id="admin-order-edit-card" class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
-        <h3 class="text-2xl font-bold mb-4 text-gray-800">Modifica Ordine: <span id="admin-ean-display"></span></h3>
-        <div id="admin-order-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-        <div class="mt-4 flex space-x-3">
-          <button onclick="saveAdminOrderUpdates()" class="btn-success py-2 px-4">Salva Aggiornamenti</button>
-          <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">Annulla</button>
-        </div>
-        <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
-      </div>
+      <!-- ✅ MODIFICA ORDINE ADMIN (maschera completa) -->
+<div id="admin-order-edit-card"
+     class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
+  <h3 class="text-2xl font-bold mb-4 text-gray-800">
+    Modifica Ordine: <span id="admin-ean-display"></span>
+  </h3>
+
+  <div id="admin-order-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+  <div class="mt-4 flex space-x-3">
+    <button onclick="saveAdminOrderUpdates()" class="btn-success py-2 px-4">
+      Salva Aggiornamenti
+    </button>
+    <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">
+      Annulla
+    </button>
+  </div>
+
+  <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
+</div>
+
     </div>
 
   </div>
