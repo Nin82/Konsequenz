@@ -9,22 +9,25 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!--- Backendless SDK -->
+  <!-- Backendless SDK -->
   <script src="https://unpkg.com/backendless@6.7.0/dist/backendless.min.js"></script>
 
   <!-- SheetJS per Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- CSS Personalizzato -->
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- CSS personalizzato -->
   <link rel="stylesheet" href="style.css">
 </head>
 
-<body class="min-h-screen">
+<body class="min-h-screen bg-gray-100">
 
   <!-- SIDEBAR -->
-  <div id="sidebar" class="hidden md:block">
+  <div id="sidebar" class="hidden md:block fixed top-0 left-0 h-full w-64 bg-gray-900 text-white p-6 overflow-y-auto">
     <div class="text-center mb-10">
-      <h1 class="text-3xl font-extrabold text-white">Quiet Propaganda Studio</h1>
+      <h1 class="text-3xl font-extrabold">Quiet Propaganda Studio</h1>
       <p class="text-sm text-gray-400">Workflow Prodotti</p>
     </div>
 
@@ -40,296 +43,128 @@
   </div>
 
   <!-- MAIN CONTENT -->
-  <div id="main-content">
-
-    <!-- HEADER MOBILE -->
-    <header class="md:hidden flex justify-between items-center mb-8 p-4 bg-white rounded-xl shadow-md">
-      <h1 class="text-xl font-bold text-gray-800">PhotoFlow</h1>
-      <button onclick="handleLogout()" class="btn-danger text-sm py-2 px-3">Logout</button>
-    </header>
+  <div id="main-content" class="md:ml-64 p-6">
 
     <!-- LOGIN AREA -->
     <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
       <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
       <div class="space-y-4 mb-6">
-        <input type="email" id="user-email" placeholder="Email" value="nino_glli@yahoo.it" />
+        <input type="email" id="user-email" placeholder="Email" />
         <input type="password" id="user-password" placeholder="Password" />
       </div>
-      <button onclick="handleStandardLogin(document.getElementById('user-email').value, document.getElementById('user-password').value)" class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
+      <button onclick="handleStandardLogin(document.getElementById('user-email').value, document.getElementById('user-password').value)"
+        class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
 
       <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Password Dimenticata?</button>
-      <p id="login-status" class="status-message status-error hidden"></p>
+      <p id="login-status" class="status-message status-error hidden mt-3"></p>
     </div>
 
-<div id="worker-dashboard" class="space-y-8 hidden">
-    <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
+    <!-- WORKER DASHBOARD -->
+    <div id="worker-dashboard" class="space-y-8 hidden">
+      <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
+      <p id="operation-feedback" class="status-message hidden"></p>
 
-	<p id="operation-feedback" class="status-message hidden"></p>
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-
+        <!-- Lavorazione attuale -->
         <div class="card lg:col-span-1">
-            <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
-            <p class="text-sm text-gray-500 mb-4">Scannerizza o inserisci il codice EAN del prodotto da lavorare.</p>
+          <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Lavorazione Attuale</h3>
+          <p class="text-sm text-gray-500 mb-4">Scannerizza o inserisci il codice EAN del prodotto da lavorare.</p>
 
-            <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4" />
-            <button id="confirm-ean-btn" onclick="confirmEanInput()" class="btn-primary w-full py-2 font-medium">
-                Conferma EAN
-            </button>
+          <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4" />
+          <button id="confirm-ean-btn" onclick="confirmEanInput()" class="btn-primary w-full py-2 font-medium">
+            Conferma EAN
+          </button>
 
-            <p id="scan-status" class="status-message status-info hidden"></p>
+          <p id="scan-status" class="status-message status-info hidden"></p>
 
-            <div id="ean-actions-area" class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
-                <h4 class="font-semibold text-gray-700 mb-3 flex justify-between items-center">
-                    Dati Operativi EAN: <span id="current-ean-display"></span>
-                    <button onclick="resetEanActionState(true)" class="btn-secondary py-1 px-3 text-sm font-medium">
-                        &times; Chiudi Dettaglio
-                    </button>
-                </h4>
-                
-                <div class="mt-2 flex space-x-3 mb-4"> 
-                    <button id="confirm-ean-updates" class="btn-success py-2 px-4" onclick="saveEanUpdates()">
-                        Conferma Aggiornamenti
-                    </button>
-                    <button onclick="resetEanActionState(true)" class="btn-secondary py-2 px-4">
-                        Annulla
-                    </button>
-                </div>
-                
-                
+          <div id="ean-actions-area" class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
+            <h4 class="font-semibold text-gray-700 mb-3 flex justify-between items-center">
+              Dati Operativi EAN: <span id="current-ean-display"></span>
+              <button onclick="resetEanActionState(true)" class="btn-secondary py-1 px-3 text-sm font-medium">&times; Chiudi</button>
+            </h4>
 
-                <div id="operational-fields" class="space-y-3">
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">N. Scatti</label>
-                        <input type="number" class="border rounded-md p-2" id="field-shots" placeholder="Inserisci numero scatti" />
-                    </div>
+            <!-- Campi operativi -->
+            <div id="operational-fields" class="space-y-3"></div>
 
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Qta</label>
-                        <input type="number" class="border rounded-md p-2" id="field-quantity" placeholder="Inserisci quantità" />
-                    </div>
+            <div class="mt-4 flex space-x-3">
+              <button id="confirm-ean-updates" class="btn-success py-2 px-4" onclick="saveEanUpdates()">Conferma</button>
+              <button onclick="resetEanActionState(true)" class="btn-secondary py-2 px-4">Annulla</button>
+            </div>
 
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">S1-Prog</label>
-                        <input type="text" class="border rounded-md p-2" id="field-s1-prog" placeholder="Inserisci S1-Prog" />
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">S2-Prog</label>
-                        <input type="text" class="border rounded-md p-2" id="field-s2-prog" placeholder="Inserisci S2-Prog" />
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Prog. on-m</label>
-                        <input type="text" class="border rounded-md p-2" id="field-prog-on-model" placeholder="Inserisci Prog. on-model" />
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Scatto Still (S/N)</label>
-                        <select class="border rounded-md p-2" id="field-still-shot">
-                            <option value="">Seleziona</option>
-                            <option value="S">S</option>
-                            <option value="N">N</option>
-                        </select>
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Scatto On Model (S/N)</label>
-                        <select class="border rounded-md p-2" id="field-onmodel-shot">
-                            <option value="">Seleziona</option>
-                            <option value="S">S</option>
-                            <option value="N">N</option>
-                        </select>
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Priorità</label>
-                        <input type="text" class="border rounded-md p-2" id="field-priority" placeholder="Inserisci priorità" />
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">S1-Stylist</label>
-                        <input type="text" class="border rounded-md p-2" id="field-s1-stylist" placeholder="Inserisci S1-Stylist" />
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">S2-Stylist</label>
-                        <input type="text" class="border rounded-md p-2" id="field-s2-stylist" placeholder="Inserisci S2-Stylist" />
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Provenienza</label>
-                        <input type="text" class="border rounded-md p-2" id="field-provenienza" placeholder="Inserisci provenienza" />
-                    </div>
-
-                    <div class="flex flex-col">
-                        <label class="text-sm font-medium text-gray-700">Tipologia</label>
-                        <input type="text" class="border rounded-md p-2" id="field-tipologia" placeholder="Inserisci tipologia" />
-                    </div>
-                    
-		    <div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Numero Ordine</label>
-  <input type="text" class="border rounded-md p-2" id="field-ordine" placeholder="Inserisci numero ordine" />
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Data Uscita</label>
-  <input type="date" class="border rounded-md p-2" id="field-exit-date" />
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Collo</label>
-  <input type="text" class="border rounded-md p-2" id="field-collo" placeholder="Numero collo" />
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Data Reso</label>
-  <input type="date" class="border rounded-md p-2" id="field-data-reso" />
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Numero DDT</label>
-  <input type="text" class="border rounded-md p-2" id="field-ddt" placeholder="Numero DDT" />
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Note Logistica</label>
-  <textarea class="border rounded-md p-2" id="field-note-logistica" placeholder="Inserisci eventuali note"></textarea>
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Data Presa Post</label>
-  <input type="date" class="border rounded-md p-2" id="field-data-presa-post" />
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Data Consegna Post</label>
-  <input type="date" class="border rounded-md p-2" id="field-data-consegna-post" />
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Calendario</label>
-  <select class="border rounded-md p-2" id="field-calendario">
-    <option value="">Seleziona</option>
-    <option value="S">Sì</option>
-    <option value="N">No</option>
-  </select>
-</div>
-
-<div class="flex flex-col">
-  <label class="text-sm font-medium text-gray-700">Post Presa</label>
-  <input type="text" class="border rounded-md p-2" id="field-postpresa" placeholder="Inserisci info post presa" />
-</div>
-	
-                    
-
-                </div>
-                
-        <p id="update-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
+            <p id="update-status" class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
           </div>
 
-            <div id="photo-upload-area" class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
-  <h4 class="font-bold text-lg mb-3 text-green-700">
-    EAN: <span id="current-ean-display-upload"></span>
-  </h4>
-
-  <label for="photo-drive-links" class="block text-sm font-medium text-gray-700 mb-2">
-    Inserisci link Google Drive (uno per riga):
-  </label>
-
-  <!-- Campo di testo per i link -->
-  <textarea
-    id="photo-drive-links"
-    placeholder="https://drive.google.com/..."
-    class="w-full p-2 border border-green-300 rounded-md h-32 mb-4 resize-y"></textarea>
-
-  <div class="flex space-x-3">
-    <button
-      onclick="handlePhotoUploadAndCompletion()"
-      class="btn-success flex-grow py-2">
-      Salva Link & Completa
-    </button>
-    <button
-      onclick="cancelAdminOrderEdit()"
-      class="btn-secondary py-2 px-4">
-      Annulla
-    </button>
-  </div>
-
-  <p id="upload-status-message" class="status-message status-success hidden mt-3"></p>
-</div>
-        </div>
-
-
-        <div class="card lg:col-span-3">
-            <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-                2. Ordini in Coda per <span id="worker-role-display-queue" class="text-indigo-600"></span>
-            </h3>
-            <p id="loading-orders" class="text-gray-500 p-4">In attesa di caricamento ordini...</p>
-            
-            <div class="overflow-x-auto">
-                <table id="orders-table" class="min-w-full divide-y divide-gray-200">
-                    <thead>
-                        <tr>
-                            <th>Codice Articolo</th>
-                            <th>EAN Code</th>
-                            <th>Style Name</th>
-                            <th>Style Group</th>
-                            <th>Brand</th>
-                            <th>Colore</th>
-                            <th>Taglia</th>
-                            <th>Categoria</th>
-                            <th>Genere</th>
-                            <th>Stato</th>
-                            <th>Azioni</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        </tbody>
-                </table>
+          <!-- Upload link Drive -->
+          <div id="photo-upload-area" class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
+            <h4 class="font-bold text-lg mb-3 text-green-700">EAN: <span id="current-ean-display-upload"></span></h4>
+            <label for="photo-drive-links" class="block text-sm font-medium text-gray-700 mb-2">Inserisci link Google Drive (uno per riga):</label>
+            <textarea id="photo-drive-links" placeholder="https://drive.google.com/..." class="w-full p-2 border border-green-300 rounded-md h-32 mb-4 resize-y"></textarea>
+            <div class="flex space-x-3">
+              <button onclick="handlePhotoUploadAndCompletion()" class="btn-success flex-grow py-2">Salva Link & Completa</button>
+              <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">Annulla</button>
             </div>
+            <p id="upload-status-message" class="status-message status-success hidden mt-3"></p>
+          </div>
         </div>
-    </div>
 
-    <div id="photo-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn text-3xl font-bold absolute top-3 right-5" onclick="closePhotoModal()">&times;</span>
-            <h3 class="text-2xl font-bold mb-4 text-gray-800">Foto EAN: <span id="modal-ean-title"></span></h3>
-            <div id="photo-modal-content" class="mt-6 space-y-4"></div>
+        <!-- Ordini in coda -->
+        <div class="card lg:col-span-3">
+          <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
+            2. Ordini in Coda per <span id="worker-role-display-queue" class="text-indigo-600"></span>
+          </h3>
+          <p id="loading-orders" class="text-gray-500 p-4">In attesa di caricamento ordini...</p>
+
+          <div class="overflow-x-auto">
+            <table id="orders-table" class="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th>Codice Articolo</th>
+                  <th>EAN</th>
+                  <th>Brand</th>
+                  <th>Colore</th>
+                  <th>Taglia</th>
+                  <th>Stato</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
+      </div>
     </div>
-</div>
 
-<div id="admin-dashboard" class="space-y-8 hidden">
-  <h2 class="text-3xl font-bold text-gray-800 mb-6">Pannello Amministratore</h2>
+    <!-- ADMIN DASHBOARD -->
+    <div id="admin-dashboard" class="space-y-8 hidden">
+      <h2 class="text-3xl font-bold text-gray-800 mb-6">Pannello Amministratore</h2>
 
-  <!-- === TOGGLE VISIBILITÀ SEZIONI ADMIN === -->
-  <div class="admin-toggle-controls" style="display:flex; gap:20px; margin-bottom:20px; align-items:center;">
-    <label style="display:flex; align-items:center; gap:8px;">
-      <input type="checkbox" id="toggle-users-card" checked>
-      <span>Mostra Gestione Utenti e Ruoli</span>
-    </label>
+      <!-- Toggle sezioni -->
+      <div class="admin-toggle-controls flex gap-6 items-center mb-6">
+        <label class="flex items-center gap-2">
+          <input type="checkbox" id="toggle-users-card" checked />
+          <span>Mostra Gestione Utenti e Ruoli</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="checkbox" id="toggle-import-card" checked />
+          <span>Mostra Importazione Ordini (Excel)</span>
+        </label>
+      </div>
 
-    <label style="display:flex; align-items:center; gap:8px;">
-      <input type="checkbox" id="toggle-import-card" checked>
-      <span>Mostra Importazione Ordini (Excel)</span>
-    </label>
-  </div>
+      <!-- Riepilogo Ordini -->
+      <section id="admin-stats-section">
+        <h3 class="text-xl font-semibold mb-4 text-gray-800">Riepilogo Ordini</h3>
+        <div id="admin-stats" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
 
-  <!-- === RIEPILOGO STATISTICO ORDINI === -->
-  <section id="admin-stats-section">
-    <h3 class="text-xl font-semibold mb-4 text-gray-800">Riepilogo Ordini</h3>
-    <div id="admin-stats" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+        <div class="mt-8 bg-white border rounded-lg p-4 shadow-sm">
+          <canvas id="admin-stats-chart" class="w-full h-64"></canvas>
+        </div>
+      </section>
 
-    <div class="mt-8 bg-white border rounded-lg p-4 shadow-sm">
-      <canvas id="admin-stats-chart" class="w-full h-64"></canvas>
-    </div>
-  </section>
-</div>		
+      <!-- Gestione Utenti e Import Ordini -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        <!-- GESTIONE UTENTI -->
+        <!-- Gestione Utenti -->
         <div id="card-users" class="card lg:col-span-2">
           <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Gestione Utenti e Ruoli</h3>
 
@@ -357,7 +192,7 @@
                 <tr>
                   <th>Email</th>
                   <th>Ruolo</th>
-                  <th class="w-1/3">Azioni</th>
+                  <th>Azioni</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -365,227 +200,69 @@
           </div>
         </div>
 
-        <!-- IMPORTAZIONE ORDINI -->
-<div id="card-import" class="card lg:col-span-1 h-fit">
-  <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
-  <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.</p>
-  
-<div class="grid grid-cols-4 gap-2 mb-2">
-  <input type="text" id="admin-provenienza" placeholder="Provenienza" class="border p-1 rounded">
-  <input type="text" id="admin-tipologia" placeholder="Tipologia" class="border p-1 rounded">
-  <input type="text" id="admin-ordine" placeholder="Ordine" class="border p-1 rounded">
-  <input type="date" id="admin-data-ordine" placeholder="Data Ordine" class="border p-1 rounded">
-</div>	
+        <!-- Importazione Ordini -->
+        <div id="card-import" class="card lg:col-span-1 h-fit">
+          <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
+          <p class="text-sm text-gray-600 mb-4">Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.</p>
 
-  <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white" />
-  <button id="import-button" onclick="handleFileUpload()" class="btn-warning w-full py-2 font-medium">Carica e Importa</button>
-  <p id="import-status" class="status-message status-success hidden"></p>
+          <div class="grid grid-cols-4 gap-2 mb-2">
+            <input type="text" id="admin-provenienza" placeholder="Provenienza" class="border p-1 rounded" />
+            <input type="text" id="admin-tipologia" placeholder="Tipologia" class="border p-1 rounded" />
+            <input type="text" id="admin-ordine" placeholder="Ordine" class="border p-1 rounded" />
+            <input type="date" id="admin-data-ordine" placeholder="Data Ordine" class="border p-1 rounded" />
+          </div>
 
-  <!-- 👇 QUI LA PROGRESS BAR E I LOG 👇 -->
-  <div id="import-ui" class="mt-4">
-    <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-      <div id="import-progress-bar" class="h-4 rounded-full" style="width:0%; background-color:#10b981;"></div>
-    </div>
-    <p id="import-progress-text" class="text-sm text-gray-600 mt-2">Nessuna importazione in corso.</p>
-    <pre id="import-log" class="mt-3 p-3 bg-gray-50 rounded-md text-sm text-gray-700" style="display:none; max-height:220px; overflow:auto;"></pre>
-  </div>
-</div>
-    </div>
- 
-<!-- LISTA ORDINI ADMIN -->
-<div id="orders-admin-card" class="card mt-8">
-  <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Ordini Importati</h3>
-  <p id="loading-admin-orders" class="text-gray-500 p-4">Caricamento ordini...</p>
-  <div class="overflow-x-auto">
-    <table id="admin-orders-table" class="min-w-full divide-y divide-gray-200">
-      <thead>
-  <tr>
-    <th>Codice Articolo</th>
-    <th>EAN</th>
-    <th>Brand</th>
-    <th>Colore</th>
-    <th>Taglia</th>
-    <th>Link Foto</th>
-    <th>Azioni</th>
-  </tr>
-</thead>
-      <tbody></tbody>
-    </table>
-  </div>
-</div>
- 
- <!-- DATI PER AMIN -->
-<div id="admin-order-edit-card" class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
-  <h3 class="text-2xl font-bold mb-4 text-gray-800">Modifica Ordine: <span id="admin-ean-display"></span></h3>
-  
-  <div id="admin-order-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white" />
+          <button id="import-button" onclick="handleFileUpload()" class="btn-warning w-full py-2 font-medium">Carica e Importa</button>
+          <p id="import-status" class="status-message status-success hidden"></p>
 
-    <!-- Colonne A–I: import Excel -->
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Codice Articolo</label>
-      <input type="text" id="admin-field-productCode" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">EAN Code</label>
-      <input type="text" id="admin-field-eanCode" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Style Name</label>
-      <input type="text" id="admin-field-styleName" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Style Group</label>
-      <input type="text" id="admin-field-styleGroup" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Brand</label>
-      <input type="text" id="admin-field-brand" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Colore</label>
-      <input type="text" id="admin-field-color" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Taglia</label>
-      <input type="text" id="admin-field-size" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Categoria</label>
-      <input type="text" id="admin-field-category" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Genere</label>
-      <input type="text" id="admin-field-gender" class="border rounded-md p-2" />
-    </div>
+          <div id="import-ui" class="mt-4">
+            <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+              <div id="import-progress-bar" class="h-4 rounded-full" style="width:0%; background-color:#10b981;"></div>
+            </div>
+            <p id="import-progress-text" class="text-sm text-gray-600 mt-2">Nessuna importazione in corso.</p>
+            <pre id="import-log" class="mt-3 p-3 bg-gray-50 rounded-md text-sm text-gray-700" style="display:none; max-height:220px; overflow:auto;"></pre>
+          </div>
+        </div>
+      </div>
 
-    <!-- Colonne successive: compilabili da Admin -->
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">N. Scatti</label>
-      <input type="number" id="admin-field-shots" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Qta</label>
-      <input type="number" id="admin-field-quantity" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">s1-Prog</label>
-      <input type="text" id="admin-field-s1Prog" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">s2-Prog</label>
-      <input type="text" id="admin-field-s2Prog" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Prog. on-m</label>
-      <input type="text" id="admin-field-progOnModel" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Scatto Still (S/N)</label>
-      <select id="admin-field-stillShot" class="border rounded-md p-2">
-        <option value="">Seleziona</option>
-        <option value="S">S</option>
-        <option value="N">N</option>
-      </select>
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Scatto On Model (S/N)</label>
-      <select id="admin-field-onModelShot" class="border rounded-md p-2">
-        <option value="">Seleziona</option>
-        <option value="S">S</option>
-        <option value="N">N</option>
-      </select>
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Priorità</label>
-      <input type="text" id="admin-field-priority" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">s1-Stylist</label>
-      <input type="text" id="admin-field-s1Stylist" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">s2-Stylist</label>
-      <input type="text" id="admin-field-s2Stylist" class="border rounded-md p-2" />
-    </div>
+      <!-- Lista Ordini Admin -->
+      <div id="orders-admin-card" class="card mt-8">
+        <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Ordini Importati</h3>
+        <p id="loading-admin-orders" class="text-gray-500 p-4">Caricamento ordini...</p>
+        <div class="overflow-x-auto">
+          <table id="admin-orders-table" class="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th>Codice Articolo</th>
+                <th>EAN</th>
+                <th>Brand</th>
+                <th>Colore</th>
+                <th>Taglia</th>
+                <th>Link Foto</th>
+                <th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
 
-    <!-- Campi Logistica -->
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Provenienza</label>
-      <input type="text" id="admin-field-provenienza" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Tipologia</label>
-      <input type="text" id="admin-field-tipologia" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Numero Ordine</label>
-      <input type="text" id="admin-field-ordine" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Data Ordine</label>
-      <input type="date" id="admin-field-dataOrdine" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Entry Date</label>
-      <input type="date" id="admin-field-entryDate" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Exit Date</label>
-      <input type="date" id="admin-field-exitDate" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Collo</label>
-      <input type="text" id="admin-field-collo" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Data Reso</label>
-      <input type="date" id="admin-field-dataReso" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">DDT N.</label>
-      <input type="text" id="admin-field-ddt" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col col-span-2">
-      <label class="text-sm font-medium text-gray-700">Note Logistica</label>
-      <textarea id="admin-field-noteLogistica" class="border rounded-md p-2"></textarea>
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Data Presa in Carico Post</label>
-      <input type="date" id="admin-field-dataPresaPost" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Data Consegna Post</label>
-      <input type="date" id="admin-field-dataConsegnaPost" class="border rounded-md p-2" />
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Calendario</label>
-      <select id="admin-field-calendario" class="border rounded-md p-2">
-        <option value="">Seleziona</option>
-        <option value="S">Sì</option>
-        <option value="N">No</option>
-      </select>
-    </div>
-    <div class="flex flex-col">
-      <label class="text-sm font-medium text-gray-700">Post-presa in carico</label>
-      <input type="text" id="admin-field-postpresa" class="border rounded-md p-2" />
+      <!-- Modifica Ordine Admin -->
+      <div id="admin-order-edit-card" class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
+        <h3 class="text-2xl font-bold mb-4 text-gray-800">Modifica Ordine: <span id="admin-ean-display"></span></h3>
+        <div id="admin-order-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        <div class="mt-4 flex space-x-3">
+          <button onclick="saveAdminOrderUpdates()" class="btn-success py-2 px-4">Salva Aggiornamenti</button>
+          <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">Annulla</button>
+        </div>
+        <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
+      </div>
     </div>
 
   </div>
-
-<div class="mt-4 flex space-x-3">
-    <button onclick="saveAdminOrderUpdates()" class="btn-success py-2 px-4">Salva Aggiornamenti</button>
-    <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">Annulla</button>
-</div>
-
-  <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
-</div>
-
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <!-- JS principale -->
-<script src="app.js" defer></script>	
+  <script src="app.js" defer></script>
 </body>
 </html>
