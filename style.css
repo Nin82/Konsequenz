@@ -286,3 +286,15 @@ table tbody tr td {
         padding: 0.5rem;
     }
 }
+/* ======================================================
+   HIGHLIGHT RIGA AGGIORNATA
+   ====================================================== */
+.highlight-row {
+  animation: flashHighlight 1.5s forwards;
+}
+
+@keyframes flashHighlight {
+  0% { background-color: #34d399; }  /* verde brillante */
+  100% { background-color: transparent; }
+}
+
