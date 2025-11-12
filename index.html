@@ -168,42 +168,80 @@
       <!-- Gestione Utenti e Import Ordini -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
 
-        <!-- Gestione Utenti -->
-        <div id="card-users" class="card lg:col-span-2">
-          <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Gestione Utenti e Ruoli</h3>
+       <!-- Gestione Utenti -->
+<div id="card-users" class="card lg:col-span-2">
+  <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">
+    Gestione Utenti e Ruoli
+  </h3>
 
-          <div class="mb-6 p-6 border border-gray-200 rounded-lg bg-gray-50 shadow-inner">
-            <h4 class="font-bold text-lg mb-3">Crea Nuovo Utente</h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <input type="email" id="new-user-email" placeholder="Email" />
-              <input type="password" id="new-user-password" placeholder="Password Iniziale" />
-              <select id="new-user-role">
-                <option value="" disabled selected>Seleziona Ruolo</option>
-                <option value="Photographer">Photographer</option>
-                <option value="PostProducer">Post Producer</option>
-                <option value="Admin">Admin</option>
-              </select>
-            </div>
-            <button onclick="handleUserCreation()" class="btn-primary mt-4 py-2 font-medium">Crea Utente</button>
-            <p id="user-creation-status" class="status-message status-info hidden"></p>
-          </div>
+  <!-- Sezione Creazione Nuovo Utente -->
+  <div class="mb-6 p-6 border border-gray-200 rounded-lg bg-gray-50 shadow-inner">
+    <h4 class="font-bold text-lg mb-3">Crea Nuovo Utente</h4>
 
-          <h4 class="font-bold text-lg mt-8 mb-4 border-b pb-2">Utenti Esistenti</h4>
-          <p id="loading-users" class="text-gray-500 p-4">Caricamento lista utenti...</p>
-          <div class="overflow-x-auto">
-            <table id="users-table" class="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Ruolo</th>
-                  <th>Azioni</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
+    <!-- Campi base -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <input type="email" id="new-user-email" placeholder="Email" />
+      <input type="password" id="new-user-password" placeholder="Password Iniziale" />
+      <select id="new-user-role">
+        <option value="" disabled selected>Seleziona Ruolo</option>
+        <option value="Photographer">Photographer</option>
+        <option value="PostProducer">Post Producer</option>
+        <option value="Admin">Admin</option>
+      </select>
+    </div>
 
+    <!-- 🔧 Campi modificabili (definiti dall'Admin) -->
+    <div class="mt-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">
+        Campi modificabili per questo utente
+      </label>
+      <div id="editable-fields-container"
+           class="grid grid-cols-2 md:grid-cols-3 gap-2 border rounded p-3 bg-gray-50">
+        <!-- popolato automaticamente da JS -->
+      </div>
+    </div>
+
+    <button onclick="handleUserCreation()" class="btn-primary mt-4 py-2 font-medium">
+      Crea Utente
+    </button>
+    <p id="user-creation-status" class="status-message status-info hidden"></p>
+  </div>
+
+  <!-- Sezione Utenti Esistenti -->
+  <h4 class="font-bold text-lg mt-8 mb-4 border-b pb-2">Utenti Esistenti</h4>
+  <p id="loading-users" class="text-gray-500 p-4">Caricamento lista utenti...</p>
+  <div class="overflow-x-auto">
+    <table id="users-table" class="min-w-full divide-y divide-gray-200">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Ruolo</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 🔧 MODALE CONFIGURAZIONE PERMESSI -->
+<div id="permissions-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-xl p-6 max-w-3xl w-full shadow-2xl relative">
+    <h3 class="text-2xl font-bold mb-4 text-gray-800">Configura Permessi Utente</h3>
+    <p class="text-gray-500 mb-4">Seleziona i campi che questo utente può modificare.</p>
+    
+    <div id="permissions-list" class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-96 overflow-y-auto border p-4 rounded-lg bg-gray-50">
+      <!-- Checkbox dinamiche -->
+    </div>
+
+    <div class="mt-6 flex justify-end gap-3">
+      <button onclick="closePermissionsModal()" class="btn-secondary px-4 py-2">Annulla</button>
+      <button onclick="saveUserPermissions()" class="btn-primary px-4 py-2">Salva Permessi</button>
+    </div>
+
+    <button onclick="closePermissionsModal()" class="absolute top-3 right-4 text-2xl font-bold text-gray-400 hover:text-gray-700">&times;</button>
+  </div>
+</div>
         <!-- Importazione Ordini -->
         <div id="card-import" class="card lg:col-span-1 h-fit">
           <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">Importazione Ordini (Excel)</h3>
