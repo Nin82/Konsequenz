@@ -74,17 +74,17 @@
     </header>
 
     <!-- LOGIN AREA -->
-    <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
-      <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
-      <div class="space-y-4 mb-6">
+   <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
+    <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
+    <div class="space-y-4 mb-6">
         <input type="email" id="user-email" placeholder="Email" value="nino_glli@yahoo.it" />
         <input type="password" id="user-password" placeholder="Password" />
-      </div>
-      <button onclick="handleStandardLogin(document.getElementById('user-email').value, document.getElementById('user-password').value)" class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
-
-      <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Password Dimenticata?</button>
-      <p id="login-status" class="status-message status-error hidden"></p>
     </div>
+    <button onclick="handleStandardLogin()" class="btn-primary w-full py-3 text-lg font-semibold shadow-md">Accedi</button>
+
+    <button onclick="handlePasswordRecovery()" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Password Dimenticata?</button>
+    <p id="login-status" class="status-message status-error hidden"></p>
+</div>
 
 <div id="worker-dashboard" class="space-y-8 hidden">
     <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
