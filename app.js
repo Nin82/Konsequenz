@@ -268,23 +268,16 @@ function showGeneralOrdersView() {
     const workerDashboard = document.getElementById('worker-dashboard');
     const loginArea = document.getElementById('login-area');
 
-    // Sicurezza: esistenza elementi
     if (!generalOrdersView) return console.warn("Elemento #general-orders-view non trovato.");
 
-    // Nasconde tutte le altre dashboard/aree
-    if (adminDashboard) adminDashboard.classList.add('hidden');
-    if (workerDashboard) workerDashboard.classList.add('hidden');
+    // Nasconde tutto il resto
     if (loginArea) loginArea.classList.add('hidden');
+    if (workerDashboard) workerDashboard.classList.add('hidden');
+    if (adminDashboard) adminDashboard.classList.add('hidden');
 
     // Mostra la vista generale
     generalOrdersView.classList.remove('hidden');
-
-    // Opzionale: carica ordini
-    if (typeof loadAllOrdersForAdmin === 'function') {
-        loadAllOrdersForAdmin();
-    }
 }
-
 
 // ----------------------------------------------------
 // FUNZIONI ADMIN (DASHBOARD)
