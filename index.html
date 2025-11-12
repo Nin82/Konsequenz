@@ -300,32 +300,27 @@
         </div>
       </div>
 
-      <!-- ✅ MODIFICA ORDINE ADMIN (maschera completa) -->
-<div id="admin-order-edit-card"
-     class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
-  <h3 class="text-2xl font-bold mb-4 text-gray-800">
-    Modifica Ordine: <span id="admin-ean-display"></span>
-  </h3>
+<!-- 🔧 MODALE ASSEGNAZIONE ORDINE -->
+<div id="assign-modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-lg p-6 w-96">
+    <h3 class="text-xl font-bold mb-3 text-gray-800">Assegna Ordine</h3>
+    <p id="assign-ean-display" class="text-sm text-gray-600 mb-3"></p>
 
-  <div id="admin-order-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    <label for="assign-user-select" class="block text-sm font-medium text-gray-700 mb-2">
+      Seleziona utente
+    </label>
+    <select id="assign-user-select" class="w-full border p-2 rounded mb-4"></select>
 
-  <div class="mt-4 flex space-x-3">
-    <button onclick="saveAdminOrderUpdates()" class="btn-success py-2 px-4">
-      Salva Aggiornamenti
-    </button>
-    <button onclick="cancelAdminOrderEdit()" class="btn-secondary py-2 px-4">
-      Annulla
-    </button>
-  </div>
-
-  <p id="admin-update-feedback" class="status-message mt-3 hidden"></p>
-</div>
-
+    <div class="flex justify-end space-x-2">
+      <button onclick="confirmOrderAssignment()" class="btn-success px-3 py-2">Conferma</button>
+      <button onclick="closeAssignModal()" class="btn-secondary px-3 py-2">Annulla</button>
     </div>
-
   </div>
+</div>
+<!-- 🔚 FINE SEZIONE ADMIN DASHBOARD -->
+</div> <!-- 👈 chiude #admin-dashboard -->
 
-  <!-- JS principale -->
-  <script src="app.js" defer></script>
+<!-- JS principale -->
+<script src="app.js" defer></script>
 </body>
 </html>
