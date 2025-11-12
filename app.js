@@ -1,4 +1,4 @@
-// Configurazione Backendless (sostituisci con le tue chiavi reali -)
+// Configurazione Backendless (sostituisci con le tue chiavi reali)
 const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C';
 const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';       
 
@@ -245,14 +245,22 @@ function handleLoginSuccess(user) {
             const adminDashboard = document.getElementById('admin-dashboard');
             const workerDashboard = document.getElementById('worker-dashboard');
             const generalOrdersView = document.getElementById('general-orders-view');
+            
+            // 💡 VARIABILE CRITICA: il pulsante che vuoi mostrare a tutti
+            const generalOrdersBtn = document.getElementById('show-general-orders-btn'); 
 
-            // Sicurezza DOM
+            // Sicurezza DOM: Imposta nome e ruolo, nasconde login e vista generale
             if (workerName) workerName.textContent = displayName;
             if (workerRole) workerRole.textContent = currentRole;
             if (loginArea) loginArea.classList.add('hidden');
             if (generalOrdersView) generalOrdersView.classList.add('hidden');
 
-            // Gestione dashboard per ruolo
+            // 📢 AZIONE CRITICA: Rendiamo il pulsante 'Tutti gli Ordini' visibile a TUTTI
+            if (generalOrdersBtn) {
+                generalOrdersBtn.classList.remove('hidden'); 
+            }
+
+            // Gestione dashboard per ruolo: mostra la dashboard principale corretta
             if (currentRole === ROLES.ADMIN) {
                 if (adminDashboard) adminDashboard.classList.remove('hidden');
                 if (workerDashboard) workerDashboard.classList.add('hidden');
@@ -262,7 +270,7 @@ function handleLoginSuccess(user) {
             else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
                 if (adminDashboard) adminDashboard.classList.add('hidden');
                 if (workerDashboard) workerDashboard.classList.remove('hidden');
-                loadOrdersForUser(currentRole);
+                loadOrdersForUser(currentRole); // Carica la coda di lavoro del lavoratore
             } 
             else {
                 console.warn("Ruolo non autorizzato:", currentRole);
@@ -276,7 +284,6 @@ function handleLoginSuccess(user) {
             handleLogout();
         });
 }
-
 
 function showGeneralOrdersView() {
     const generalOrdersView = document.getElementById('general-orders-view');
@@ -320,6 +327,8 @@ function showMainDashboard() {
         showLoginArea(); 
     }
 }
+
+
 
 // ----------------------------------------------------
 // FUNZIONI ADMIN (DASHBOARD)
@@ -1402,6 +1411,52 @@ async function loadGeneralOrders() {
     }
 }
 
+function renderGeneralOrdersTable(orders) {
+    const tableBody = document.querySelector('#general-orders-table tbody');
+    const loadingEl = document.getElementById('loading-general-orders');
+    const tableContainer = document.querySelector('#general-orders-table').parentNode; // Il div overflow
+
+    if (!tableBody || !loadingEl) return;
+
+    tableBody.innerHTML = '';
+    loadingEl.classList.add('hidden');
+    tableContainer.classList.add('hidden');
+
+    if (!orders || orders.length === 0) {
+        loadingEl.textContent = "Nessun ordine trovato con i filtri correnti.";
+        loadingEl.classList.remove('hidden');
+        return;
+    }
+    
+    tableContainer.classList.remove('hidden'); // Mostra la tabella
+
+    orders.forEach(order => {
+        const tr = document.createElement('tr');
+        tr.classList.add('hover:bg-gray-100', 'cursor-pointer', 'text-sm', 'divide-x');
+
+        // Assicurati che questi campi siano validi nel tuo schema Backendless
+        tr.innerHTML = `
+            <td class="px-4 py-2">${order.productCode || '—'}</td>
+            <td class="px-4 py-2">${order.eanCode || '—'}</td>
+            <td class="px-4 py-2">${order.styleName || '—'}</td>
+            <td class="px-4 py-2">${order.brand || '—'}</td>
+            <td class="px-4 py-2">${order.category || '—'}</td>
+            <td class="px-4 py-2">${order.status || '—'}</td>
+            <td class="px-4 py-2 text-center"></td>
+        `;
+        
+        // Colonna Azioni (Visualizza Link Foto)
+        const actionCell = tr.querySelector('td:last-child');
+        const viewBtn = document.createElement('button');
+        viewBtn.textContent = 'Visualizza Link';
+        viewBtn.className = 'btn-primary text-xs py-1 px-2';
+        // 💡 Assumi che il link sia salvato in `photoUrl` (come da modifiche precedenti)
+        viewBtn.onclick = () => alert(`Link Foto per EAN ${order.eanCode}: ${order.photoUrl || 'Nessun link presente'}`);
+        actionCell.appendChild(viewBtn);
+
+        tableBody.appendChild(tr);
+    });
+}
 
 // ----------------------------------------------------
 // GESTIONE INIZIALE
@@ -1424,6 +1479,9 @@ window.onload = function() {
             }
         })
         .then(user => {
+            // 💡 CHIAMATA AGGIUNTA: Popola i filtri di stato una volta caricata la sessione
+            populateStatusFilters(); 
+
             if (user && user.objectId) {
                 handleLoginSuccess(user);
             } else {
@@ -1435,4 +1493,3 @@ window.onload = function() {
             showLoginArea();
         });
 };
-
