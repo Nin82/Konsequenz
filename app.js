@@ -114,17 +114,22 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // ----------------------------------------------------
 
 async function handleStandardLogin() {
-    // 💡 Usa gli ID corretti mostrati nel tuo HTML
-    const email = document.getElementById('user-email').value;
-    const password = document.getElementById('user-password').value;
-    
+    // Usa gli ID corretti (da index.txt) [cite: 1345]
+    const emailInput = document.getElementById('user-email');
+    const passwordInput = document.getElementById('user-password');
     const statusEl = document.getElementById('login-status');
-    const loginButton = document.querySelector('.btn-primary'); // Trova il bottone per disabilitarlo
+    const loginButton = document.querySelector('.btn-primary'); // Seleziona il primo bottone primario
+
+    if (!emailInput || !passwordInput) return;
+    
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
 
     if (!email || !password) {
         if (statusEl) {
             statusEl.textContent = "Per favore, inserisci email e password.";
             statusEl.classList.remove('hidden');
+            statusEl.classList.add('status-error'); 
         }
         return;
     }
@@ -132,27 +137,35 @@ async function handleStandardLogin() {
     if (statusEl) {
         statusEl.textContent = "Accesso in corso...";
         statusEl.classList.remove('hidden');
+        statusEl.classList.remove('status-error');
     }
     if (loginButton) loginButton.disabled = true;
 
     try {
-        const user = await Backendless.UserService.login(email, password, true);
-        
-        // Chiamata alla funzione di successo (che deve esistere in app.txt)
-        handleLoginSuccess(user); 
-
+        const user = await Backendless.UserService.login(email, password, true); // [cite: 1019]
+        handleLoginSuccess(user); // [cite: 1020]
     } catch (error) {
+        // GESTIONE MIGLIORATA DELL'ERRORE
         console.error("Errore di Login:", error);
-        const message = error.message || "Credenziali non valide o errore di sistema.";
         
+        let message = "Credenziali non valide o errore di sistema.";
+        
+        // Codice 3003 è l'errore tipico di Backendless per credenziali errate
+        if (error.code === 3003 || error.message.includes('Invalid login')) { 
+            message = "Email o password errati. Verificare le credenziali.";
+        } else if (error.message) {
+            message = error.message;
+        }
+
         if (statusEl) {
             statusEl.textContent = "Accesso fallito: " + message;
             statusEl.classList.remove('hidden');
-            statusEl.classList.add('status-error'); // Assicurati che lo stile errore sia applicato
+            statusEl.classList.add('status-error'); // [cite: 1023]
         }
-        if (loginButton) loginButton.disabled = false;
+        if (loginButton) loginButton.disabled = false; // Riattiva il bottone
     }
 }
+
 function handleLogout() {
     Backendless.UserService.logout()
         .then(() => {
@@ -1459,6 +1472,32 @@ function renderGeneralOrdersTable(orders) {
 }
 
 // ----------------------------------------------------
+// FUNZIONI PER VISTA ORDINI GENERALI (FILTRI)
+// ----------------------------------------------------
+
+function populateStatusFilters() {
+    const statusSelect = document.getElementById('filter-status');
+    if (!statusSelect) {
+        console.warn("Elemento #filter-status non trovato.");
+        return;
+    }
+    
+    // Pulisce le opzioni precedenti (mantenendo "Tutti gli Stati")
+    statusSelect.innerHTML = '<option value="">Tutti gli Stati</option>';
+    
+    // Combina la costante STATUS_WAITING_PHOTO con gli stati dell'oggetto STATUS
+    const allStatuses = [STATUS_WAITING_PHOTO, ...Object.values(STATUS)]; // [cite: 996]
+
+    allStatuses.forEach(status => {
+        const option = document.createElement('option');
+        option.value = status;
+        option.textContent = status;
+        statusSelect.appendChild(option);
+    });
+    console.log("Filtri di stato popolati.");
+}
+
+// ----------------------------------------------------
 // GESTIONE INIZIALE
 // ----------------------------------------------------
 
@@ -1479,7 +1518,7 @@ window.onload = function() {
             }
         })
         .then(user => {
-            // 💡 CHIAMATA AGGIUNTA: Popola i filtri di stato una volta caricata la sessione
+            // 💡 FIX: Ora la funzione è definita e viene chiamata qui dopo la sessione
             populateStatusFilters(); 
 
             if (user && user.objectId) {
@@ -1489,7 +1528,7 @@ window.onload = function() {
             }
         })
         .catch(error => {
-            console.error("Errore di inizializzazione sessione:", error);
+            console.error("Errore di inizializzazione sessione:", error); //
             showLoginArea();
         });
 };
