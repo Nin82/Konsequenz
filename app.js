@@ -1,3 +1,6 @@
+// =====================================================
+// PARTE 1 – CONFIGURAZIONE E COSTANTI
+// =====================================================
 // Configurazione Backendless (sostituisci con le tue chiavi reali)
 const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C';
 const API_KEY = 'B266000F-684B-4889-9174-2D1734001E08';
@@ -23,7 +26,7 @@ const STATUS_COLORS = {
   [STATUS.WAITING_PHOTO]: "bg-yellow-100 text-yellow-700 border-yellow-300",
   [STATUS.WAITING_POST_PRODUCTION]: "bg-blue-100 text-blue-700 border-blue-300",
   [STATUS.IN_POST_PROCESS]: "bg-amber-100 text-amber-700 border-amber-300",
-  "In approvazione": "bg-purple-100 text-purple-700 border-purple-300",
+  ["In approvazione"]: "bg-purple-100 text-purple-700 border-purple-300",
   [STATUS.COMPLETED]: "bg-green-100 text-green-700 border-green-300",
   [STATUS.REJECTED]: "bg-red-100 text-red-700 border-red-300",
   DEFAULT: "bg-gray-100 text-gray-600 border-gray-300"
@@ -36,7 +39,7 @@ const ROLES = {
   POST_PRODUCER: "PostProducer"
 };
 
-// 🔧 CONFIGURAZIONE RUOLI
+// 🔧 CONFIGURAZIONE RUOLI (colonne dinamiche + azioni per tabella worker)
 const ROLE_CONFIG = {
   [ROLES.ADMIN]: {
     filter: "",
@@ -52,7 +55,7 @@ const ROLE_CONFIG = {
     columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
     actions: order => `
       <button class="btn-success px-3 py-1 text-sm"
-              onclick="startPhotoUpload('${order.objectId}', '${order.eanCode}')">
+              onclick="startPhotoUpload && startPhotoUpload('${order.objectId}', '${order.eanCode}')">
         Carica Link
       </button>`
   },
@@ -89,315 +92,575 @@ let currentRole = null;
 let currentEanInProcess = null;
 let currentAdminOrder = null;
 
-
 // Inizializzazione di Backendless
 Backendless.initApp(APPLICATION_ID, API_KEY);
 console.log("Backendless inizializzato.");
 
 // Registrazione del Service Worker per la PWA
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-                console.log('Service Worker registrato con successo:', registration.scope);
-            })
-            .catch(error => {
-                console.error('Service Worker fallito:', error);
-            });
-    });
-} 
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('Service Worker registrato con successo:', registration.scope);
+      })
+      .catch(error => {
+        console.error('Service Worker fallito:', error);
+      });
+  });
+}
 
-// ----------------------------------------------------
-// FUNZIONI DI UTILITY E UI
-// ----------------------------------------------------
+// =====================================================
+// PARTE 2 – AUTENTICAZIONE E GESTIONE UTENTI
+// =====================================================
 
 function showLoginArea(message = "") {
-    document.getElementById('login-area').style.display = 'block';
-    document.getElementById('worker-dashboard').style.display = 'none';
-    document.getElementById('admin-dashboard').style.display = 'none';
-    document.getElementById('worker-name').textContent = 'Ospite';
-    document.getElementById('worker-role').textContent = 'Non Loggato';
-    
-    const status = document.getElementById('login-status');
-    status.textContent = message;
-    status.style.display = message ? 'block' : 'none';
-    
-    document.getElementById('scan-status').textContent = '';
-    document.getElementById('photo-upload-area').style.display = 'none';
+  document.getElementById('login-area').style.display = 'block';
+  document.getElementById('worker-dashboard').style.display = 'none';
+  document.getElementById('admin-dashboard').style.display = 'none';
+  document.getElementById('worker-name').textContent = 'Ospite';
+  document.getElementById('worker-role').textContent = 'Non Loggato';
+
+  const status = document.getElementById('login-status');
+  status.textContent = message;
+  status.style.display = message ? 'block' : 'none';
+
+  const scanStatus = document.getElementById('scan-status');
+  if (scanStatus) scanStatus.textContent = '';
+  const uploadArea = document.getElementById('photo-upload-area');
+  if (uploadArea) uploadArea.style.display = 'none';
 }
 
 function showStatusMessage(elementId, message, isSuccess = true) {
-    const el = document.getElementById(elementId);
-    el.textContent = message;
-    el.style.display = 'block';
-    if (isSuccess) {
-        el.classList.remove('text-red-600', 'bg-red-100');
-        el.classList.add('text-green-600', 'bg-green-100');
-    } else {
-        el.classList.remove('text-green-600', 'bg-green-100');
-        el.classList.add('text-red-600', 'bg-red-100');
-    }
+  const el = document.getElementById(elementId);
+  el.textContent = message;
+  el.style.display = 'block';
+  if (isSuccess) {
+    el.classList.remove('text-red-600', 'bg-red-100');
+    el.classList.add('text-green-600', 'bg-green-100');
+  } else {
+    el.classList.remove('text-green-600', 'bg-green-100');
+    el.classList.add('text-red-600', 'bg-red-100');
+  }
 }
 
-// ----------------------------------------------------
-// AUTENTICAZIONE E GESTIONE UTENTI
-// ----------------------------------------------------
-
 function handleStandardLogin(email, password) {
-    if (!email || !password) {
-        showLoginArea("Per favore, inserisci email e password.");
-        return;
-    }
-    
-    document.getElementById('login-status').textContent = "Accesso in corso...";
-    Backendless.UserService.login(email, password, true)
-        .then(user => {
-            handleLoginSuccess(user);
-        })
-        .catch(error => {
-            console.error("Errore di Login:", error);
-            const message = error.message || "Credenziali non valide o errore di sistema.";
-            showLoginArea("Accesso Fallito: " + message);
-        });
+  if (!email || !password) {
+    showLoginArea("Per favore, inserisci email e password.");
+    return;
+  }
+
+  document.getElementById('login-status').textContent = "Accesso in corso...";
+  Backendless.UserService.login(email, password, true)
+    .then(user => {
+      handleLoginSuccess(user);
+    })
+    .catch(error => {
+      console.error("Errore di Login:", error);
+      const message = error.message || "Credenziali non valide o errore di sistema.";
+      showLoginArea("Accesso Fallito: " + message);
+    });
 }
 
 function handleLogout() {
-    Backendless.UserService.logout()
-        .then(() => {
-            currentUser = null;
-            currentRole = null;
-            currentEanInProcess = null;
-            showLoginArea("Logout avvenuto con successo.");
-        })
-        .catch(error => {
-            console.error("Errore di Logout:", error);
-            showLoginArea("Errore durante il logout. Riprova.");
-        });
+  Backendless.UserService.logout()
+    .then(() => {
+      currentUser = null;
+      currentRole = null;
+      currentEanInProcess = null;
+      showLoginArea("Logout avvenuto con successo.");
+    })
+    .catch(error => {
+      console.error("Errore di Logout:", error);
+      showLoginArea("Errore durante il logout. Riprova.");
+    });
 }
 
 function handlePasswordRecovery() {
-    const email = document.getElementById('user-email').value;
-    if (!email) {
-        showLoginArea("Per recuperare la password, inserisci l'email nel campo apposito.");
-        return;
-    }
+  const email = document.getElementById('user-email').value;
+  if (!email) {
+    showLoginArea("Per recuperare la password, inserisci l'email nel campo apposito.");
+    return;
+  }
 
-    Backendless.UserService.restorePassword(email)
-        .then(() => {
-            showLoginArea(`Email di recupero inviata a ${email}. Controlla la tua casella di posta.`);
-        })
-        .catch(error => {
-            console.error("Errore di recupero password:", error);
-            showLoginArea(`Errore di recupero password: ${error.message}`);
-        });
+  Backendless.UserService.restorePassword(email)
+    .then(() => {
+      showLoginArea(`Email di recupero inviata a ${email}. Controlla la tua casella di posta.`);
+    })
+    .catch(error => {
+      console.error("Errore di recupero password:", error);
+      showLoginArea(`Errore di recupero password: ${error.message}`);
+    });
 }
 
 function getRoleFromUser(user) {
-    if (user.role) {
-        return Promise.resolve(user.role);
-    }
+  if (user.role) {
+    return Promise.resolve(user.role);
+  }
 
-    const queryBuilder = Backendless.DataQueryBuilder.create()
-        .setProperties(["objectId", "role"])
-        .setWhereClause(`objectId = '${user.objectId}'`);
-    return Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
-        .then(result => {
-            if (result && result.length > 0) {
-                return result[0].role || 'Nessun Ruolo';
-            }
-            return 'Nessun Ruolo';
-        })
-        .catch(error => {
-            console.error("Errore nel recupero del ruolo:", error);
-            return 'Nessun Ruolo';
-        });
+  const queryBuilder = Backendless.DataQueryBuilder.create()
+    .setProperties(["objectId", "role"])
+    .setWhereClause(`objectId = '${user.objectId}'`);
+  return Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
+    .then(result => {
+      if (result && result.length > 0) {
+        return result[0].role || 'Nessun Ruolo';
+      }
+      return 'Nessun Ruolo';
+    })
+    .catch(error => {
+      console.error("Errore nel recupero del ruolo:", error);
+      return 'Nessun Ruolo';
+    });
 }
 
 async function handleLoginSuccess(user) {
-    currentUser = user;
-    
-    getRoleFromUser(user)
-        .then(async role => {   // 👈 aggiungi async qui per usare await sotto
-            currentRole = role;
-            
-            const displayName = user.name || user.email;
-            document.getElementById('worker-name').textContent = displayName;
-            document.getElementById('worker-role').textContent = currentRole;
-            
-            document.getElementById('login-area').style.display = 'none';
+  currentUser = user;
 
-            if (currentRole === ROLES.ADMIN) {
-                document.getElementById('admin-dashboard').style.display = 'block';
-                document.getElementById('worker-dashboard').style.display = 'none'; 
+  getRoleFromUser(user)
+    .then(async role => {
+      currentRole = role;
 
-                loadUsersAndRoles(); 
-                await loadAllOrdersForAdmin();   // ✅ carica tabella ordini
-                await loadAdminDashboard();      // ✅ carica riepilogo e grafico
-            } 
-            else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
-                document.getElementById('admin-dashboard').style.display = 'none'; 
-                document.getElementById('worker-dashboard').style.display = 'block';
-                loadOrdersForUser(currentRole); 
-            } 
-            else {
-                showLoginArea("Ruolo utente non autorizzato o non definito.");
-                handleLogout();
-            }
-        })
-        .catch(error => {
-            console.error("Errore critico durante la gestione del ruolo:", error);
-            showLoginArea(`Errore nella verifica del ruolo: ${error.message}`);
-            handleLogout();
-        });
+      const displayName = user.name || user.email;
+      document.getElementById('worker-name').textContent = displayName;
+      document.getElementById('worker-role').textContent = currentRole;
+
+      document.getElementById('login-area').style.display = 'none';
+
+      if (currentRole === ROLES.ADMIN) {
+        document.getElementById('admin-dashboard').style.display = 'block';
+        document.getElementById('worker-dashboard').style.display = 'none';
+
+        loadUsersAndRoles();
+        await loadAllOrdersForAdmin();
+        await loadAdminDashboard();
+      }
+      else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+        document.getElementById('admin-dashboard').style.display = 'none';
+        document.getElementById('worker-dashboard').style.display = 'block';
+        loadOrdersForUser(currentRole);
+      }
+      else {
+        showLoginArea("Ruolo utente non autorizzato o non definito.");
+        handleLogout();
+      }
+    })
+    .catch(error => {
+      console.error("Errore critico durante la gestione del ruolo:", error);
+      showLoginArea(`Errore nella verifica del ruolo: ${error.message}`);
+      handleLogout();
+    });
 }
 
 // ----------------------------------------------------
-// FUNZIONI ADMIN (DASHBOARD)
+// FUNZIONI ADMIN (USERS LIST/CRUD RUOLI)
 // ----------------------------------------------------
 
 function renderUsersTable(users) {
-    const tableBody = document.querySelector('#users-table tbody');
-    tableBody.innerHTML = '';
-    const loadingUsersEl = document.getElementById('loading-users');
-    if (!users || users.length === 0) {
-        loadingUsersEl.textContent = "Nessun utente trovato (a parte te, Admin).";
-        loadingUsersEl.style.display = 'block';
-        return;
-    }
-    
-    loadingUsersEl.style.display = 'none';
-    users.forEach(user => {
-        if (user.objectId === currentUser.objectId) return; 
+  const tableBody = document.querySelector('#users-table tbody');
+  tableBody.innerHTML = '';
+  const loadingUsersEl = document.getElementById('loading-users');
+  if (!users || users.length === 0) {
+    loadingUsersEl.textContent = "Nessun utente trovato (a parte te, Admin).";
+    loadingUsersEl.style.display = 'block';
+    return;
+  }
 
-        const row = tableBody.insertRow();
-        row.insertCell().textContent = user.email;
+  loadingUsersEl.style.display = 'none';
+  users.forEach(user => {
+    // ✅ evita errore se currentUser è nullo
+    if (currentUser && user.objectId === currentUser.objectId) return;
 
-        const currentRoleCell = row.insertCell();
-        currentRoleCell.textContent = user.role || 'Nessun Ruolo';
-        
-        const actionCell = row.insertCell();
-        actionCell.classList.add('action-cell');
+    const row = tableBody.insertRow();
+    row.insertCell().textContent = user.email;
 
-        const roleSelect = document.createElement('select');
-        roleSelect.className = 'w-1/2 p-2 border border-gray-300 rounded-md text-sm';
-        Object.values(ROLES).filter(r => r !== ROLES.ADMIN).forEach(role => {
-            const option = document.createElement('option');
-            option.value = role;
-            option.textContent = role;
-            if (user.role === role) {
-                option.selected = true;
-            }
-            roleSelect.appendChild(option);
-        });
-        const saveButton = document.createElement('button');
-        saveButton.textContent = 'Salva Ruolo';
-        saveButton.className = 'btn-success text-xs py-1 px-2 mr-2';
-        saveButton.onclick = () => updateRole(user.objectId, roleSelect.value);
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Elimina';
-        deleteButton.className = 'btn-danger text-xs py-1 px-2';
-        deleteButton.onclick = () => deleteUser(user.objectId, user.email);
+    const currentRoleCell = row.insertCell();
+    currentRoleCell.textContent = user.role || 'Nessun Ruolo';
 
-        actionCell.appendChild(roleSelect);
-        actionCell.appendChild(saveButton);
-        actionCell.appendChild(deleteButton);
+    const actionCell = row.insertCell();
+    actionCell.classList.add('action-cell');
+
+    const roleSelect = document.createElement('select');
+    roleSelect.className = 'w-1/2 p-2 border border-gray-300 rounded-md text-sm';
+    Object.values(ROLES).filter(r => r !== ROLES.ADMIN).forEach(role => {
+      const option = document.createElement('option');
+      option.value = role;
+      option.textContent = role;
+      if (user.role === role) {
+        option.selected = true;
+      }
+      roleSelect.appendChild(option);
     });
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Salva Ruolo';
+    saveButton.className = 'btn-success text-xs py-1 px-2 mr-2';
+    saveButton.onclick = () => updateRole(user.objectId, roleSelect.value);
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'Elimina';
+    deleteButton.className = 'btn-danger text-xs py-1 px-2';
+    deleteButton.onclick = () => deleteUser(user.objectId, user.email);
+
+    actionCell.appendChild(roleSelect);
+    actionCell.appendChild(saveButton);
+    actionCell.appendChild(deleteButton);
+  });
 }
 
 function loadUsersAndRoles() {
-    const loadingUsersEl = document.getElementById('loading-users');
-    loadingUsersEl.textContent = "Caricamento lista utenti...";
-    loadingUsersEl.style.display = 'block';
-    
-    const queryBuilder = Backendless.DataQueryBuilder.create()
-        .setProperties(["objectId", "email", "role"]) 
-        .setPageSize(50);
+  const loadingUsersEl = document.getElementById('loading-users');
+  loadingUsersEl.textContent = "Caricamento lista utenti...";
+  loadingUsersEl.style.display = 'block';
 
-    Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
-        .then(users => {
-            renderUsersTable(users);
-        })
-        .catch(error => {
-            console.error("ERRORE CRITICO in loadUsersAndRoles (Find):", error);
-            loadingUsersEl.textContent = 
-                `ERRORE: Impossibile caricare gli utenti. (Errore: ${error.message}).`;
-            loadingUsersEl.style.color = '#dc2626';
-        });
-}
+  const queryBuilder = Backendless.DataQueryBuilder.create()
+    .setProperties(["objectId", "email", "role"])
+    .setPageSize(50);
 
-function updateRole(userId, newRole) {
-    if (userId === currentUser.objectId) {
-        showStatusMessage('user-creation-status', 'Non puoi modificare il tuo ruolo tramite questo pannello.', false);
-        return;
-    }
-
-    const userUpdate = {
-        objectId: userId,
-        role: newRole
-    };
-    Backendless.Data.of(USER_TABLE_NAME).save(userUpdate)
-        .then(() => {
-            showStatusMessage('user-creation-status', `Ruolo dell'utente aggiornato a ${newRole} con successo.`, true);
-            loadUsersAndRoles(); 
-        })
-        .catch(error => {
-            showStatusMessage('user-creation-status', `Errore nell'aggiornamento del ruolo: ${error.message}`, false);
-            console.error("Errore aggiornamento ruolo:", error);
-        });
-}
-
-function deleteUser(userId, email) {
-    if (confirm(`Sei sicuro di voler eliminare l'utente ${email}?`)) {
-        Backendless.Data.of(USER_TABLE_NAME).remove({ objectId: userId })
-            .then(() => {
-                showStatusMessage('user-creation-status', `Utente ${email} eliminato con successo.`, true);
-                loadUsersAndRoles(); 
-            })
-            .catch(error => {
-                showStatusMessage('user-creation-status', `Errore nell'eliminazione dell'utente: ${error.message}`, false);
-                console.error("Errore eliminazione utente:", error);
-            });
-    }
-}
-
-
-function handleUserCreation() {
-    const email = document.getElementById('new-user-email').value.trim();
-    const password = document.getElementById('new-user-password').value;
-    const role = document.getElementById('new-user-role').value;
-    if (!email || !password || !role) {
-        showStatusMessage('user-creation-status', 'Per favore, compila tutti i campi per il nuovo utente.', false);
-        return;
-    }
-
-    Backendless.UserService.register({
-        email: email,
-        password: password
-    })
-    .then(newUser => {
-        const userUpdate = {
-            objectId: newUser.objectId,
-            role: role 
-        };
-
-        return Backendless.Data.of(USER_TABLE_NAME).save(userUpdate);
-    })
-    .then(() => {
-        showStatusMessage('user-creation-status', `Utente ${email} creato e ruolo ${role} assegnato con successo.`, true);
-        document.getElementById('new-user-email').value = '';
-        document.getElementById('new-user-password').value = '';
-        document.getElementById('new-user-role').value = '';
-        loadUsersAndRoles(); 
+  Backendless.Data.of(USER_TABLE_NAME).find(queryBuilder)
+    .then(users => {
+      renderUsersTable(users);
     })
     .catch(error => {
-        console.error("Errore creazione utente:", error);
-        showStatusMessage('user-creation-status', `Creazione Utente Fallita: ${error.message}`, false);
+      console.error("ERRORE CRITICO in loadUsersAndRoles (Find):", error);
+      loadingUsersEl.textContent =
+        `ERRORE: Impossibile caricare gli utenti. (Errore: ${error.message}).`;
+      loadingUsersEl.style.color = '#dc2626';
     });
 }
 
+function updateRole(userId, newRole) {
+  if (currentUser && userId === currentUser.objectId) {
+    showStatusMessage('user-creation-status', 'Non puoi modificare il tuo ruolo tramite questo pannello.', false);
+    return;
+  }
+
+  const userUpdate = { objectId: userId, role: newRole };
+  Backendless.Data.of(USER_TABLE_NAME).save(userUpdate)
+    .then(() => {
+      showStatusMessage('user-creation-status', `Ruolo dell'utente aggiornato a ${newRole} con successo.`, true);
+      loadUsersAndRoles();
+    })
+    .catch(error => {
+      showStatusMessage('user-creation-status', `Errore nell'aggiornamento del ruolo: ${error.message}`, false);
+      console.error("Errore aggiornamento ruolo:", error);
+    });
+}
+
+function deleteUser(userId, email) {
+  if (confirm(`Sei sicuro di voler eliminare l'utente ${email}?`)) {
+    Backendless.Data.of(USER_TABLE_NAME).remove({ objectId: userId })
+      .then(() => {
+        showStatusMessage('user-creation-status', `Utente ${email} eliminato con successo.`, true);
+        loadUsersAndRoles();
+      })
+      .catch(error => {
+        showStatusMessage('user-creation-status', `Errore nell'eliminazione dell'utente: ${error.message}`, false);
+        console.error("Errore eliminazione utente:", error);
+      });
+  }
+}
+
+function handleUserCreation() {
+  const email = document.getElementById('new-user-email').value.trim();
+  const password = document.getElementById('new-user-password').value;
+  const role = document.getElementById('new-user-role').value;
+  if (!email || !password || !role) {
+    showStatusMessage('user-creation-status', 'Per favore, compila tutti i campi per il nuovo utente.', false);
+    return;
+  }
+
+  Backendless.UserService.register({ email, password })
+    .then(newUser => {
+      const userUpdate = { objectId: newUser.objectId, role };
+      return Backendless.Data.of(USER_TABLE_NAME).save(userUpdate);
+    })
+    .then(() => {
+      showStatusMessage('user-creation-status', `Utente ${email} creato e ruolo ${role} assegnato con successo.`, true);
+      document.getElementById('new-user-email').value = '';
+      document.getElementById('new-user-password').value = '';
+      document.getElementById('new-user-role').value = '';
+      loadUsersAndRoles();
+    })
+    .catch(error => {
+      console.error("Errore creazione utente:", error);
+      showStatusMessage('user-creation-status', `Creazione Utente Fallita: ${error.message}`, false);
+    });
+}
+
+// =====================================================
+// PARTE 3 – FUNZIONI ADMIN (ORDINI: LISTA, EDIT, IMPORT)
+// =====================================================
+
+/** Escaping di sicurezza per HTML */
+function escapeHTML(str) {
+  return String(str || '').replace(/[&<>"']/g, match => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[match]));
+}
+
+/** Feedback toast nell'area admin */
+function showAdminFeedback(message, type = 'info') {
+  const feedbackBox = document.createElement('div');
+  feedbackBox.textContent = message;
+  feedbackBox.className =
+    `fixed bottom-4 right-4 px-4 py-2 rounded shadow-lg text-white z-50 
+    ${type === 'success' ? 'bg-green-600' :
+      type === 'error' ? 'bg-red-600' :
+      'bg-blue-600'}`;
+
+  document.body.appendChild(feedbackBox);
+  setTimeout(() => feedbackBox.remove(), 4000);
+}
+
+/** Evidenzia riga aggiornata */
+function highlightUpdatedRow(objectId) {
+  const table = document.getElementById('admin-orders-table');
+  if (!table) return;
+
+  const rows = table.querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    if (row.dataset.objectid === objectId) {
+      row.style.transition = 'background-color 0.5s ease';
+      row.style.backgroundColor = '#d1fae5';
+      setTimeout(() => { row.style.backgroundColor = ''; }, 1500);
+    }
+  });
+}
+
+/** Carica tutti gli ordini nella tabella Admin */
+async function loadAllOrdersForAdmin() {
+  const loadingEl = document.getElementById('loading-admin-orders');
+  const table = document.getElementById('admin-orders-table');
+  const tbody = table.querySelector('tbody');
+
+  loadingEl.textContent = "Caricamento ordini in corso...";
+  loadingEl.style.display = "block";
+  loadingEl.style.color = "#111";
+  tbody.innerHTML = "";
+  table.classList.add('hidden');
+
+  try {
+    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find({
+      sortBy: ['lastUpdated DESC'],
+      pageSize: 100
+    });
+
+    if (!orders || orders.length === 0) {
+      loadingEl.textContent = "Nessun ordine trovato.";
+      table.classList.add('hidden');
+      return;
+    }
+
+    orders.forEach(order => {
+      const tr = document.createElement('tr');
+      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
+      tr.dataset.objectid = order.objectId;
+
+      tr.innerHTML = `
+        <td class="px-4 py-2">${escapeHTML(order.productCode)}</td>
+        <td class="px-4 py-2">${escapeHTML(order.eanCode)}</td>
+        <td class="px-4 py-2">${escapeHTML(order.brand)}</td>
+        <td class="px-4 py-2">${escapeHTML(order.color)}</td>
+        <td class="px-4 py-2">${escapeHTML(order.size)}</td>
+        <td class="px-4 py-2">
+          ${Array.isArray(order.driveLinks) && order.driveLinks.length > 0
+            ? order.driveLinks.map(raw => {
+                const link = escapeHTML(String(raw).trim());
+                return `
+                  <a href="${link}" target="_blank"
+                     class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
+                     ${link}
+                  </a>`;
+              }).join('')
+            : '<span class="text-gray-400 italic">Nessun link</span>'}
+        </td>
+        <td class="px-4 py-2">
+          <button class="btn-primary px-3 py-1 text-sm" data-oid="${order.objectId}">
+            Modifica
+          </button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    // bind pulsanti Modifica → maschera completa
+    tbody.querySelectorAll('button[data-oid]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const oid = btn.getAttribute('data-oid');
+        const order = orders.find(o => o.objectId === oid);
+        if (order) handleAdminEdit(order);
+      });
+    });
+
+    loadingEl.style.display = 'none';
+    table.classList.remove('hidden');
+  } catch (err) {
+    console.error("Errore durante il caricamento ordini:", err);
+    tbody.innerHTML = "";
+    loadingEl.textContent = "Errore durante il caricamento ordini.";
+    loadingEl.style.color = "#b91c1c";
+    loadingEl.style.display = 'block';
+    table.classList.add('hidden');
+  }
+}
+
+/** Apre la card di modifica completa per Admin e popola i campi */
+function handleAdminEdit(order) {
+  if (!order) return;
+
+  // Nascondi la tabella principale
+  const ordersCard = document.getElementById('orders-admin-card');
+  if (ordersCard) ordersCard.classList.add('hidden');
+
+  // Mostra la card di modifica
+  const editCard = document.getElementById('admin-order-edit-card');
+  editCard.classList.remove('hidden');
+
+  // Mostra EAN in intestazione
+  document.getElementById('admin-ean-display').textContent = order.eanCode || order.productCode || '';
+
+  // Mappa dei campi HTML → proprietà Backendless
+  const fieldMap = {
+    "admin-field-productCode": "productCode",
+    "admin-field-eanCode": "eanCode",
+    "admin-field-styleName": "styleName",
+    "admin-field-styleGroup": "styleGroup",
+    "admin-field-brand": "brand",
+    "admin-field-color": "color",
+    "admin-field-size": "size",
+    "admin-field-category": "category",
+    "admin-field-gender": "gender",
+    "admin-field-shots": "shots",
+    "admin-field-quantity": "quantity",
+    "admin-field-s1Prog": "s1Prog",
+    "admin-field-s2Prog": "s2Prog",
+    "admin-field-progOnModel": "progOnModel",
+    "admin-field-stillShot": "stillShot",
+    "admin-field-onModelShot": "onModelShot",
+    "admin-field-priority": "priority",
+    "admin-field-s1Stylist": "s1Stylist",
+    "admin-field-s2Stylist": "s2Stylist",
+    "admin-field-provenienza": "provenienza",
+    "admin-field-tipologia": "tipologia",
+    "admin-field-ordine": "ordine",
+    "admin-field-dataOrdine": "dataOrdine",
+    "admin-field-entryDate": "entryDate",
+    "admin-field-exitDate": "exitDate",
+    "admin-field-collo": "collo",
+    "admin-field-dataReso": "dataReso",
+    "admin-field-ddt": "ddt",
+    "admin-field-noteLogistica": "noteLogistica",
+    "admin-field-dataPresaPost": "dataPresaPost",
+    "admin-field-dataConsegnaPost": "dataConsegnaPost",
+    "admin-field-calendario": "calendario",
+    "admin-field-postpresa": "postPresa"
+  };
+
+  // Popola tutti i campi
+  Object.entries(fieldMap).forEach(([fieldId, prop]) => {
+    const input = document.getElementById(fieldId);
+    if (input) input.value = order[prop] || '';
+  });
+
+  // Salva l’oggetto corrente in memoria globale
+  currentAdminOrder = order;
+}
+
+/** Salva aggiornamenti della card Admin */
+async function saveAdminOrderUpdates() {
+  if (!currentAdminOrder || !currentAdminOrder.objectId) {
+    showAdminFeedback("⚠️ Nessun ordine selezionato.", "error");
+    return;
+  }
+
+  const updatedOrder = { objectId: currentAdminOrder.objectId };
+
+  // Stessa mappa campi
+  const map = {
+    "admin-field-productCode": "productCode",
+    "admin-field-eanCode": "eanCode",
+    "admin-field-styleName": "styleName",
+    "admin-field-styleGroup": "styleGroup",
+    "admin-field-brand": "brand",
+    "admin-field-color": "color",
+    "admin-field-size": "size",
+    "admin-field-category": "category",
+    "admin-field-gender": "gender",
+    "admin-field-shots": "shots",
+    "admin-field-quantity": "quantity",
+    "admin-field-s1Prog": "s1Prog",
+    "admin-field-s2Prog": "s2Prog",
+    "admin-field-progOnModel": "progOnModel",
+    "admin-field-stillShot": "stillShot",
+    "admin-field-onModelShot": "onModelShot",
+    "admin-field-priority": "priority",
+    "admin-field-s1Stylist": "s1Stylist",
+    "admin-field-s2Stylist": "s2Stylist",
+    "admin-field-provenienza": "provenienza",
+    "admin-field-tipologia": "tipologia",
+    "admin-field-ordine": "ordine",
+    "admin-field-dataOrdine": "dataOrdine",
+    "admin-field-entryDate": "entryDate",
+    "admin-field-exitDate": "exitDate",
+    "admin-field-collo": "collo",
+    "admin-field-dataReso": "dataReso",
+    "admin-field-ddt": "ddt",
+    "admin-field-noteLogistica": "noteLogistica",
+    "admin-field-dataPresaPost": "dataPresaPost",
+    "admin-field-dataConsegnaPost": "dataConsegnaPost",
+    "admin-field-calendario": "calendario",
+    "admin-field-postpresa": "postPresa"
+  };
+
+  Object.entries(map).forEach(([fieldId, prop]) => {
+    const el = document.getElementById(fieldId);
+    if (el) updatedOrder[prop] = el.value.trim();
+  });
+
+  updatedOrder.lastUpdated = new Date();
+
+  try {
+    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
+    showAdminFeedback("✅ Aggiornamenti salvati correttamente!", "success");
+    currentAdminOrder = updatedOrder;
+
+    await loadAllOrdersForAdmin(); // ricarica la lista ordini
+    highlightUpdatedRow(updatedOrder.objectId); // evidenzia riga aggiornata
+
+    // Chiudi card modifica e riapri lista ordini
+    const editCard = document.getElementById('admin-order-edit-card');
+    editCard.classList.add('hidden');
+
+    const ordersCard = document.getElementById('orders-admin-card');
+    if (ordersCard) ordersCard.classList.remove('hidden');
+
+  } catch (err) {
+    console.error(err);
+    showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
+  }
+}
+
+function cancelAdminOrderEdit() {
+  const editCard = document.getElementById('admin-order-edit-card');
+  const ordersCard = document.getElementById('orders-admin-card');
+
+  // Nasconde card modifica
+  editCard.classList.add('hidden');
+  currentAdminOrder = null;
+
+  // Mostra di nuovo la lista ordini
+  if (ordersCard) ordersCard.classList.remove('hidden');
+
+  // Pulisce tutti i campi della card di modifica
+  const fields = editCard.querySelectorAll('input, textarea, select');
+  fields.forEach(f => f.value = '');
+}
 
 // ----------------------------------------------------
-// FUNZIONI DI UPLOAD FILE ADMIN
+// FUNZIONI DI UPLOAD FILE ADMIN (IMPORT EXCEL)
 // ----------------------------------------------------
 async function handleFileUpload() {
   const fileInput = document.getElementById('excel-file-input');
@@ -520,588 +783,29 @@ async function handleFileUpload() {
   reader.readAsArrayBuffer(file);
 }
 
-
-
-/**
- * Mostra la card di modifica ordine per Admin e popola i campi
- * @param {Object} order - Oggetto ordine da Backendless
- */
-function openAdminOrderCard(order) {
-    if (!order || !order.eanCode) return;
-
-    // Mostra la card
-    const card = document.getElementById('admin-order-edit-card');
-    card.classList.remove('hidden');
-
-    // Mostra EAN nell'intestazione
-    document.getElementById('admin-ean-display').textContent = order.eanCode;
-
-    // Mappa campi HTML -> proprietà Backendless
-    const map = {
-        "admin-field-productCode": "productCode",
-        "admin-field-eanCode": "eanCode",
-        "admin-field-styleName": "styleName",
-        "admin-field-styleGroup": "styleGroup",
-        "admin-field-brand": "brand",
-        "admin-field-color": "color",
-        "admin-field-size": "size",
-        "admin-field-category": "category",
-        "admin-field-gender": "gender",
-        "admin-field-shots": "shots",
-        "admin-field-quantity": "quantity",
-        "admin-field-s1Prog": "s1Prog",
-        "admin-field-s2Prog": "s2Prog",
-        "admin-field-progOnModel": "progOnModel",
-        "admin-field-stillShot": "stillShot",
-        "admin-field-onModelShot": "onModelShot",
-        "admin-field-priority": "priority",
-        "admin-field-s1Stylist": "s1Stylist",
-        "admin-field-s2Stylist": "s2Stylist",
-        "admin-field-provenienza": "provenienza",
-        "admin-field-tipologia": "tipologia",
-        "admin-field-ordine": "ordine",
-        "admin-field-dataOrdine": "dataOrdine",
-        "admin-field-entryDate": "entryDate",
-        "admin-field-exitDate": "exitDate",
-        "admin-field-collo": "collo",
-        "admin-field-dataReso": "dataReso",
-        "admin-field-ddt": "ddt",
-        "admin-field-noteLogistica": "noteLogistica",
-        "admin-field-dataPresaPost": "dataPresaPost",
-        "admin-field-dataConsegnaPost": "dataConsegnaPost",
-        "admin-field-calendario": "calendario",
-        "admin-field-postpresa": "postPresa"
-    };
-
-    Object.entries(map).forEach(([fieldId, prop]) => {
-        const el = document.getElementById(fieldId);
-        if (el) {
-            el.value = order[prop] || '';
-        }
-    });
-
-    // Salva l'ID dell'ordine corrente per saveAdminOrderUpdates
-    currentAdminOrder = order;
-}
-
-
-
-// ----------------------------------------------------
-// FUNZIONI GESTIONE ORDINI (ADMIN)
-// ----------------------------------------------------
-async function saveAdminOrderUpdates() {
-    if (!currentAdminOrder || !currentAdminOrder.objectId) {
-        showAdminFeedback("⚠️ Nessun ordine selezionato.", "error");
-        return;
-    }
-
-    const updatedOrder = { objectId: currentAdminOrder.objectId };
-
-    // Stessa mappa campi
-    const map = {
-        "admin-field-productCode": "productCode",
-        "admin-field-eanCode": "eanCode",
-        "admin-field-styleName": "styleName",
-        "admin-field-styleGroup": "styleGroup",
-        "admin-field-brand": "brand",
-        "admin-field-color": "color",
-        "admin-field-size": "size",
-        "admin-field-category": "category",
-        "admin-field-gender": "gender",
-        "admin-field-shots": "shots",
-        "admin-field-quantity": "quantity",
-        "admin-field-s1Prog": "s1Prog",
-        "admin-field-s2Prog": "s2Prog",
-        "admin-field-progOnModel": "progOnModel",
-        "admin-field-stillShot": "stillShot",
-        "admin-field-onModelShot": "onModelShot",
-        "admin-field-priority": "priority",
-        "admin-field-s1Stylist": "s1Stylist",
-        "admin-field-s2Stylist": "s2Stylist",
-        "admin-field-provenienza": "provenienza",
-        "admin-field-tipologia": "tipologia",
-        "admin-field-ordine": "ordine",
-        "admin-field-dataOrdine": "dataOrdine",
-        "admin-field-entryDate": "entryDate",
-        "admin-field-exitDate": "exitDate",
-        "admin-field-collo": "collo",
-        "admin-field-dataReso": "dataReso",
-        "admin-field-ddt": "ddt",
-        "admin-field-noteLogistica": "noteLogistica",
-        "admin-field-dataPresaPost": "dataPresaPost",
-        "admin-field-dataConsegnaPost": "dataConsegnaPost",
-        "admin-field-calendario": "calendario",
-        "admin-field-postpresa": "postPresa"
-    };
-
-    Object.entries(map).forEach(([fieldId, prop]) => {
-        const el = document.getElementById(fieldId);
-        if (el) updatedOrder[prop] = el.value.trim();
-    });
-
-    // Timestamp aggiornamento
-    updatedOrder.lastUpdated = new Date();
-
-    try {
-        await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
-        showAdminFeedback("✅ Aggiornamenti salvati correttamente!", "success");
-        currentAdminOrder = updatedOrder; 
-
-        await loadAllOrdersForAdmin(); // ricarica la lista ordini
-
-        highlightUpdatedRow(updatedOrder.objectId); // evidenzia riga aggiornata
-
-        // Chiudi card modifica e riapri lista ordini
-        const editCard = document.getElementById('admin-order-edit-card');
-        editCard.classList.add('hidden');
-
-        const ordersCard = document.getElementById('orders-admin-card'); 
-        if (ordersCard) ordersCard.classList.remove('hidden');
-
-    } catch (err) {
-        console.error(err);
-        showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
-    }
-}
-
-
-// ----------------------------------------------------
-// FUNZIONI CHIUSURA CARD (ADMIN)
-// ----------------------------------------------------
-
-document.addEventListener("DOMContentLoaded", () => {
-  const toggleUsers = document.getElementById('toggle-users-card');
-  const toggleImport = document.getElementById('toggle-import-card');
-  const toggleStats = document.getElementById('toggle-stats-card'); // 👈 nuovo toggle
-
-  const usersCard = document.getElementById('card-users');
-  const importCard = document.getElementById('card-import');
-  const statsSection = document.getElementById('admin-stats-section'); // 👈 nuova sezione target
-
-  // === Card Gestione Utenti ===
-  if (toggleUsers && usersCard) {
-    const savedUsersVisibility = localStorage.getItem('showUsersCard');
-    if (savedUsersVisibility !== null) {
-      toggleUsers.checked = savedUsersVisibility === 'true';
-      usersCard.style.display = toggleUsers.checked ? 'block' : 'none';
-    }
-
-    toggleUsers.addEventListener('change', () => {
-      usersCard.style.display = toggleUsers.checked ? 'block' : 'none';
-      localStorage.setItem('showUsersCard', toggleUsers.checked);
-    });
-  }
-
-  // === Card Import Excel ===
-  if (toggleImport && importCard) {
-    const savedImportVisibility = localStorage.getItem('showImportCard');
-    if (savedImportVisibility !== null) {
-      toggleImport.checked = savedImportVisibility === 'true';
-      importCard.style.display = toggleImport.checked ? 'block' : 'none';
-    }
-
-    toggleImport.addEventListener('change', () => {
-      importCard.style.display = toggleImport.checked ? 'block' : 'none';
-      localStorage.setItem('showImportCard', toggleImport.checked);
-    });
-  }
-
-  // === Sezione Riepilogo Ordini ===
-  if (toggleStats && statsSection) {
-    const savedStatsVisibility = localStorage.getItem('showStatsSection');
-    if (savedStatsVisibility !== null) {
-      toggleStats.checked = savedStatsVisibility === 'true';
-      statsSection.style.display = toggleStats.checked ? 'block' : 'none';
-    }
-
-    toggleStats.addEventListener('change', () => {
-      statsSection.style.display = toggleStats.checked ? 'block' : 'none';
-      localStorage.setItem('showStatsSection', toggleStats.checked);
-    });
-  }
-});
-
-
-
-function cancelAdminOrderEdit() {
-    const editCard = document.getElementById('admin-order-edit-card');
-    const ordersCard = document.getElementById('orders-admin-card'); // usa ID sicuro
-
-    // Nasconde card modifica
-    editCard.classList.add('hidden');
-    currentAdminOrder = null;
-
-    // Mostra di nuovo la lista ordini
-    if (ordersCard) ordersCard.classList.remove('hidden');
-
-    // Pulisce tutti i campi della card di modifica
-    const fields = editCard.querySelectorAll('input, textarea, select');
-    fields.forEach(f => f.value = '');
-}
-
-function highlightUpdatedRow(objectId) {
-    const table = document.getElementById('admin-orders-table');
-    if (!table) return;
-
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-        if (row.dataset.objectid === objectId) {
-            // Effetto flash verde
-            row.style.transition = 'background-color 0.5s ease';
-            row.style.backgroundColor = '#d1fae5'; // verde chiaro Tailwind (emerald-100)
-            setTimeout(() => {
-                row.style.backgroundColor = '';
-            }, 1500);
-        }
-    });
-}	
-
-
-function showAdminFeedback(message, type = 'info') {
-  const feedbackBox = document.createElement('div');
-  feedbackBox.textContent = message;
-  feedbackBox.className =
-    `fixed bottom-4 right-4 px-4 py-2 rounded shadow-lg text-white z-50 
-    ${type === 'success' ? 'bg-green-600' :
-      type === 'error' ? 'bg-red-600' :
-      'bg-blue-600'}`;
-
-  document.body.appendChild(feedbackBox);
-  setTimeout(() => feedbackBox.remove(), 4000);
-}
-
-
-/**
- * Carica tutti gli ordini da Backendless e li mostra nella tabella Admin
- */
-
-async function loadAdminDashboard() {
-  const dash = document.getElementById("admin-dashboard");
-  const container = document.getElementById("admin-stats");
-  const chartEl = document.getElementById("admin-stats-chart");
-  container.innerHTML = "";
-
-  try {
-    // recupera tutti gli ordini
-    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find();
-
-    // calcola conteggio per stato
-    const counts = {};
-    orders.forEach(o => {
-      const st = o.status || "Sconosciuto";
-      counts[st] = (counts[st] || 0) + 1;
-    });
-
-    // genera i box colorati
-    Object.entries(counts).forEach(([status, count]) => {
-      const color = STATUS_COLORS[status] || STATUS_COLORS.DEFAULT;
-      const div = document.createElement("div");
-      div.className = `p-4 border rounded-lg text-center ${color}`;
-      div.innerHTML = `<p class="font-semibold">${status}</p><p class="text-2xl font-bold">${count}</p>`;
-      container.appendChild(div);
-    });
-
-    // Mostra sezione dashboard
-    dash.classList.remove("hidden");
-
-    // 🔹 Crea grafico (usa Chart.js disponibile via CDN)
-    if (window.Chart) {
-      const ctx = chartEl.getContext("2d");
-      const labels = Object.keys(counts);
-      const data = Object.values(counts);
-      const colors = labels.map(l => {
-        const c = STATUS_COLORS[l] || STATUS_COLORS.DEFAULT;
-        const match = c.match(/text-([a-z]+)-(\d+)/);
-        return match ? match[1] : "gray";
-      });
-
-      // distrugge grafico precedente se esiste
-      if (window._adminChart) window._adminChart.destroy();
-
-      window._adminChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [{
-            label: "Numero ordini",
-            data,
-            backgroundColor: colors.map(c => `var(--tw-${c}-400, #9ca3af)`)
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, precision: 0 } }
-        }
-      });
-    }
-  } catch (err) {
-    console.error("Errore caricamento dashboard:", err);
-  }
-}
-
-
-
-function escapeHTML(str) {
-  return str.replace(/[&<>"']/g, match => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[match]));
-}
-
-
-
-function handleAdminEdit(order) {
-  if (!order) return;
-
-  // Nascondi la tabella principale
-  const ordersCard = document.getElementById('orders-admin-card');
-  if (ordersCard) ordersCard.classList.add('hidden');
-
-  // Mostra la card di modifica
-  const editCard = document.getElementById('admin-order-edit-card');
-  editCard.classList.remove('hidden');
-
-  // Mostra EAN in intestazione
-  document.getElementById('admin-ean-display').textContent = order.eanCode || order.productCode || '';
-
-  // 🔹 Mappa dei campi HTML → proprietà Backendless
-  const fieldMap = {
-    "admin-field-productCode": "productCode",
-    "admin-field-eanCode": "eanCode",
-    "admin-field-styleName": "styleName",
-    "admin-field-styleGroup": "styleGroup",
-    "admin-field-brand": "brand",
-    "admin-field-color": "color",
-    "admin-field-size": "size",
-    "admin-field-category": "category",
-    "admin-field-gender": "gender",
-    "admin-field-shots": "shots",
-    "admin-field-quantity": "quantity",
-    "admin-field-s1Prog": "s1Prog",
-    "admin-field-s2Prog": "s2Prog",
-    "admin-field-progOnModel": "progOnModel",
-    "admin-field-stillShot": "stillShot",
-    "admin-field-onModelShot": "onModelShot",
-    "admin-field-priority": "priority",
-    "admin-field-s1Stylist": "s1Stylist",
-    "admin-field-s2Stylist": "s2Stylist",
-    "admin-field-provenienza": "provenienza",
-    "admin-field-tipologia": "tipologia",
-    "admin-field-ordine": "ordine",
-    "admin-field-dataOrdine": "dataOrdine",
-    "admin-field-entryDate": "entryDate",
-    "admin-field-exitDate": "exitDate",
-    "admin-field-collo": "collo",
-    "admin-field-dataReso": "dataReso",
-    "admin-field-ddt": "ddt",
-    "admin-field-noteLogistica": "noteLogistica",
-    "admin-field-dataPresaPost": "dataPresaPost",
-    "admin-field-dataConsegnaPost": "dataConsegnaPost",
-    "admin-field-calendario": "calendario",
-    "admin-field-postpresa": "postPresa"
-  };
-
-  // Popola tutti i campi
-  Object.entries(fieldMap).forEach(([fieldId, prop]) => {
-    const input = document.getElementById(fieldId);
-    if (input) input.value = order[prop] || '';
-  });
-
-  // Salva l’oggetto corrente in memoria globale
-  currentAdminOrder = order;
-}
-
-
-// ----------------------------------------------------
-// FUNZIONI WORKER (DASHBOARD)
-// ----------------------------------------------------
-
-async function loadOrdersForUser(role) {
-  const config = ROLE_CONFIG[role] || ROLE_CONFIG[ROLES.ADMIN];
-  const loadingEl = document.getElementById('loading-orders');
-  const table = document.getElementById('orders-table');
-  const tbody = table.querySelector('tbody');
-
-  loadingEl.textContent = "Caricamento ordini in corso...";
-  loadingEl.style.display = "block";
-  loadingEl.style.color = "#111";
-  tbody.innerHTML = "";
-  table.classList.add('hidden');
-
-  try {
-    const query = Backendless.DataQueryBuilder.create();
-    query.setSortBy(["lastUpdated DESC"]);
-    query.setPageSize(100);
-
-    if (config.filter) query.setWhereClause(config.filter);
-
-    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query);
-
-    if (!orders || orders.length === 0) {
-      loadingEl.textContent = "Nessun ordine disponibile.";
-      table.classList.add('hidden');
-      return;
-    }
-
-    // 🔹 genera intestazione tabella dinamica
-    const thead = table.querySelector('thead');
-    if (thead) {
-      thead.innerHTML = `
-        <tr>
-          ${config.columns.map(col => `<th class="px-4 py-2 capitalize">${col}</th>`).join('')}
-          <th class="px-4 py-2">Azioni</th>
-        </tr>`;
-    }
-
-    // 🔹 genera righe
-    orders.forEach(order => {
-      const tr = document.createElement('tr');
-      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
-
-      // costruzione dinamica delle colonne
-      const colsHtml = config.columns.map(col => {
-        if (col === "driveLinks") {
-          if (Array.isArray(order.driveLinks) && order.driveLinks.length > 0) {
-            return `
-              <td class="px-4 py-2">
-                ${order.driveLinks
-                  .map(raw => {
-                    const link = escapeHTML(raw.trim());
-                    return `
-                      <a href="${link}" target="_blank"
-                         class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
-                        ${link}
-                      </a>`;
-                  })
-                  .join('')}
-              </td>`;
-          } else {
-            return `<td class="px-4 py-2 text-gray-400 italic">Nessun link</td>`;
-          }
-        }
-        return `<td class="px-4 py-2">${order[col] || ''}</td>`;
-      }).join('');
-
-      tr.innerHTML = `${colsHtml}<td class="px-4 py-2">${config.actions(order)}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    loadingEl.style.display = "none";
-    table.classList.remove('hidden');
-  } catch (err) {
-    console.error("Errore durante il caricamento ordini:", err);
-    tbody.innerHTML = "";
-    loadingEl.textContent = "Errore durante il caricamento ordini.";
-    loadingEl.style.color = "#b91c1c";
-    loadingEl.style.display = "block";
-    table.classList.add('hidden');
-  }
-}
-
-
-async function markAsCompleted(orderId) {
-  if (!orderId) return;
-
-  const confirmComplete = confirm("Vuoi davvero segnare questo ordine come COMPLETATO?");
-  if (!confirmComplete) return;
-
-  const statusEl = document.getElementById('loading-orders');
-  statusEl.textContent = "Aggiornamento in corso...";
-  statusEl.style.display = "block";
-  statusEl.style.color = "#111";
-
-  try {
-    // 🔹 Aggiorna l'ordine su Backendless
-    const updatedOrder = {
-      objectId: orderId,
-      status: STATUS.COMPLETED,
-      completedAt: new Date(),
-      lastUpdated: new Date()
-    };
-
-    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
-
-    // 🔹 Feedback utente
-    statusEl.textContent = "Ordine completato con successo ✅";
-    statusEl.style.color = "#16a34a"; // verde tailwind-600
-
-    // 🔹 Ricarica tabella corrente senza refresh pagina
-    setTimeout(() => {
-      statusEl.style.display = "none";
-      loadOrdersForUser(currentRole);
-    }, 1200);
-  } catch (error) {
-    console.error("Errore durante il completamento ordine:", error);
-    statusEl.textContent = "Errore durante l'aggiornamento ordine ❌";
-    statusEl.style.color = "#b91c1c";
-  }
-}
-
-/**
- * 🔄 Aggiorna lo stato di un ordine in Backendless
- * @param {string} orderId - objectId dell'ordine
- * @param {string} newStatus - nuovo stato (es. STATUS.COMPLETED)
- * @param {string} successMessage - messaggio da mostrare dopo l'aggiornamento
- */
-async function updateOrderStatus(orderId, newStatus, successMessage = "Ordine aggiornato con successo!") {
-  if (!orderId) return;
-
-  const confirmAction = confirm(`Vuoi impostare lo stato su "${newStatus}"?`);
-  if (!confirmAction) return;
-
-  const statusEl = document.getElementById('loading-orders');
-  statusEl.textContent = "Aggiornamento in corso...";
-  statusEl.style.display = "block";
-  statusEl.style.color = "#111";
-
-  try {
-    // 🔹 prepara i dati per l'update
-    const updatedOrder = {
-      objectId: orderId,
-      status: newStatus,
-      lastUpdated: new Date()
-    };
-
-    // se il nuovo stato è "Completato", aggiunge la data di completamento
-    if (newStatus === STATUS.COMPLETED) {
-      updatedOrder.completedAt = new Date();
-    }
-
-    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
-
-    // 🔹 feedback visivo
-    statusEl.textContent = successMessage;
-    statusEl.style.color = "#16a34a"; // verde tailwind-600
-
-    // 🔹 ricarica tabella dopo breve delay
-    setTimeout(() => {
-      statusEl.style.display = "none";
-      loadOrdersForUser(currentRole);
-    }, 1200);
-  } catch (error) {
-    console.error("Errore durante l'aggiornamento ordine:", error);
-    statusEl.textContent = "Errore durante l'aggiornamento ordine ❌";
-    statusEl.style.color = "#b91c1c";
-  }
-}
-
+// =====================================================
+// PARTE 4 – WORKER (EAN, UPLOAD LINK, FEEDBACK)
+// =====================================================
+
+/** Apertura modale foto (se usata) */
 function openPhotoModal(eanCode) {
-    document.getElementById('photo-modal').style.display = 'block';
-    document.getElementById('modal-ean-title').textContent = eanCode || '';
-    const modalContent = document.getElementById('photo-modal-content');
-    modalContent.innerHTML = `<p>Caricamento foto per EAN: ${eanCode}...</p>`;
+  document.getElementById('photo-modal').style.display = 'block';
+  document.getElementById('modal-ean-title').textContent = eanCode || '';
+  const modalContent = document.getElementById('photo-modal-content');
+  modalContent.innerHTML = `<p>Caricamento foto per EAN: ${eanCode}...</p>`;
 }
 
+function closePhotoModal() {
+  document.getElementById('photo-modal').style.display = 'none';
+}
+
+/** Conferma EAN o Codice Articolo */
 async function confirmEanInput() {
   const eanInput = document.getElementById("ean-input").value.trim();
   const scanStatus = document.getElementById("scan-status");
   const actionsArea = document.getElementById("ean-actions-area");
   const photoUploadArea = document.getElementById("photo-upload-area");
-  const currentEanDisplay = document.getElementById("current-ean-display"); 
+  const currentEanDisplay = document.getElementById("current-ean-display");
 
   if (!eanInput) {
     scanStatus.textContent = "Inserisci un codice EAN o un Codice Articolo!";
@@ -1116,7 +820,7 @@ async function confirmEanInput() {
     scanStatus.textContent = "Verifica in corso...";
     scanStatus.className = "status-message status-info";
     scanStatus.classList.remove("hidden");
-    
+
     const query = Backendless.DataQueryBuilder.create().setWhereClause(
       `eanCode='${eanInput}' OR productCode='${eanInput}'`
     );
@@ -1133,16 +837,16 @@ async function confirmEanInput() {
     const order = orders[0];
     scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
     scanStatus.className = "status-message status-success";
-    
+
     actionsArea.classList.remove("hidden");
-    if (currentEanDisplay) currentEanDisplay.textContent = eanInput; 
+    if (currentEanDisplay) currentEanDisplay.textContent = eanInput;
 
     if (currentRole === ROLES.PHOTOGRAPHER) {
-        photoUploadArea.style.display = 'block';
-        const uploadEanDisplay = document.getElementById("current-ean-display-upload");
-        if(uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
+      photoUploadArea.style.display = 'block';
+      const uploadEanDisplay = document.getElementById("current-ean-display-upload");
+      if(uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
     } else {
-        photoUploadArea.style.display = 'none';
+      photoUploadArea.style.display = 'none';
     }
 
     const map = {
@@ -1175,7 +879,7 @@ async function confirmEanInput() {
       const el = document.getElementById(inputId);
       if (el) el.value = order[key] || "";
     });
-    
+
     currentEanInProcess = { objectId: order.objectId, ean: eanInput };
   } catch (err) {
     console.error(err);
@@ -1186,144 +890,75 @@ async function confirmEanInput() {
   }
 }
 
-// 💾 Salva i dati operativi aggiornati su Backendless
+/** Salva i dati operativi aggiornati su Backendless */
 async function saveEanUpdates() {
-    // Controlla che ci sia un EAN attivo (ACCESSO DIRETTO ALLA VARIABILE GLOBALE)
-    if (!currentEanInProcess || !currentEanInProcess.objectId) {
-        showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
-        return;
-    }
+  if (!currentEanInProcess || !currentEanInProcess.objectId) {
+    showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
+    return;
+  }
 
-    const ean = currentEanInProcess.ean;
-    const objectId = currentEanInProcess.objectId;
-    
-    // Mappa campi HTML → colonne Backendless (Mappa dal tuo codice)
-    const map = {
-        "field-shots": "shots",
-        "field-quantity": "quantity",
-        "field-s1-prog": "s1Prog",
-        "field-s2-prog": "s2Prog",
-        "field-prog-on-model": "progOnModel",
-        "field-still-shot": "stillShot",
-        "field-onmodel-shot": "onModelShot",
-        "field-priority": "priority",
-        "field-s1-stylist": "s1Stylist",
-        "field-s2-stylist": "s2Stylist",
-        "field-provenienza": "provenienza",
-        "field-tipologia": "tipologia",
-        "field-ordine": "ordine",
-        "field-data-ordine": "dataOrdine",
-        "field-entry-date": "entryDate",
-        "field-exit-date": "exitDate",
-        "field-collo": "collo",
-        "field-data-reso": "dataReso",
-        "field-ddt": "ddt",
-        "field-note-logistica": "noteLogistica",
-        "field-data-presa-post": "dataPresaPost",
-        "field-data-consegna-post": "dataConsegnaPost",
-        "field-calendario": "calendario",
-        "field-postpresa": "postPresa",
-    };
-    
-    // Costruisci l’oggetto aggiornato
-    const updatedOrder = { objectId };
-    Object.entries(map).forEach(([inputId, key]) => {
-        const el = document.getElementById(inputId);
-        updatedOrder[key] = el ? el.value.trim() : '';
-    });
-    
-    // Aggiungi timestamp di aggiornamento
-    updatedOrder.lastUpdated = new Date();
-    
-    try {
-        // Usa il nuovo sistema di feedback
-        showFeedback("⏳ Salvataggio in corso...", 'info');
-        
-        await Backendless.Data.of("Orders").save(updatedOrder);
+  const ean = currentEanInProcess.ean;
+  const objectId = currentEanInProcess.objectId;
 
-        // Successo
-        showFeedback(`✅ Aggiornamenti per ${ean} salvati correttamente!`, 'success');
-        
-        // Ricarica dell'interfaccia dopo 1 secondo
-        setTimeout(async () => {
-            resetEanActionState(false); 
-            
-            // 🔥 CORREZIONE DEL BUG RUOLO PERDUTO
-            try {
-                // Ricarica l'oggetto utente COMPLETO dalla sessione corrente
-                const updatedUser = await Backendless.UserService.getCurrentUser();
-                
-                // Estrai la stringa del ruolo
-                const reloadedRole = await getRoleFromUser(updatedUser); 
-                
-                // Aggiorna la variabile globale del ruolo
-                currentRole = reloadedRole; // <--- ACCESSO DIRETTO
-                
-                // Chiama la funzione di caricamento ordini PASSANDO LA STRINGA del ruolo
-                loadOrdersForUser(reloadedRole); 
-            } catch (err) {
-                console.error("Errore critico nel ricaricare l'utente/ruolo dopo il salvataggio:", err);
-                // Fallback: ricarica con il ruolo globale se ancora valido
-                loadOrdersForUser(currentRole); 
-            }
-        }, 1000); 
+  const map = {
+    "field-shots": "shots",
+    "field-quantity": "quantity",
+    "field-s1-prog": "s1Prog",
+    "field-s2-prog": "s2Prog",
+    "field-prog-on-model": "progOnModel",
+    "field-still-shot": "stillShot",
+    "field-onmodel-shot": "onModelShot",
+    "field-priority": "priority",
+    "field-s1-stylist": "s1Stylist",
+    "field-s2-stylist": "s2Stylist",
+    "field-provenienza": "provenienza",
+    "field-tipologia": "tipologia",
+    "field-ordine": "ordine",
+    "field-data-ordine": "dataOrdine",
+    "field-entry-date": "entryDate",
+    "field-exit-date": "exitDate",
+    "field-collo": "collo",
+    "field-data-reso": "dataReso",
+    "field-ddt": "ddt",
+    "field-note-logistica": "noteLogistica",
+    "field-data-presa-post": "dataPresaPost",
+    "field-data-consegna-post": "dataConsegnaPost",
+    "field-calendario": "calendario",
+    "field-postpresa": "postPresa",
+  };
 
-    } catch (err) {
-        console.error("Errore durante il salvataggio:", err);
-        // Errore
-        showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
-    }
+  const updatedOrder = { objectId };
+  Object.entries(map).forEach(([inputId, key]) => {
+    const el = document.getElementById(inputId);
+    updatedOrder[key] = el ? el.value.trim() : '';
+  });
+
+  updatedOrder.lastUpdated = new Date();
+
+  try {
+    showFeedback("⏳ Salvataggio in corso...", 'info');
+    await Backendless.Data.of("Orders").save(updatedOrder);
+    showFeedback(`✅ Aggiornamenti per ${ean} salvati correttamente!`, 'success');
+
+    setTimeout(async () => {
+      resetEanActionState(false);
+      try {
+        const updatedUser = await Backendless.UserService.getCurrentUser();
+        const reloadedRole = await getRoleFromUser(updatedUser);
+        currentRole = reloadedRole;
+        loadOrdersForUser(reloadedRole);
+      } catch (err) {
+        console.error("Errore nel ricaricare l'utente/ruolo dopo il salvataggio:", err);
+        loadOrdersForUser(currentRole);
+      }
+    }, 800);
+  } catch (err) {
+    console.error("Errore durante il salvataggio:", err);
+    showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
+  }
 }
 
-/* ======================================================
-   NUOVE UTILITY PER IL FEEDBACK
-   ====================================================== */
-
-/**
- * Mostra un messaggio di feedback con stile specifico e lo nasconde dopo 3 secondi.
- * @param {string} message Il testo da mostrare.
- * @param {string} type 'success', 'error', o 'info'.
- */
-function showFeedback(message, type) {
-  const feedbackElement = document.getElementById('operation-feedback');
-  if (!feedbackElement) return console.error("⚠️ Elemento #operation-feedback non trovato.");
-
-  // Rimuovi tutti gli stili precedenti
-  feedbackElement.classList.remove('status-success', 'status-error', 'status-info', 'hidden');
-
-  // Applica lo stile corretto
-  feedbackElement.textContent = message;
-  feedbackElement.classList.add(`status-${type}`);
-
-  // 🔥 Forza la visibilità
-  feedbackElement.style.display = 'block';
-
-  // Nasconde dopo 3 secondi
-  setTimeout(() => {
-    feedbackElement.style.display = 'none';
-  }, 3000);
-}
-
-/**
- * Resetta l'interfaccia di azione EAN allo stato iniziale.
- * @param {boolean} showCancelFeedback Se true, mostra un messaggio di annullamento.
- */
-function resetEanActionState(showCancelFeedback = false) {
-    // 1. Nasconde/mostra gli elementi
-    document.getElementById('ean-actions-area').classList.add('hidden');
-    document.getElementById('photo-upload-area').classList.add('hidden');
-    document.getElementById('confirm-ean-btn').classList.remove('hidden');
-
-    // 2. Resetta i campi di input EAN
-    document.getElementById('ean-input').value = '';
-
-    // 3. Feedback visivo se l'utente ha premuto Annulla/Chiudi Dettaglio
-    if (showCancelFeedback) {
-        showFeedback("Operazione di aggiornamento annullata.", 'info'); 
-    }
-}
-
-
+/** Upload link Google Drive e cambio stato */
 async function handlePhotoUploadAndCompletion() {
   const status = document.getElementById('upload-status-message');
   const linksInput = document.getElementById('photo-drive-links');
@@ -1364,46 +999,294 @@ async function handlePhotoUploadAndCompletion() {
   }
 }
 
+/** Messaggi feedback worker */
+function showFeedback(message, type) {
+  const feedbackElement = document.getElementById('operation-feedback');
+  if (!feedbackElement) return console.error("⚠️ Elemento #operation-feedback non trovato.");
 
+  feedbackElement.classList.remove('status-success', 'status-error', 'status-info', 'hidden');
+  feedbackElement.textContent = message;
+  feedbackElement.classList.add(`status-${type}`);
+  feedbackElement.style.display = 'block';
 
-function closePhotoModal() {
-    document.getElementById('photo-modal').style.display = 'none';
+  setTimeout(() => { feedbackElement.style.display = 'none'; }, 3000);
 }
 
+/** Reset interfaccia EAN */
+function resetEanActionState(showCancelFeedback = false) {
+  document.getElementById('ean-actions-area').classList.add('hidden');
+  document.getElementById('photo-upload-area').classList.add('hidden');
+  document.getElementById('confirm-ean-btn').classList.remove('hidden');
+  document.getElementById('ean-input').value = '';
 
+  if (showCancelFeedback) {
+    showFeedback("Operazione di aggiornamento annullata.", 'info');
+  }
+}
 
+/** Aggiorna lo stato di un ordine (riuso ruoli vari) */
+async function updateOrderStatus(orderId, newStatus, successMessage = "Ordine aggiornato con successo!") {
+  if (!orderId) return;
+  const confirmAction = confirm(`Vuoi impostare lo stato su "${newStatus}"?`);
+  if (!confirmAction) return;
 
+  const statusEl = document.getElementById('loading-orders');
+  statusEl.textContent = "Aggiornamento in corso...";
+  statusEl.style.display = "block";
+  statusEl.style.color = "#111";
 
+  try {
+    const updatedOrder = {
+      objectId: orderId,
+      status: newStatus,
+      lastUpdated: new Date()
+    };
+    if (newStatus === STATUS.COMPLETED) {
+      updatedOrder.completedAt = new Date();
+    }
+
+    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
+
+    statusEl.textContent = successMessage;
+    statusEl.style.color = "#16a34a";
+
+    setTimeout(() => {
+      statusEl.style.display = "none";
+      loadOrdersForUser(currentRole);
+    }, 1000);
+  } catch (error) {
+    console.error("Errore durante l'aggiornamento ordine:", error);
+    statusEl.textContent = "Errore durante l'aggiornamento ordine ❌";
+    statusEl.style.color = "#b91c1c";
+  }
+}
 
 // ----------------------------------------------------
-// GESTIONE INIZIALE
+// LISTA ORDINI PER RUOLO (WORKER TABLE DINAMICA)
 // ----------------------------------------------------
+async function loadOrdersForUser(role) {
+  const config = ROLE_CONFIG[role] || ROLE_CONFIG[ROLES.ADMIN];
+  const loadingEl = document.getElementById('loading-orders');
+  const table = document.getElementById('orders-table');
+  const tbody = table.querySelector('tbody');
 
-// Controlla lo stato di autenticazione all'avvio
+  loadingEl.textContent = "Caricamento ordini in corso...";
+  loadingEl.style.display = "block";
+  loadingEl.style.color = "#111";
+  tbody.innerHTML = "";
+  table.classList.add('hidden');
+
+  try {
+    const query = Backendless.DataQueryBuilder.create();
+    query.setSortBy(["lastUpdated DESC"]);
+    query.setPageSize(100);
+
+    if (config.filter) query.setWhereClause(config.filter);
+
+    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query);
+
+    if (!orders || orders.length === 0) {
+      loadingEl.textContent = "Nessun ordine disponibile.";
+      table.classList.add('hidden');
+      return;
+    }
+
+    // Intestazione dinamica
+    const thead = table.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          ${config.columns.map(col => `<th class="px-4 py-2 capitalize">${col}</th>`).join('')}
+          <th class="px-4 py-2">Azioni</th>
+        </tr>`;
+    }
+
+    // Righe
+    orders.forEach(order => {
+      const tr = document.createElement('tr');
+      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
+
+      const colsHtml = config.columns.map(col => {
+        if (col === "driveLinks") {
+          if (Array.isArray(order.driveLinks) && order.driveLinks.length > 0) {
+            return `
+              <td class="px-4 py-2">
+                ${order.driveLinks
+                  .map(raw => {
+                    const link = escapeHTML(String(raw).trim());
+                    return `
+                      <a href="${link}" target="_blank"
+                         class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
+                        ${link}
+                      </a>`;
+                  })
+                  .join('')}
+              </td>`;
+          } else {
+            return `<td class="px-4 py-2 text-gray-400 italic">Nessun link</td>`;
+          }
+        }
+        return `<td class="px-4 py-2">${escapeHTML(order[col] || '')}</td>`;
+      }).join('');
+
+      tr.innerHTML = `${colsHtml}<td class="px-4 py-2">${config.actions(order)}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    loadingEl.style.display = "none";
+    table.classList.remove('hidden');
+  } catch (err) {
+    console.error("Errore durante il caricamento ordini:", err);
+    tbody.innerHTML = "";
+    loadingEl.textContent = "Errore durante il caricamento ordini.";
+    loadingEl.style.color = "#b91c1c";
+    loadingEl.style.display = "block";
+    table.classList.add('hidden');
+  }
+}
+
+// =====================================================
+// PARTE 5 – TOGGLE ADMIN, DASHBOARD CHART, INIT SESSIONE
+// =====================================================
+
+// Toggle visibilità sezioni admin (utenti, import, riepilogo)
+document.addEventListener("DOMContentLoaded", () => {
+  const toggleUsers = document.getElementById('toggle-users-card');
+  const toggleImport = document.getElementById('toggle-import-card');
+  const toggleStats = document.getElementById('toggle-stats-card');
+
+  const usersCard = document.getElementById('card-users');
+  const importCard = document.getElementById('card-import');
+  const statsSection = document.getElementById('admin-stats-section');
+
+  // Card Gestione Utenti
+  if (toggleUsers && usersCard) {
+    const savedUsersVisibility = localStorage.getItem('showUsersCard');
+    if (savedUsersVisibility !== null) {
+      toggleUsers.checked = savedUsersVisibility === 'true';
+      usersCard.style.display = toggleUsers.checked ? 'block' : 'none';
+    }
+    toggleUsers.addEventListener('change', () => {
+      usersCard.style.display = toggleUsers.checked ? 'block' : 'none';
+      localStorage.setItem('showUsersCard', toggleUsers.checked);
+    });
+  }
+
+  // Card Import Excel
+  if (toggleImport && importCard) {
+    const savedImportVisibility = localStorage.getItem('showImportCard');
+    if (savedImportVisibility !== null) {
+      toggleImport.checked = savedImportVisibility === 'true';
+      importCard.style.display = toggleImport.checked ? 'block' : 'none';
+    }
+    toggleImport.addEventListener('change', () => {
+      importCard.style.display = toggleImport.checked ? 'block' : 'none';
+      localStorage.setItem('showImportCard', toggleImport.checked);
+    });
+  }
+
+  // Sezione Riepilogo Ordini
+  if (toggleStats && statsSection) {
+    const savedStatsVisibility = localStorage.getItem('showStatsSection');
+    if (savedStatsVisibility !== null) {
+      toggleStats.checked = savedStatsVisibility === 'true';
+      statsSection.style.display = toggleStats.checked ? 'block' : 'none';
+    }
+    toggleStats.addEventListener('change', () => {
+      statsSection.style.display = toggleStats.checked ? 'block' : 'none';
+      localStorage.setItem('showStatsSection', toggleStats.checked);
+    });
+  }
+});
+
+// Dashboard riepilogo + grafico (Chart.js deve essere caricato via CDN nell'HTML)
+async function loadAdminDashboard() {
+  const dash = document.getElementById("admin-dashboard");
+  const container = document.getElementById("admin-stats");
+  const chartEl = document.getElementById("admin-stats-chart");
+  if (!container || !chartEl) return;
+
+  container.innerHTML = "";
+
+  try {
+    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find();
+
+    const counts = {};
+    orders.forEach(o => {
+      const st = o.status || "Sconosciuto";
+      counts[st] = (counts[st] || 0) + 1;
+    });
+
+    Object.entries(counts).forEach(([status, count]) => {
+      const color = STATUS_COLORS[status] || STATUS_COLORS.DEFAULT;
+      const div = document.createElement("div");
+      div.className = `p-4 border rounded-lg text-center ${color}`;
+      div.innerHTML = `<p class="font-semibold">${status}</p><p class="text-2xl font-bold">${count}</p>`;
+      container.appendChild(div);
+    });
+
+    // Mostra sezione dashboard
+    dash.classList.remove("hidden");
+
+    if (window.Chart) {
+      const ctx = chartEl.getContext("2d");
+      const labels = Object.keys(counts);
+      const data = Object.values(counts);
+      const colors = labels.map(l => {
+        const c = STATUS_COLORS[l] || STATUS_COLORS.DEFAULT;
+        const match = c.match(/text-([a-z]+)-(\d+)/);
+        return match ? match[1] : "gray";
+      });
+
+      if (window._adminChart) window._adminChart.destroy();
+
+      window._adminChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Numero ordini",
+            data,
+            backgroundColor: colors.map(c => `var(--tw-${c}-400, #9ca3af)`)
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, precision: 0 } }
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Errore caricamento dashboard:", err);
+  }
+}
+
+// ----------------------------------------------------
+// GESTIONE INIZIALE – RIPRISTINO SESSIONE
+// ----------------------------------------------------
 window.onload = function() {
-    Backendless.UserService.isValidLogin()
-        .then(isValid => {
-            if (isValid) {
-                return Backendless.UserService.getCurrentUser()
-                    .then(user => {
-                        if (!user || !user.role) {
-                             return user;
-                        }
-                        return user;
-                    });
-            } else {
-                showLoginArea();
-            }
-        })
-        .then(user => {
-            if (user && user.objectId) {
-                handleLoginSuccess(user);
-            } else {
-                 showLoginArea();
-            }
-        })
-        .catch(error => {
-            console.error("Errore di inizializzazione sessione:", error);
-            showLoginArea();
-        });
+  Backendless.UserService.isValidLogin()
+    .then(isValid => {
+      if (isValid) {
+        return Backendless.UserService.getCurrentUser()
+          .then(user => {
+            return user;
+          });
+      } else {
+        showLoginArea();
+        return null;
+      }
+    })
+    .then(user => {
+      if (user && user.objectId) {
+        handleLoginSuccess(user);
+      } else {
+        showLoginArea();
+      }
+    })
+    .catch(error => {
+      console.error("Errore di inizializzazione sessione:", error);
+      showLoginArea();
+    });
 };
