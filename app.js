@@ -695,73 +695,136 @@ function showAdminFeedback(message, type = 'info') {
  * Carica tutti gli ordini da Backendless e li mostra nella tabella Admin
  */
 async function loadAllOrdersForAdmin() {
-    const loadingEl = document.getElementById('loading-orders');
-    const table = document.getElementById('admin-orders-table');
-    const tbody = table.querySelector('tbody');
-    const editBtn = document.createElement('button');
-    editBtn.textContent = 'Modifica';
-    editBtn.className = 'btn-primary py-1 px-2';
-    editBtn.onclick = () => openAdminOrderCard(order);	
+  const loadingEl = document.getElementById('loading-admin-orders');
+  const table = document.getElementById('admin-orders-table');
+  const tbody = table.querySelector('tbody');
 
-    loadingEl.textContent = "Caricamento ordini in corso...";
-    tbody.innerHTML = "";
-    table.classList.add('hidden');
+  loadingEl.textContent = "Caricamento ordini in corso...";
+  loadingEl.style.display = "block";
+  loadingEl.style.color = "#111"; // colore testo normale
+  tbody.innerHTML = "";
+  table.classList.add('hidden');
 
-    try {
-        const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find({ sortBy: ['lastUpdated DESC'] });
+  try {
+    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find({
+      sortBy: ['lastUpdated DESC'],
+      pageSize: 100
+    });
 
-        if (!orders || orders.length === 0) {
-            loadingEl.textContent = "Nessun ordine trovato.";
-            return;
-        }
-
-        orders.forEach(order => {
-            const tr = document.createElement('tr');
-            tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
-
-            tr.innerHTML = `
-                <td class="px-4 py-2">${order.eanCode || ''}</td>
-                <td class="px-4 py-2">${order.brand || ''}</td>
-                <td class="px-4 py-2">${order.styleName || ''}</td>
-                <td class="px-4 py-2">${order.category || ''}</td>
-                <td class="px-4 py-2">
-                    <button class="btn-primary px-3 py-1 text-sm" onclick='handleAdminEdit(${JSON.stringify(order).replace(/"/g,'&quot;')})'>Modifica</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        loadingEl.style.display = 'none';
-        table.classList.remove('hidden');
-    } catch (err) {
-        console.error(err);
-        loadingEl.textContent = "Errore durante il caricamento ordini.";
+    if (!orders || orders.length === 0) {
+      loadingEl.textContent = "Nessun ordine trovato.";
+      table.classList.add('hidden');
+      return;
     }
+
+    orders.forEach(order => {
+      const tr = document.createElement('tr');
+      tr.classList.add('hover:bg-gray-100', 'cursor-pointer');
+
+      tr.innerHTML = `
+        <td class="px-4 py-2">${order.productCode || ''}</td>
+        <td class="px-4 py-2">${order.eanCode || ''}</td>
+        <td class="px-4 py-2">${order.brand || ''}</td>
+        <td class="px-4 py-2">${order.color || ''}</td>
+        <td class="px-4 py-2">${order.size || ''}</td>
+        <td class="px-4 py-2">
+          ${Array.isArray(order.driveLinks) && order.driveLinks.length > 0
+            ? order.driveLinks.map(raw => {
+                const link = escapeHTML(raw.trim());
+                return `
+                  <a href="${link}" target="_blank"
+                     class="text-blue-600 underline block truncate max-w-xs hover:text-blue-800">
+                     ${link}
+                  </a>`;
+              }).join('')
+            : '<span class="text-gray-400 italic">Nessun link</span>'}
+        </td>
+        <td class="px-4 py-2">
+          <button class="btn-primary px-3 py-1 text-sm" data-oid="${order.objectId}">
+            Modifica
+          </button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('button[data-oid]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const oid = btn.getAttribute('data-oid');
+        const order = orders.find(o => o.objectId === oid);
+        if (order) handleAdminEdit(order);
+      });
+    });
+
+    loadingEl.style.display = 'none';
+    table.classList.remove('hidden');
+  } catch (err) {
+    console.error("Errore durante il caricamento ordini:", err);
+    tbody.innerHTML = "";
+    loadingEl.textContent = "Errore durante il caricamento ordini.";
+    loadingEl.style.color = "#b91c1c"; // rosso
+    loadingEl.style.display = 'block';
+    table.classList.add('hidden');
+  }
 }
 
+function escapeHTML(str) {
+  return str.replace(/[&<>"']/g, match => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[match]));
+}
 
 function handleAdminEdit(order) {
-    // 1️⃣ Nascondi lista ordini
-    const ordersCard = document.getElementById('orders-admin-card');
-    if (ordersCard) ordersCard.style.display = 'none';
+  if (!order) return;
 
-    // 2️⃣ Popola form/modale con i dati dell'ordine
-    openAdminOrderCard(order);
+  // Mostra un prompt per aggiornare i campi principali
+  const newProductCode = prompt("Codice Articolo:", order.productCode || "");
+  if (newProductCode === null) return;
 
-    // 3️⃣ Override dei pulsanti Salva / Annulla nella modale
-    const saveBtn = document.getElementById('admin-order-save-btn');
-    const cancelBtn = document.getElementById('admin-order-cancel-btn');
+  const newEanCode = prompt("EAN:", order.eanCode || "");
+  if (newEanCode === null) return;
 
-    if (saveBtn) {
-        saveBtn.onclick = async () => {
-            await saveAdminOrderChanges(order); // salva le modifiche su Backendless
-            closeAdminEditCard();
-        };
-    }
+  const newBrand = prompt("Brand:", order.brand || "");
+  if (newBrand === null) return;
 
-    if (cancelBtn) {
-        cancelBtn.onclick = () => closeAdminEditCard();
-    }
+  const newColor = prompt("Colore:", order.color || "");
+  if (newColor === null) return;
+
+  const newSize = prompt("Taglia:", order.size || "");
+  if (newSize === null) return;
+
+  const newStatus = prompt(
+    "Stato (In attesa foto / In attesa post-produzione / Completato):",
+    order.status || ""
+  );
+  if (newStatus === null) return;
+
+  const updatedOrder = {
+    objectId: order.objectId,
+    productCode: newProductCode.trim(),
+    eanCode: newEanCode.trim(),
+    brand: newBrand.trim(),
+    color: newColor.trim(),
+    size: newSize.trim(),
+    status: newStatus.trim(),
+    lastUpdated: new Date(),
+  };
+
+  Backendless.Data.of(ORDER_TABLE_NAME)
+    .save(updatedOrder)
+    .then(() => {
+      showFeedback("Ordine aggiornato con successo!");
+      loadAllOrdersForAdmin();
+    })
+    .catch((error) => {
+      console.error("Errore aggiornamento ordine:", error);
+      showFeedback("Errore durante l'aggiornamento ordine.", true);
+    });
 }
 
 function closeAdminEditCard() {
@@ -771,6 +834,8 @@ function closeAdminEditCard() {
     // Ricarica la lista ordini admin
     loadAllOrdersForAdmin();
 }
+
+
 
 
 // ----------------------------------------------------
@@ -1076,9 +1141,47 @@ function resetEanActionState(showCancelFeedback = false) {
 }
 
 
-function handlePhotoUploadAndCompletion() {
-    alert("Funzione di upload non ancora implementata!");
+async function handlePhotoUploadAndCompletion() {
+  const status = document.getElementById('upload-status-message');
+  const linksInput = document.getElementById('photo-drive-links');
+
+  if (!currentEanInProcess || !currentEanInProcess.objectId) {
+    status.textContent = 'Nessun EAN attivo.';
+    status.classList.remove('hidden');
+    return;
+  }
+
+  const linksRaw = linksInput.value.trim();
+  if (!linksRaw) {
+    status.textContent = 'Inserisci almeno un link Google Drive.';
+    status.classList.remove('hidden');
+    return;
+  }
+
+  const driveLinks = linksRaw.split('\n').map(l => l.trim()).filter(l => l !== '');
+
+  status.textContent = 'Salvataggio link in corso...';
+  status.classList.remove('hidden');
+
+  try {
+    await Backendless.Data.of(ORDER_TABLE_NAME).save({
+      objectId: currentEanInProcess.objectId,
+      driveLinks: driveLinks,
+      status: STATUS.WAITING_POST_PRODUCTION,
+      lastUpdated: new Date()
+    });
+
+    status.textContent = 'Link salvati e ordine aggiornato con successo!';
+    linksInput.value = '';
+    resetEanActionState(false);
+    loadOrdersForUser(currentRole);
+  } catch (error) {
+    console.error('Errore durante il salvataggio link:', error);
+    status.textContent = 'Errore durante il salvataggio dei link.';
+  }
 }
+
+
 
 function closePhotoModal() {
     document.getElementById('photo-modal').style.display = 'none';
