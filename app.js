@@ -113,28 +113,45 @@ function showStatusMessage(elementId, message, isSuccess = true) {
 // AUTENTICAZIONE E GESTIONE UTENTI
 // ----------------------------------------------------
 
-function handleStandardLogin(email, password) {
-    const status = document.getElementById('login-status');
+async function handleStandardLogin() {
+    // 💡 Usa gli ID corretti mostrati nel tuo HTML
+    const email = document.getElementById('user-email').value;
+    const password = document.getElementById('user-password').value;
+    
+    const statusEl = document.getElementById('login-status');
+    const loginButton = document.querySelector('.btn-primary'); // Trova il bottone per disabilitarlo
 
     if (!email || !password) {
-        showLoginArea("Per favore, inserisci email e password.");
+        if (statusEl) {
+            statusEl.textContent = "Per favore, inserisci email e password.";
+            statusEl.classList.remove('hidden');
+        }
         return;
     }
 
-    if (status) {
-        status.textContent = "Accesso in corso...";
-        status.classList.remove('hidden');
+    if (statusEl) {
+        statusEl.textContent = "Accesso in corso...";
+        statusEl.classList.remove('hidden');
     }
+    if (loginButton) loginButton.disabled = true;
 
-    Backendless.UserService.login(email, password, true)
-        .then(user => {
-            handleLoginSuccess(user);
-        })
-        .catch(error => {
-            console.error("Errore di Login:", error);
-            const message = error.message || "Credenziali non valide o errore di sistema.";
-            showLoginArea("Accesso fallito: " + message);
-        });
+    try {
+        const user = await Backendless.UserService.login(email, password, true);
+        
+        // Chiamata alla funzione di successo (che deve esistere in app.txt)
+        handleLoginSuccess(user); 
+
+    } catch (error) {
+        console.error("Errore di Login:", error);
+        const message = error.message || "Credenziali non valide o errore di sistema.";
+        
+        if (statusEl) {
+            statusEl.textContent = "Accesso fallito: " + message;
+            statusEl.classList.remove('hidden');
+            statusEl.classList.add('status-error'); // Assicurati che lo stile errore sia applicato
+        }
+        if (loginButton) loginButton.disabled = false;
+    }
 }
 
 function handleLogout() {
@@ -179,6 +196,7 @@ function handlePasswordRecovery() {
             showLoginArea(`❌ Recupero password fallito: ${msg}`);
         });
 }
+
 
 function getRoleFromUser(user) {
     if (!user || !user.objectId) {
@@ -1285,8 +1303,123 @@ function openPhotoModal(eanCode) {
 }
 
 
+// ----------------------------------------------------
+// FUNZIONE PER LA VISTA GENERALE DI TUTTI GLI ORDINI
+// ----------------------------------------------------
+async function loadGeneralOrders() {
+    const loadingEl = document.getElementById('loading-general-orders');
+    const table = document.getElementById('general-orders-table');
+    const tableHeader = document.getElementById('general-orders-table-header');
+    const tableBody = table ? table.querySelector('tbody') : null;
 
+    if (!loadingEl || !table || !tableHeader || !tableBody) {
+        console.error("Elementi DOM per la tabella generale ordini non trovati.");
+        return;
+    }
 
+    // Imposta stato di caricamento
+    loadingEl.textContent = "Caricamento lista completa ordini...";
+    loadingEl.classList.remove('hidden');
+    table.classList.add('hidden');
+    tableBody.innerHTML = ''; // Pulisci la tabella
+
+    try {
+        // Query per recuperare tutti gli ordini (fino a 100 per pagina)
+        const queryBuilder = Backendless.DataQueryBuilder.create().setPageSize(100).setOffset(0);
+        // Utilizza ORDER_TABLE_NAME = "Orders" 
+        const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(queryBuilder); 
+
+        if (!orders || orders.length === 0) {
+            loadingEl.textContent = "Nessun ordine trovato.";
+            return;
+        }
+
+        // 1. Genera l'intestazione della tabella (tutte le colonne)
+        // Usa le chiavi del primo oggetto come nomi delle colonne
+        const firstOrder = orders[0];
+        // Filtra proprietà standard di Backendless non rilevanti per la colonna
+        const columns = Object.keys(firstOrder).filter(key => typeof firstOrder[key] !== 'object' && key !== 'ownerId');
+        
+        tableHeader.innerHTML = columns.map(col => 
+            `<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${col}</th>`
+        ).join('');
+
+        // 2. Popola il corpo della tabella
+        orders.forEach(order => {
+            const tr = document.createElement('tr');
+            tr.classList.add('border-b', 'hover:bg-gray-50');
+            
+            columns.forEach(col => {
+                const cell = document.createElement('td');
+                cell.classList.add('px-4', 'py-2', 'whitespace-nowrap', 'text-sm', 'text-gray-900');
+                let value = order[col];
+                
+                // Formattazione semplice per le date (se necessario)
+                if (value instanceof Date) {
+                    value = value.toLocaleDateString();
+                }
+                
+                cell.textContent = value || '—';
+                tr.appendChild(cell);
+            });
+            tableBody.appendChild(tr);
+        });
+        
+        // Nasconde loading e mostra tabella
+        loadingEl.classList.add('hidden');
+        table.classList.remove('hidden');
+
+    } catch (error) {
+        console.error("Errore nel caricamento ordini generali:", error);
+        loadingEl.textContent = `❌ Errore durante il caricamento ordini: ${error.message}`;
+        loadingEl.classList.remove('hidden');
+        loadingEl.classList.add('text-red-600');
+        table.classList.add('hidden');
+    }
+}
+
+function showGeneralOrdersView() {
+    const generalOrdersView = document.getElementById('general-orders-view');
+    const adminDashboard = document.getElementById('admin-dashboard');
+    const workerDashboard = document.getElementById('worker-dashboard');
+    const loginArea = document.getElementById('login-area');
+
+    if (!generalOrdersView) return console.warn("Elemento #general-orders-view non trovato.");
+    // Nasconde tutto il resto
+    if (loginArea) loginArea.classList.add('hidden');
+    if (workerDashboard) workerDashboard.classList.add('hidden');
+    if (adminDashboard) adminDashboard.classList.add('hidden');
+    // Mostra la vista generale
+    generalOrdersView.classList.remove('hidden');
+    
+    // 💡 AGGIUNGI QUESTA CHIAMATA PER CARICARE I DATI 💡
+    loadGeneralOrders();
+}
+
+function showMainDashboard() {
+    const generalOrdersView = document.getElementById('general-orders-view');
+    const adminDashboard = document.getElementById('admin-dashboard');
+    const workerDashboard = document.getElementById('worker-dashboard');
+    const loginArea = document.getElementById('login-area');
+
+    // 1. Nasconde tutte le aree dell'applicazione
+    if (loginArea) loginArea.classList.add('hidden');
+    if (generalOrdersView) generalOrdersView.classList.add('hidden');
+    
+    // Assicurati che le dashboard siano nascoste prima di mostrare quella corretta
+    if (workerDashboard) workerDashboard.classList.add('hidden');
+    if (adminDashboard) adminDashboard.classList.add('hidden');
+
+    // 2. Mostra la dashboard corretta in base al ruolo (devi avere una variabile globale 'currentRole' definita)
+    if (currentRole === ROLES.ADMIN) {
+        if (adminDashboard) adminDashboard.classList.remove('hidden');
+    } else if (currentRole === ROLES.PHOTOGRAPHER || currentRole === ROLES.POST_PRODUCER) {
+        if (workerDashboard) workerDashboard.classList.remove('hidden');
+    } else {
+        // Se non c'è un ruolo valido (es. sessione scaduta o prima esecuzione)
+        showLoginArea(); 
+    }
+}
 
 // ----------------------------------------------------
 // GESTIONE INIZIALE
