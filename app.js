@@ -760,18 +760,23 @@ async function handleAdminEdit(order) {
   const ordersCard = document.getElementById('orders-admin-card');
   if (ordersCard) ordersCard.classList.add('hidden');
 
-  // Mostra maschera di modifica
+  // Mostra la card di modifica
   const editCard = document.getElementById('admin-order-edit-card');
   editCard.classList.remove('hidden');
 
   // Mostra intestazione EAN
-  document.getElementById('admin-ean-display').textContent =
-    order.eanCode || order.productCode || '';
+  const eanDisplay = document.getElementById('admin-ean-display');
+  if (eanDisplay) eanDisplay.textContent = order.eanCode || order.productCode || '';
 
-  const container = document.getElementById("admin-order-edit-fields");
+  // ✅ Contenitore corretto in base al tuo HTML
+  const container = document.getElementById("admin-order-fields");
+  if (!container) {
+    console.error("❌ ERRORE: elemento #admin-order-fields non trovato nel DOM.");
+    return;
+  }
   container.innerHTML = ""; // pulisci prima
 
-  // Lista dei campi con tipo (testo, numero, data, booleano)
+  // Definizione campi con tipo input
   const fields = {
     productCode: "text",
     eanCode: "text",
@@ -808,9 +813,9 @@ async function handleAdminEdit(order) {
     postPresa: "text"
   };
 
-  // Genera campi dinamicamente
+  // Genera dinamicamente i campi
   for (const [key, type] of Object.entries(fields)) {
-    const value = order[key] || "";
+    const value = order[key] ?? "";
     let inputHTML = "";
 
     if (type === "boolean") {
@@ -826,18 +831,16 @@ async function handleAdminEdit(order) {
 
     const fieldEl = document.createElement("div");
     fieldEl.innerHTML = `
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        ${key}
-      </label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">${key}</label>
       ${inputHTML}
     `;
     container.appendChild(fieldEl);
   }
 
-  // Applica permessi dinamici (chi può modificare cosa)
+  // Applica permessi (Admin = tutto, altri = solo campi editabili)
   applyFieldPermissions("admin-order-edit-card");
 
-  // Salva ordine attuale
+  // Memorizza l’ordine corrente
   currentAdminOrder = order;
 }
 
@@ -865,78 +868,62 @@ function applyFieldPermissions(containerId) {
 
 /** Salva aggiornamenti della card Admin */
 async function saveAdminOrderUpdates() {
-  if (!currentAdminOrder || !currentAdminOrder.objectId) {
-    showAdminFeedback("⚠️ Nessun ordine selezionato.", "error");
+  if (!currentAdminOrder) return;
+
+  const status = document.getElementById("admin-update-feedback");
+  const container = document.getElementById("admin-order-fields");
+
+  if (!container) {
+    console.error("❌ ERRORE: elemento #admin-order-fields non trovato.");
     return;
   }
 
-  const updatedOrder = { objectId: currentAdminOrder.objectId };
-
-  // Stessa mappa campi
-  const map = {
-    "admin-field-productCode": "productCode",
-    "admin-field-eanCode": "eanCode",
-    "admin-field-styleName": "styleName",
-    "admin-field-styleGroup": "styleGroup",
-    "admin-field-brand": "brand",
-    "admin-field-color": "color",
-    "admin-field-size": "size",
-    "admin-field-category": "category",
-    "admin-field-gender": "gender",
-    "admin-field-shots": "shots",
-    "admin-field-quantity": "quantity",
-    "admin-field-s1Prog": "s1Prog",
-    "admin-field-s2Prog": "s2Prog",
-    "admin-field-progOnModel": "progOnModel",
-    "admin-field-stillShot": "stillShot",
-    "admin-field-onModelShot": "onModelShot",
-    "admin-field-priority": "priority",
-    "admin-field-s1Stylist": "s1Stylist",
-    "admin-field-s2Stylist": "s2Stylist",
-    "admin-field-provenienza": "provenienza",
-    "admin-field-tipologia": "tipologia",
-    "admin-field-ordine": "ordine",
-    "admin-field-dataOrdine": "dataOrdine",
-    "admin-field-entryDate": "entryDate",
-    "admin-field-exitDate": "exitDate",
-    "admin-field-collo": "collo",
-    "admin-field-dataReso": "dataReso",
-    "admin-field-ddt": "ddt",
-    "admin-field-noteLogistica": "noteLogistica",
-    "admin-field-dataPresaPost": "dataPresaPost",
-    "admin-field-dataConsegnaPost": "dataConsegnaPost",
-    "admin-field-calendario": "calendario",
-    "admin-field-postpresa": "postPresa"
-  };
-
-  Object.entries(map).forEach(([fieldId, prop]) => {
-    const el = document.getElementById(fieldId);
-    if (el) updatedOrder[prop] = el.value.trim();
-  });
-
-  updatedOrder.lastUpdated = new Date();
+  status.textContent = "💾 Salvataggio in corso...";
+  status.className = "status-message status-info";
+  status.classList.remove("hidden");
 
   try {
-    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
-    showAdminFeedback("✅ Aggiornamenti salvati correttamente!", "success");
-    currentAdminOrder = updatedOrder;
+    // Prepara l’oggetto aggiornato
+    const updated = { objectId: currentAdminOrder.objectId };
 
-    await loadAllOrdersForAdmin(); // ricarica la lista ordini
-    highlightUpdatedRow(updatedOrder.objectId); // evidenzia riga aggiornata
+    container.querySelectorAll("input, select, textarea").forEach(input => {
+      const key = input.id.replace("admin-field-", "");
+      let val = input.value;
 
-    // Chiudi card modifica e riapri lista ordini
-    const editCard = document.getElementById('admin-order-edit-card');
-    editCard.classList.add('hidden');
+      // conversioni tipo automatiche
+      if (input.type === "number") {
+        val = val ? Number(val) : null;
+      } else if (input.type === "date") {
+        val = val ? new Date(val) : null;
+      } else if (input.tagName === "SELECT" && (val === "true" || val === "false")) {
+        val = val === "true";
+      }
 
-    const ordersCard = document.getElementById('orders-admin-card');
-    if (ordersCard) ordersCard.classList.remove('hidden');
+      updated[key] = val;
+    });
 
+    // Salva su Backendless
+    await Backendless.Data.of("Orders").save(updated);
+
+    status.textContent = "✅ Modifiche salvate con successo!";
+    status.className = "status-message status-success";
+
+    // Attendi un momento per mostrare feedback visivo
+    setTimeout(async () => {
+      // Nascondi la card di edit
+      document.getElementById("admin-order-edit-card").classList.add("hidden");
+      // Mostra di nuovo la tabella ordini
+      document.getElementById("orders-admin-card").classList.remove("hidden");
+
+      // Ricarica gli ordini aggiornati
+      await loadAllOrdersForAdmin();
+    }, 800);
   } catch (err) {
-    console.error(err);
-    showAdminFeedback("❌ Errore durante il salvataggio: " + (err.message || ""), "error");
+    console.error("❌ Errore durante il salvataggio:", err);
+    status.textContent = "Errore durante il salvataggio: " + err.message;
+    status.className = "status-message status-error";
   }
 }
-
 
 function applyFieldPermissions(containerId) {
   const container = document.getElementById(containerId);
@@ -998,10 +985,12 @@ async function saveAdminOrderChanges() {
 }
 
 function cancelAdminOrderEdit() {
-  document.getElementById('admin-order-edit-card').classList.add('hidden');
-  document.getElementById('orders-admin-card').classList.remove('hidden');
-}
+  const editCard = document.getElementById("admin-order-edit-card");
+  const ordersCard = document.getElementById("orders-admin-card");
 
+  if (editCard) editCard.classList.add("hidden");
+  if (ordersCard) ordersCard.classList.remove("hidden");
+}
 
 function cancelAdminOrderEdit() {
   const editCard = document.getElementById('admin-order-edit-card');
