@@ -260,6 +260,15 @@ async function handleLoginSuccess(user) {
     .then(async role => {
       currentRole = role;
 
+      // ✅ Recupera anche i permessi personalizzati dell’utente
+      try {
+        const userDetails = await Backendless.Data.of(USER_TABLE_NAME).findById(user.objectId);
+        currentUser.editableFields = userDetails.editableFields || [];
+      } catch (err) {
+        console.error("Errore nel recupero dei permessi personalizzati:", err);
+        currentUser.editableFields = [];
+      }
+
       const displayName = user.name || user.email;
       document.getElementById('worker-name').textContent = displayName;
       document.getElementById('worker-role').textContent = currentRole;
@@ -361,6 +370,46 @@ function renderUsersTable(users) {
     actionCell.appendChild(permissionsButton);
   });
 }
+
+// === GESTIONE PERMESSI DINAMICI CREAZIONE UTENTE ===
+
+// Campi modificabili possibili (coerenti con Backendless)
+const EDITABLE_FIELD_OPTIONS = [
+  "shots", "quantity", "s1Prog", "s2Prog", "progOnModel",
+  "stillShot", "onModelShot", "priority", "s1Stylist", "s2Stylist",
+  "provenienza", "tipologia", "ordine", "dataOrdine", "entryDate",
+  "exitDate", "collo", "dataReso", "ddt", "noteLogistica",
+  "dataPresaPost", "dataConsegnaPost", "calendario", "postPresa"
+];
+
+// Popola i checkbox dei campi editabili quando viene selezionato un ruolo
+document.getElementById("new-user-role").addEventListener("change", e => {
+  const role = e.target.value;
+  const section = document.getElementById("editable-fields-section");
+  const container = document.getElementById("editable-fields-container");
+
+  // Admin non ha limiti, quindi niente check
+  if (role === ROLES.ADMIN) {
+    section.classList.add("hidden");
+    container.innerHTML = "";
+    return;
+  }
+
+  // Mostra la sezione dei campi
+  section.classList.remove("hidden");
+
+  // Genera dinamicamente le checkbox
+  container.innerHTML = "";
+  EDITABLE_FIELD_OPTIONS.forEach(field => {
+    const label = document.createElement("label");
+    label.className = "flex items-center space-x-2";
+    label.innerHTML = `
+      <input type="checkbox" class="editable-field-checkbox" value="${field}">
+      <span>${field}</span>
+    `;
+    container.appendChild(label);
+  });
+});
 
 
 // ===============================
@@ -525,53 +574,56 @@ function deleteUser(userId, email) {
   }
 }
 
-function handleUserCreation() {
-  const email = document.getElementById('new-user-email').value.trim();
-  const password = document.getElementById('new-user-password').value;
-  const role = document.getElementById('new-user-role').value;
+async function handleUserCreation() {
+  const email = document.getElementById("new-user-email").value.trim();
+  const password = document.getElementById("new-user-password").value.trim();
+  const role = document.getElementById("new-user-role").value;
+  const statusEl = document.getElementById("user-creation-status");
 
   if (!email || !password || !role) {
-    showStatusMessage('user-creation-status', 'Per favore, compila tutti i campi per il nuovo utente.', false);
+    statusEl.textContent = "⚠️ Compila tutti i campi (Email, Password e Ruolo).";
+    statusEl.className = "status-message status-warning";
+    statusEl.classList.remove("hidden");
     return;
   }
 
-  // 🔹 Raccogli i campi selezionati nei checkbox
-  const checkedBoxes = document.querySelectorAll('#editable-fields-container input[type="checkbox"]:checked');
-  const editableFields = Array.from(checkedBoxes).map(cb => cb.value);
+  try {
+    statusEl.textContent = "Creazione utente in corso...";
+    statusEl.className = "status-message status-info";
+    statusEl.classList.remove("hidden");
 
-  Backendless.UserService.register({
-    email: email,
-    password: password
-  })
-  .then(newUser => {
-    // 🔹 Aggiorniamo anche il ruolo e i campi modificabili
-    const userUpdate = {
-      objectId: newUser.objectId,
-      role: role,
-      editableFields: editableFields // 👈 nuovo campo array
-    };
+    // Raccogli i campi modificabili selezionati
+    const checkboxes = document.querySelectorAll(".editable-field-checkbox:checked");
+    const editableFields = Array.from(checkboxes).map(c => c.value);
 
-    return Backendless.Data.of(USER_TABLE_NAME).save(userUpdate);
-  })
-  .then(() => {
-    showStatusMessage('user-creation-status', `Utente ${email} creato con successo e ruolo ${role} assegnato.`, true);
+    // Crea nuovo utente su Backendless
+    const newUser = new Backendless.User();
+    newUser.email = email;
+    newUser.password = password;
+    newUser.role = role;
+    newUser.editableFields = editableFields; // <-- memorizzati su Backendless
 
-    // Reset form
-    document.getElementById('new-user-email').value = '';
-    document.getElementById('new-user-password').value = '';
-    document.getElementById('new-user-role').value = '';
-    document.querySelectorAll('#editable-fields-container input[type="checkbox"]').forEach(cb => cb.checked = false);
+    const savedUser = await Backendless.UserService.register(newUser);
 
-    // Ricarica lista utenti
+    // Assegna il ruolo nel sistema di sicurezza
+    await Backendless.Roles.addUserToRole(savedUser, role);
+
+    statusEl.textContent = `✅ Utente ${email} creato con ruolo ${role}.`;
+    statusEl.className = "status-message status-success";
+
+    // Ripulisce form
+    document.getElementById("new-user-email").value = "";
+    document.getElementById("new-user-password").value = "";
+    document.getElementById("new-user-role").value = "";
+    document.getElementById("editable-fields-section").classList.add("hidden");
+
     loadUsersAndRoles();
-  })
-  .catch(error => {
-    console.error("Errore creazione utente:", error);
-    showStatusMessage('user-creation-status', `Creazione Utente Fallita: ${error.message}`, false);
-  });
+  } catch (err) {
+    console.error("Errore creazione utente:", err);
+    statusEl.textContent = `❌ Errore durante la creazione: ${err.message}`;
+    statusEl.className = "status-message status-error";
+  }
 }
-
-
 // =====================================================
 // PARTE 3 – FUNZIONI ADMIN (ORDINI: LISTA, EDIT, IMPORT)
 // =====================================================
@@ -753,33 +805,35 @@ function handleAdminEdit(order) {
     if (input) input.value = order[prop] || '';
   });
 
-  // ✅  Permessi di modifica in base al ruolo e ai campi consentiti
-  const isAdmin = currentRole === ROLES.ADMIN;
-  let allowedFields = [];
+  // ✅ Subito dopo il popolamento dei campi:
+  // applica i permessi dinamici dell'utente loggato
+  applyFieldPermissions('admin-order-edit-card');
 
-  if (!isAdmin && currentUser && Array.isArray(currentUser.editableFields)) {
-    allowedFields = currentUser.editableFields;
-  }
-
-  Object.entries(fieldMap).forEach(([fieldId, prop]) => {
-    const input = document.getElementById(fieldId);
-    if (!input) return;
-
-    // Admin → tutto abilitato
-    if (isAdmin) {
-      input.disabled = false;
-      input.classList.remove('opacity-50');
-    } else {
-      // Ruoli non admin → controlla permesso
-      const canEdit = allowedFields.includes(prop);
-      input.disabled = !canEdit;
-      input.classList.toggle('opacity-50', !canEdit);
-    }
-  });
-
-  // Salva l’oggetto corrente in memoria globale
+  // Infine salva l'oggetto in memoria globale
   currentAdminOrder = order;
 }
+
+/**
+ * Abilita o disabilita i campi in base ai permessi dell'utente loggato
+ */
+function applyFieldPermissions(containerId) {
+  if (!currentUser || !Array.isArray(currentUser.editableFields)) return;
+
+  const allowed = currentUser.editableFields;
+  const inputs = document.querySelectorAll(`#${containerId} input, #${containerId} select, #${containerId} textarea`);
+
+  inputs.forEach(el => {
+    const fieldName = el.id.replace(/^admin-field-|^field-/, ""); // rimuove prefissi
+    if (allowed.includes(fieldName)) {
+      el.disabled = false;
+      el.classList.remove("opacity-50", "cursor-not-allowed");
+    } else {
+      el.disabled = true;
+      el.classList.add("opacity-50", "cursor-not-allowed");
+    }
+  });
+}
+
 
 /** Salva aggiornamenti della card Admin */
 async function saveAdminOrderUpdates() {
@@ -1024,7 +1078,7 @@ async function confirmEanInput() {
     scanStatus.className = "status-message status-error";
     scanStatus.classList.remove("hidden");
     actionsArea.classList.add("hidden");
-    photoUploadArea.style.display = 'none';
+    photoUploadArea.style.display = "none";
     return;
   }
 
@@ -1042,7 +1096,7 @@ async function confirmEanInput() {
       scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
       scanStatus.className = "status-message status-error";
       actionsArea.classList.add("hidden");
-      photoUploadArea.style.display = 'none';
+      photoUploadArea.style.display = "none";
       return;
     }
 
@@ -1050,17 +1104,20 @@ async function confirmEanInput() {
     scanStatus.textContent = `✅ Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
     scanStatus.className = "status-message status-success";
 
+    // Mostra l'area operativa
     actionsArea.classList.remove("hidden");
     if (currentEanDisplay) currentEanDisplay.textContent = eanInput;
 
+    // Gestione visibilità area upload foto
     if (currentRole === ROLES.PHOTOGRAPHER) {
-      photoUploadArea.style.display = 'block';
+      photoUploadArea.style.display = "block";
       const uploadEanDisplay = document.getElementById("current-ean-display-upload");
-      if(uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
+      if (uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
     } else {
-      photoUploadArea.style.display = 'none';
+      photoUploadArea.style.display = "none";
     }
 
+    // Mappa dei campi operativi
     const map = {
       "field-shots": "shots",
       "field-quantity": "quantity",
@@ -1087,88 +1144,121 @@ async function confirmEanInput() {
       "field-calendario": "calendario",
       "field-postpresa": "postPresa",
     };
+
+    // Popola i campi del form
     Object.entries(map).forEach(([inputId, key]) => {
       const el = document.getElementById(inputId);
       if (el) el.value = order[key] || "";
     });
 
+    // ✅ Applica i permessi dinamici in base all’utente loggato
+    applyFieldPermissions("ean-actions-area");
+
+    // Salva lo stato corrente
     currentEanInProcess = { objectId: order.objectId, ean: eanInput };
   } catch (err) {
-    console.error(err);
+    console.error("Errore durante la verifica EAN:", err);
     scanStatus.textContent = "Errore durante la verifica EAN.";
     scanStatus.className = "status-message status-error";
     actionsArea.classList.add("hidden");
-    photoUploadArea.style.display = 'none';
+    photoUploadArea.style.display = "none";
   }
 }
-
-/** Salva i dati operativi aggiornati su Backendless */
+/**
+ * Salva gli aggiornamenti dell'ordine corrente (solo campi autorizzati)
+ */
 async function saveEanUpdates() {
+  const updateStatus = document.getElementById("update-status");
   if (!currentEanInProcess || !currentEanInProcess.objectId) {
-    showFeedback("⚠️ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
+    updateStatus.textContent = "❌ Nessun ordine selezionato.";
+    updateStatus.className = "status-message status-error";
+    updateStatus.classList.remove("hidden");
     return;
   }
 
-  const ean = currentEanInProcess.ean;
-  const objectId = currentEanInProcess.objectId;
-
-  const map = {
-    "field-shots": "shots",
-    "field-quantity": "quantity",
-    "field-s1-prog": "s1Prog",
-    "field-s2-prog": "s2Prog",
-    "field-prog-on-model": "progOnModel",
-    "field-still-shot": "stillShot",
-    "field-onmodel-shot": "onModelShot",
-    "field-priority": "priority",
-    "field-s1-stylist": "s1Stylist",
-    "field-s2-stylist": "s2Stylist",
-    "field-provenienza": "provenienza",
-    "field-tipologia": "tipologia",
-    "field-ordine": "ordine",
-    "field-data-ordine": "dataOrdine",
-    "field-entry-date": "entryDate",
-    "field-exit-date": "exitDate",
-    "field-collo": "collo",
-    "field-data-reso": "dataReso",
-    "field-ddt": "ddt",
-    "field-note-logistica": "noteLogistica",
-    "field-data-presa-post": "dataPresaPost",
-    "field-data-consegna-post": "dataConsegnaPost",
-    "field-calendario": "calendario",
-    "field-postpresa": "postPresa",
-  };
-
-  const updatedOrder = { objectId };
-  Object.entries(map).forEach(([inputId, key]) => {
-    const el = document.getElementById(inputId);
-    updatedOrder[key] = el ? el.value.trim() : '';
-  });
-
-  updatedOrder.lastUpdated = new Date();
-
   try {
-    showFeedback("⏳ Salvataggio in corso...", 'info');
-    await Backendless.Data.of("Orders").save(updatedOrder);
-    showFeedback(`✅ Aggiornamenti per ${ean} salvati correttamente!`, 'success');
+    updateStatus.textContent = "Salvataggio in corso...";
+    updateStatus.className = "status-message status-info";
+    updateStatus.classList.remove("hidden");
 
-    setTimeout(async () => {
-      resetEanActionState(false);
-      try {
-        const updatedUser = await Backendless.UserService.getCurrentUser();
-        const reloadedRole = await getRoleFromUser(updatedUser);
-        currentRole = reloadedRole;
-        loadOrdersForUser(reloadedRole);
-      } catch (err) {
-        console.error("Errore nel ricaricare l'utente/ruolo dopo il salvataggio:", err);
-        loadOrdersForUser(currentRole);
-      }
-    }, 800);
+    const orderId = currentEanInProcess.objectId;
+
+    // Ottieni permessi: Admin = tutti, altri = editableFields
+    const isAdmin = currentRole === ROLES.ADMIN;
+    const allowedFields = isAdmin
+      ? null
+      : Array.isArray(currentUser.editableFields)
+      ? currentUser.editableFields
+      : [];
+
+    // Mappa dei campi operativi
+    const map = {
+      "field-shots": "shots",
+      "field-quantity": "quantity",
+      "field-s1-prog": "s1Prog",
+      "field-s2-prog": "s2Prog",
+      "field-prog-on-model": "progOnModel",
+      "field-still-shot": "stillShot",
+      "field-onmodel-shot": "onModelShot",
+      "field-priority": "priority",
+      "field-s1-stylist": "s1Stylist",
+      "field-s2-stylist": "s2Stylist",
+      "field-provenienza": "provenienza",
+      "field-tipologia": "tipologia",
+      "field-ordine": "ordine",
+      "field-data-ordine": "dataOrdine",
+      "field-entry-date": "entryDate",
+      "field-exit-date": "exitDate",
+      "field-collo": "collo",
+      "field-data-reso": "dataReso",
+      "field-ddt": "ddt",
+      "field-note-logistica": "noteLogistica",
+      "field-data-presa-post": "dataPresaPost",
+      "field-data-consegna-post": "dataConsegnaPost",
+      "field-calendario": "calendario",
+      "field-postpresa": "postPresa",
+    };
+
+    // Crea oggetto aggiornamento
+    const updates = {};
+
+    Object.entries(map).forEach(([inputId, prop]) => {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+
+      // Se non admin, aggiorna solo se il campo è permesso
+      if (!isAdmin && !allowedFields.includes(prop)) return;
+
+      const val = el.value?.trim?.() ?? "";
+      if (val !== "") updates[prop] = val;
+    });
+
+    if (Object.keys(updates).length === 0) {
+      updateStatus.textContent = "⚠️ Nessun campo modificato o permesso insufficiente.";
+      updateStatus.className = "status-message status-warning";
+      return;
+    }
+
+    // Aggiorna record su Backendless
+    updates.objectId = orderId;
+    await Backendless.Data.of("Orders").save(updates);
+
+    updateStatus.textContent = "✅ Dati aggiornati con successo!";
+    updateStatus.className = "status-message status-success";
+
+    // Piccola pausa e reset form
+    setTimeout(() => {
+      updateStatus.classList.add("hidden");
+      resetEanActionState(true);
+      loadOrdersForUser(currentRole);
+    }, 1200);
   } catch (err) {
-    console.error("Errore durante il salvataggio:", err);
-    showFeedback(`❌ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
+    console.error("Errore nel salvataggio EAN:", err);
+    updateStatus.textContent = "❌ Errore durante il salvataggio.";
+    updateStatus.className = "status-message status-error";
   }
 }
+
 
 /** Upload link Google Drive e cambio stato */
 async function handlePhotoUploadAndCompletion() {
