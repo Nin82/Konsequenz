@@ -83,15 +83,16 @@ const ROLE_CONFIG = {
         Modifica
       </button>`
   },
-  [ROLES.PHOTOGRAPHER]: {
-    filter: `status = '${STATUS.WAITING_PHOTO}'`,
-    columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
-    actions: order => `
-  <button class="btn-primary px-3 py-1 text-sm"
-          onclick="openWorkerOrderEditor('${order.objectId}')">
-    Modifica 
-  </button>`
-  },
+[ROLES.PHOTOGRAPHER]: {
+  filter: `status = '${STATUS.WAITING_PHOTO}'`,
+  columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
+  actions: order => `
+    <button class="btn-success px-3 py-1 text-sm"
+            onclick="openWorkerOrderEditor('${order.objectId}')">
+      Apri modifica
+    </button>`
+},
+
   [ROLES.POST_PRODUCER]: {
     filter: `status = '${STATUS.WAITING_POST_PRODUCTION}'`,
     columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
@@ -1030,56 +1031,30 @@ async function loadOrdersForUser(role) {
 /** apre la stessa maschera di admin ma per un worker (rispettando i permessi) */
 async function openWorkerOrderEditor(orderId) {
   try {
-    const order = await Backendless.Data.of("Orders").findById(orderId);
+    const order = await Backendless.Data.of(ORDER_TABLE_NAME).findById(orderId);
 
-    if (!order) return alert("Ordine non trovato");
-
-    // Mostra sezione operativa
-    document.getElementById("ean-actions-area").classList.remove("hidden");
-
-    // Riempie EAN display
-    document.getElementById("current-ean-display").textContent = order.eanCode;
-
-    // Imposta il codice nel box scansione
-    document.getElementById("ean-input").value = order.eanCode;
-
-    // Costruisce campi se necessario
-    buildWorkerOperationalFields();
-
-    // Popola campi operativi
-    ORDER_FIELDS.forEach(f => {
-      const el = document.getElementById(`field-${f.key}`);
-      if (!el) return;
-
-      if (f.type === "date") {
-        el.value = formatDateForInput(order[f.key]);
+    if (!order) {
+      if (typeof showFeedback === "function") {
+        showFeedback("❌ Impossibile aprire il dettaglio: ordine non trovato.", "error");
       } else {
-        el.value = order[f.key] || "";
+        alert("Ordine non trovato.");
       }
-    });
-
-    // Drive links
-    if (order.driveLinks && order.driveLinks.length > 0) {
-      document.getElementById("photo-upload-area").classList.remove("hidden");
-      document.getElementById("current-ean-display-upload").textContent = order.eanCode;
-      document.getElementById("photo-drive-links").value = order.driveLinks.join("\n");
-    } else {
-      document.getElementById("photo-upload-area").classList.add("hidden");
-      document.getElementById("photo-drive-links").value = "";
+      return;
     }
 
-    // Permessi
-    applyFieldPermissions("ean-actions-area");
+    // Usa lo stesso editor del flusso EAN
+    openOperationalEditor(order);
 
-    // Salva stato corrente
-    currentEanInProcess = {
-      objectId: order.objectId,
-      ean: order.eanCode
-    };
-
+    if (typeof showFeedback === "function") {
+      showFeedback(`📸 Dettaglio aperto per ${order.eanCode || order.productCode}`, "info");
+    }
   } catch (err) {
-    console.error("Errore nell'aprire l'editor:", err);
-    alert("Impossibile aprire il dettaglio.");
+    console.error("Errore durante l'apertura del dettaglio:", err);
+    if (typeof showFeedback === "function") {
+      showFeedback("❌ Errore durante l'apertura del dettaglio ordine.", "error");
+    } else {
+      alert("Errore durante l'apertura del dettaglio ordine.");
+    }
   }
 }
 
@@ -1130,22 +1105,27 @@ function showFeedback(message, type) {
   }, 3000);
 }
 
-function resetEanActionState(hideAll = false) {
+function resetEanActionState(showCancelFeedback = false) {
+  const actionsArea = document.getElementById("ean-actions-area");
+  const photoUploadArea = document.getElementById("photo-upload-area");
+  const confirmBtn = document.getElementById("confirm-ean-btn");
+  const eanInput = document.getElementById("ean-input");
+  const scanStatus = document.getElementById("scan-status");
+  const updateStatus = document.getElementById("update-status");
+  const linksEl = document.getElementById("photo-drive-links");
 
-  document.getElementById("ean-input").value = "";
-  document.getElementById("current-ean-display").textContent = "";
+  if (actionsArea) actionsArea.classList.add("hidden");
+  if (photoUploadArea) photoUploadArea.classList.add("hidden");
+  if (confirmBtn) confirmBtn.classList.remove("hidden");
+  if (eanInput) eanInput.value = "";
+  if (scanStatus) scanStatus.classList.add("hidden");
+  if (updateStatus) updateStatus.classList.add("hidden");
+  if (linksEl) linksEl.value = "";
 
-  // CAMPI OPERATIVI
-  document.getElementById("operational-fields").innerHTML = "";
+  currentEanInProcess = null;
 
-  // SECTION FOTO
-  const photo = document.getElementById("photo-upload-area");
-  photo.classList.add("hidden"); // ← UNICO MODO GIUSTO
-  document.getElementById("current-ean-display-upload").textContent = "";
-  document.getElementById("photo-drive-links").value = "";
-
-  if (hideAll) {
-    document.getElementById("ean-actions-area").classList.add("hidden");
+  if (showCancelFeedback && typeof showFeedback === "function") {
+    showFeedback("Operazione annullata.", "info");
   }
 }
 
@@ -1193,82 +1173,166 @@ function buildWorkerOperationalFields() {
   container.dataset.built = "true";
 }
 
-async function confirmEanInput() {
-  const eanInputField = document.getElementById("ean-input");
-  const eanInput = eanInputField ? eanInputField.value.trim() : "";
-  const scanStatus     = document.getElementById("scan-status");
-  const actionsArea    = document.getElementById("ean-actions-area");
-  const photoUploadArea= document.getElementById("photo-upload-area");
+
+function openOperationalEditor(order) {
+  if (!order) return;
+
+  const actionsArea = document.getElementById("ean-actions-area");
+  const photoUploadArea = document.getElementById("photo-upload-area");
   const currentEanDisplay = document.getElementById("current-ean-display");
+  const currentEanDisplayUpload = document.getElementById("current-ean-display-upload");
+  const eanInputEl = document.getElementById("ean-input");
+  const scanStatus = document.getElementById("scan-status");
+
+  // Codice visualizzato (EAN o productCode)
+  const code = order.eanCode || order.productCode || "";
+
+  // Salvo in globale
+  currentEanInProcess = {
+    objectId: order.objectId,
+    ean: code,
+  };
+
+  // Aggiorno input scanner
+  if (eanInputEl) eanInputEl.value = code;
+  if (currentEanDisplay) currentEanDisplay.textContent = code;
+  if (currentEanDisplayUpload) currentEanDisplayUpload.textContent = code;
+
+  // Mostro sezione operativa
+  if (actionsArea) actionsArea.classList.remove("hidden");
+
+  // Mostro box verde solo per Photographer
+  if (currentRole === ROLES.PHOTOGRAPHER && photoUploadArea) {
+    photoUploadArea.classList.remove("hidden");
+
+    const linksTextarea = document.getElementById("photo-drive-links");
+    if (linksTextarea) {
+      if (Array.isArray(order.driveLinks) && order.driveLinks.length > 0) {
+        linksTextarea.value = order.driveLinks.join("\n");
+      } else {
+        linksTextarea.value = "";
+      }
+    }
+  } else if (photoUploadArea) {
+    photoUploadArea.classList.add("hidden");
+  }
+
+  // Messaggio stato
+  if (scanStatus) {
+    scanStatus.textContent = `✅ Codice ${code} trovato. Compila o aggiorna i dati operativi.`;
+    scanStatus.className = "status-message status-success";
+    scanStatus.classList.remove("hidden");
+  }
+
+  // Mappa EAN → campi operativi
+  const map = {
+    "field-shots": "shots",
+    "field-quantity": "quantity",
+    "field-s1-prog": "s1Prog",
+    "field-s2-prog": "s2Prog",
+    "field-prog-on-model": "progOnModel",
+    "field-still-shot": "stillShot",
+    "field-onmodel-shot": "onModelShot",
+    "field-priority": "priority",
+    "field-s1-stylist": "s1Stylist",
+    "field-s2-stylist": "s2Stylist",
+    "field-provenienza": "provenienza",
+    "field-tipologia": "tipologia",
+    "field-ordine": "ordine",
+    "field-data-ordine": "dataOrdine",
+    "field-entry-date": "entryDate",
+    "field-exit-date": "exitDate",
+    "field-collo": "collo",
+    "field-data-reso": "dataReso",
+    "field-ddt": "ddt",
+    "field-note-logistica": "noteLogistica",
+    "field-data-presa-post": "dataPresaPost",
+    "field-data-consegna-post": "dataConsegnaPost",
+    "field-calendario": "calendario",
+    "field-postpresa": "postPresa",
+  };
+
+  Object.entries(map).forEach(([inputId, key]) => {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+
+    const value = order[key];
+
+    if (el.type === "date" && value) {
+      // se Backendless memorizza Date, prova a convertirla
+      try {
+        const d = new Date(value);
+        if (!isNaN(d.getTime())) {
+          el.value = d.toISOString().slice(0, 10);
+        } else {
+          el.value = value || "";
+        }
+      } catch {
+        el.value = value || "";
+      }
+    } else {
+      el.value = value ?? "";
+    }
+  });
+
+  // Applica permessi dinamici
+  if (typeof applyFieldPermissions === "function") {
+    applyFieldPermissions("ean-actions-area");
+  }
+}
+
+async function confirmEanInput() {
+  const eanInput = document.getElementById("ean-input").value.trim();
+  const scanStatus = document.getElementById("scan-status");
+  const actionsArea = document.getElementById("ean-actions-area");
+  const photoUploadArea = document.getElementById("photo-upload-area");
 
   if (!eanInput) {
-    scanStatus.textContent = "Inserisci un codice EAN o un Codice Articolo!";
-    scanStatus.className   = "status-message status-error";
-    scanStatus.classList.remove("hidden");
+    if (scanStatus) {
+      scanStatus.textContent = "Inserisci un codice EAN o un Codice Articolo!";
+      scanStatus.className = "status-message status-error";
+      scanStatus.classList.remove("hidden");
+    }
     if (actionsArea) actionsArea.classList.add("hidden");
-    if (photoUploadArea) photoUploadArea.style.display = "none";
+    if (photoUploadArea) photoUploadArea.classList.add("hidden");
     return;
   }
 
   try {
-    scanStatus.textContent = "Verifica in corso...";
-    scanStatus.className   = "status-message status-info";
-    scanStatus.classList.remove("hidden");
+    if (scanStatus) {
+      scanStatus.textContent = "Verifica in corso...";
+      scanStatus.className = "status-message status-info";
+      scanStatus.classList.remove("hidden");
+    }
 
-    const query = Backendless.DataQueryBuilder.create()
-      .setWhereClause(`eanCode='${eanInput}' OR productCode='${eanInput}'`);
-    const orders = await Backendless.Data.of(ORDER_TABLE_NAME).find(query);
+    const query = Backendless.DataQueryBuilder.create().setWhereClause(
+      `eanCode='${eanInput}' OR productCode='${eanInput}'`
+    );
+    const orders = await Backendless.Data.of("Orders").find(query);
 
     if (!orders || orders.length === 0) {
-      scanStatus.textContent = `âŒ Codice ${eanInput} non trovato in Backendless.`;
-      scanStatus.className   = "status-message status-error";
-      if (actionsArea)    actionsArea.classList.add("hidden");
-      if (photoUploadArea)photoUploadArea.style.display = "none";
+      if (scanStatus) {
+        scanStatus.textContent = `❌ Codice ${eanInput} non trovato in Backendless.`;
+        scanStatus.className = "status-message status-error";
+        scanStatus.classList.remove("hidden");
+      }
+      if (actionsArea) actionsArea.classList.add("hidden");
+      if (photoUploadArea) photoUploadArea.classList.add("hidden");
       return;
     }
 
     const order = orders[0];
-    scanStatus.textContent = `âœ… Codice ${eanInput} trovato. Compila o aggiorna i dati operativi.`;
-    scanStatus.className   = "status-message status-success";
-
-    // costruiamo i campi worker se non esistono
-    buildWorkerOperationalFields();
-
-    if (actionsArea) actionsArea.classList.remove("hidden");
-    if (currentEanDisplay) currentEanDisplay.textContent = eanInput;
-
-    if (currentRole === ROLES.PHOTOGRAPHER && photoUploadArea) {
-      photoUploadArea.style.display = "block";
-      const uploadEanDisplay = document.getElementById("current-ean-display-upload");
-      if (uploadEanDisplay) uploadEanDisplay.textContent = eanInput;
-    } else if (photoUploadArea) {
-      photoUploadArea.style.display = "none";
-    }
-
-    // Popola i valori nei campi worker
-    ORDER_FIELDS.forEach(f => {
-      const id = `field-${f.key}`;
-      const el = document.getElementById(id);
-      if (!el) return;
-      const value = order[f.key];
-
-      if (f.type === "date") {
-        el.value = formatDateForInput(value);
-      } else {
-        el.value = value == null ? "" : value;
-      }
-    });
-
-    // Applica permessi nel contenitore
-    applyFieldPermissions("ean-actions-area");
-
-    currentEanInProcess = { objectId: order.objectId, ean: eanInput };
+    // 👇 riutilizziamo lo stesso flusso di "Modifica"
+    openOperationalEditor(order);
   } catch (err) {
     console.error("Errore durante la verifica EAN:", err);
-    scanStatus.textContent = "Errore durante la verifica EAN.";
-    scanStatus.className   = "status-message status-error";
+    if (scanStatus) {
+      scanStatus.textContent = "Errore durante la verifica EAN.";
+      scanStatus.className = "status-message status-error";
+      scanStatus.classList.remove("hidden");
+    }
     if (actionsArea) actionsArea.classList.add("hidden");
-    if (photoUploadArea) photoUploadArea.style.display = "none";
+    if (photoUploadArea) photoUploadArea.classList.add("hidden");
   }
 }
 
@@ -1277,28 +1341,29 @@ async function saveEanUpdates() {
   const statusEl = document.getElementById("update-status");
 
   if (!currentEanInProcess || !currentEanInProcess.objectId) {
-    statusEl.textContent = "Errore: nessun ordine in modifica.";
-    statusEl.className = "status-message status-error";
-    statusEl.classList.remove("hidden");
+    if (statusEl) {
+      statusEl.textContent = "Errore: nessun ordine in modifica.";
+      statusEl.className = "status-message status-error";
+      statusEl.classList.remove("hidden");
+    }
     return;
   }
 
   const orderId = currentEanInProcess.objectId;
 
   try {
-    // Ricarico l’ordine aggiornato
-    let order = await Backendless.Data.of("Orders").findById(orderId);
-
+    // Ricarico l’ordine
+    let order = await Backendless.Data.of(ORDER_TABLE_NAME).findById(orderId);
     if (!order) {
-      statusEl.textContent = "❌ Ordine non trovato.";
-      statusEl.className = "status-message status-error";
-      statusEl.classList.remove("hidden");
+      if (statusEl) {
+        statusEl.textContent = "❌ Ordine non trovato.";
+        statusEl.className = "status-message status-error";
+        statusEl.classList.remove("hidden");
+      }
       return;
     }
 
-    // --------------------------
-    //  AGGIORNA I CAMPI OPERATIVI
-    // --------------------------
+    // --- Mappa campi operativi ---
     const fieldMap = {
       "field-shots": "shots",
       "field-quantity": "quantity",
@@ -1326,63 +1391,95 @@ async function saveEanUpdates() {
       "field-postpresa": "postPresa",
     };
 
-    for (const [inputId, prop] of Object.entries(fieldMap)) {
+    Object.entries(fieldMap).forEach(([inputId, prop]) => {
       const el = document.getElementById(inputId);
-      if (!el || el.disabled) continue;
+      if (!el || el.disabled) return; // rispetto permessi
 
       let value = el.value;
 
-      // converti date in ISO
       if (el.type === "date" && value) {
-        value = new Date(value).toISOString();
-      }
-
-      // select booleano
-      if (el.tagName === "SELECT" && (value === "true" || value === "false")) {
-        value = value === "true";
+        // converto in ISO per Backendless (se la colonna è Date)
+        const d = new Date(value);
+        if (!isNaN(d.getTime())) {
+          value = d.toISOString();
+        }
       }
 
       order[prop] = value;
+    });
+
+    // --- Link Drive (solo Photographer) ---
+    if (currentRole === ROLES.PHOTOGRAPHER) {
+      const linksEl = document.getElementById("photo-drive-links");
+      if (linksEl) {
+        const rawLinks = linksEl.value.trim();
+        const driveLinks = rawLinks
+          .split("\n")
+          .map(l => l.trim())
+          .filter(l => l.length > 0);
+
+        order.driveLinks = driveLinks;
+      }
     }
 
-    // --------------------------
-    //   SALVATAGGIO LINK FOTO
-    // --------------------------
+    order.lastUpdated = new Date();
 
-    if (currentRole === ROLES.PHOTOGRAPHER) {
-  const raw = document.getElementById("photo-drive-links")?.value.trim() || "";
+    await Backendless.Data.of(ORDER_TABLE_NAME).save(order);
 
-  const driveLinks = raw
-    .split("\n")
-    .map(l => l.trim())
-    .filter(l => l !== "");
-
-  order.driveLinks = driveLinks;
-
-  if (driveLinks.length > 0) {
-    order.status = STATUS.COMPLETED; // ← quello giusto
-  }
-}
-
-    // --------------------------
-    //   SALVA SU BACKENDLESS
-    // --------------------------
-    await Backendless.Data.of("Orders").save(order);
-
-    statusEl.textContent = "✔ Modifiche salvate con successo.";
-    statusEl.className = "status-message status-success";
-    statusEl.classList.remove("hidden");
+    if (statusEl) {
+      statusEl.textContent = "✔ Modifiche salvate con successo.";
+      statusEl.className = "status-message status-success";
+      statusEl.classList.remove("hidden");
+    }
 
     setTimeout(() => {
-      resetEanActionState(true);
+      resetEanActionState(false);  // 👈 niente messaggio “annullata”
       loadOrdersForUser(currentRole);
     }, 600);
 
   } catch (error) {
     console.error("Errore salvataggio EAN:", error);
-    statusEl.textContent = "❌ Errore durante il salvataggio.";
-    statusEl.className = "status-message status-error";
-    statusEl.classList.remove("hidden");
+    if (statusEl) {
+      statusEl.textContent = "❌ Errore durante il salvataggio.";
+      statusEl.className = "status-message status-error";
+      statusEl.classList.remove("hidden");
+    }
+  }
+}
+
+async function markOrderAsDelivered() {
+  if (!currentEanInProcess || !currentEanInProcess.objectId) {
+    if (typeof showFeedback === "function") {
+      showFeedback("Nessun ordine selezionato.", "error");
+    } else {
+      alert("Nessun ordine selezionato.");
+    }
+    return;
+  }
+
+  const ok = confirm("Vuoi segnare questo ordine come CONSEGNATO?");
+  if (!ok) return;
+
+  try {
+    await Backendless.Data.of(ORDER_TABLE_NAME).save({
+      objectId: currentEanInProcess.objectId,
+      status: "Consegnato",
+      lastUpdated: new Date(),
+    });
+
+    if (typeof showFeedback === "function") {
+      showFeedback("📦 Ordine segnato come consegnato.", "success");
+    }
+
+    resetEanActionState(false);
+    loadOrdersForUser(currentRole);
+  } catch (err) {
+    console.error("Errore durante l'aggiornamento stato consegnato:", err);
+    if (typeof showFeedback === "function") {
+      showFeedback("❌ Errore durante l'aggiornamento dello stato.", "error");
+    } else {
+      alert("Errore durante l'aggiornamento dello stato.");
+    }
   }
 }
 
