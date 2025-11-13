@@ -1,6 +1,6 @@
-// ======================================================
+// =====================================================
 // CONFIGURAZIONE BACKENDLESS E COSTANTI
-// ======================================================
+// =====================================================
 const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C';
 const API_KEY         = 'B266000F-684B-4889-9174-2D1734001E08';
 
@@ -1031,30 +1031,40 @@ async function loadOrdersForUser(role) {
 /** apre la stessa maschera di admin ma per un worker (rispettando i permessi) */
 async function openWorkerOrderEditor(orderId) {
   try {
-    const order = await Backendless.Data.of(ORDER_TABLE_NAME).findById(orderId);
+    const order = await Backendless.Data.of("Orders").findById(orderId);
 
     if (!order) {
-      if (typeof showFeedback === "function") {
-        showFeedback("❌ Impossibile aprire il dettaglio: ordine non trovato.", "error");
-      } else {
-        alert("Ordine non trovato.");
-      }
+      showToast("❌ Ordine non trovato!", "error");
       return;
     }
 
-    // Usa lo stesso editor del flusso EAN
+    // Forza ruolo per sicurezza
+    if (!currentRole) currentRole = ROLES.PHOTOGRAPHER;
+
+    // Mostra maschera operativa (come Conferma EAN)
     openOperationalEditor(order);
 
-    if (typeof showFeedback === "function") {
-      showFeedback(`📸 Dettaglio aperto per ${order.eanCode || order.productCode}`, "info");
-    }
+    // Mostra la parte verde dei link Drive
+    const uploadArea = document.getElementById("photo-upload-area");
+    uploadArea.classList.remove("hidden");
+
+    // Aggiorna etichetta EAN in testa alla card verde
+    document.getElementById("current-ean-display-upload").textContent =
+      order.eanCode || order.productCode;
+
+    // Precarica link già salvati
+    document.getElementById("photo-drive-links").value =
+      (order.driveLinks || []).join("\n");
+
+    // Imposta ordine corrente per salvataggio
+    currentEanInProcess = {
+      objectId: order.objectId,
+      ean: order.eanCode || order.productCode
+    };
+
   } catch (err) {
-    console.error("Errore durante l'apertura del dettaglio:", err);
-    if (typeof showFeedback === "function") {
-      showFeedback("❌ Errore durante l'apertura del dettaglio ordine.", "error");
-    } else {
-      alert("Errore durante l'apertura del dettaglio ordine.");
-    }
+    console.error("Errore apertura ordine lavoratore:", err);
+    showToast("Impossibile aprire il dettaglio.", "error");
   }
 }
 
@@ -1617,4 +1627,3 @@ window.onload = function() {
       showLoginArea();
     });
 };
-
