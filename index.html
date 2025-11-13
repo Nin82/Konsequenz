@@ -137,37 +137,19 @@
                class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
           </div>
 
-          <!-- UPLOAD DRIVE -->
-          <div id="photo-upload-area"
-               class="hidden mt-6 p-4 border border-dashed border-green-400 rounded-lg bg-green-50">
-            <h4 class="font-bold text-lg mb-3 text-green-700">
-              EAN: <span id="current-ean-display-upload"></span>
-            </h4>
+         <!-- Upload Foto (solo per ruolo Photographer) -->
+             <div id="photo-upload-area"
+             class="hidden mt-6 p-4 border border-green-300 rounded-lg bg-green-50">
 
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Inserisci link Google Drive (uno per riga):
-            </label>
+              <h4 class="font-bold text-md mb-2 text-green-700">
+               Link Foto per EAN: <span id="current-ean-display-upload"></span>
+                </h4>
 
-            <textarea id="photo-drive-links"
-                      class="w-full p-2 border border-green-300 rounded-md h-32 mb-4 resize-y"
-                      placeholder="https://drive.google.com/..."></textarea>
+               <textarea id="photo-drive-links"
+            placeholder="Inserisci i link Google Drive (uno per riga)"
+            class="w-full p-2 border rounded-md h-28 mb-3 resize-y"></textarea>
 
-            <div class="flex space-x-3">
-              <button onclick="handlePhotoUploadAndCompletion()"
-                      class="btn-success flex-grow py-2">
-                Salva Link & Completa
-              </button>
-
-              <button onclick="resetEanActionState(true)"
-                      class="btn-secondary py-2 px-4">
-                Annulla
-              </button>
-            </div>
-
-            <p id="upload-status-message"
-               class="status-message status-success hidden mt-3"></p>
-          </div>
-        </div>
+         </div>
 
         <!-- ORDINI IN CODA -->
         <div class="card lg:col-span-3">
