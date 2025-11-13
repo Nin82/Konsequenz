@@ -87,10 +87,10 @@ const ROLE_CONFIG = {
     filter: `status = '${STATUS.WAITING_PHOTO}'`,
     columns: ["productCode", "eanCode", "brand", "color", "size", "status", "driveLinks"],
     actions: order => `
-      <button class="btn-success px-3 py-1 text-sm"
-              onclick="openWorkerOrderEditor('${order.objectId}')">
-        Apri Dettaglio
-      </button>`
+  <button class="btn-primary px-3 py-1 text-sm"
+          onclick="openWorkerOrderEditor('${order.objectId}')">
+    Modifica 
+  </button>`
   },
   [ROLES.POST_PRODUCER]: {
     filter: `status = '${STATUS.WAITING_POST_PRODUCTION}'`,
@@ -507,28 +507,27 @@ function populateEditableFieldsCheckboxes() {
 }
 
 function openPermissionsModal(user) {
-  permissionsTargetUser = user;
-  const modal = document.getElementById('permissions-modal');
-  const list = document.getElementById('permissions-list');
-  if (!modal || !list) return;
+  currentEditingUser = user;
 
-  list.innerHTML = '';
+  const modal = document.getElementById("permissions-modal");
+  modal.classList.remove("hidden");
 
-  const existing = Array.isArray(user.editableFields) ? user.editableFields : [];
+  const list = document.getElementById("permissions-list");
+  list.innerHTML = "";
 
-  ORDER_FIELDS.forEach(f => {
-    const div = document.createElement('div');
-    div.className = "flex items-center gap-2";
-    const checked = existing.includes(f.key) ? "checked" : "";
-    div.innerHTML = `
-      <input type="checkbox" id="perm-${f.key}" value="${f.key}" class="rounded border-gray-300" ${checked}>
-      <label for="perm-${f.key}" class="text-sm text-gray-700">${f.label}</label>
+  const saved = Array.isArray(user.editableFields) ? user.editableFields : [];
+
+  Object.entries(OPERATIONAL_FIELDS).forEach(([key, label]) => {
+    const id = `perm-${key}`;
+    const checked = saved.includes(key) ? "checked" : "";
+
+    list.innerHTML += `
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" id="${id}" value="${key}" ${checked}>
+        <span>${label}</span>
+      </label>
     `;
-    list.appendChild(div);
   });
-
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
 }
 
 function closePermissionsModal() {
@@ -539,31 +538,40 @@ function closePermissionsModal() {
   permissionsTargetUser = null;
 }
 
-function saveUserPermissions() {
-  if (!permissionsTargetUser) {
-    closePermissionsModal();
-    return;
-  }
-  const selected = [];
-  document.querySelectorAll('#permissions-list input[type="checkbox"]:checked')
-    .forEach(cb => selected.push(cb.value));
+async function saveUserPermissions() {
+  try {
+    if (!currentEditingUser) {
+      showToast("❌ Nessun utente selezionato.", "error");
+      return;
+    }
 
-  const update = {
-    objectId: permissionsTargetUser.objectId,
-    editableFields: selected
-  };
-
-  Backendless.Data.of(USER_TABLE_NAME).save(update)
-    .then(() => {
-      showToast("Permessi aggiornati con successo âœ…", "success");
-      closePermissionsModal();
-      loadUsersAndRoles();
-    })
-    .catch(err => {
-      console.error("Errore salvataggio permessi:", err);
-      showToast("Errore durante il salvataggio dei permessi.", "error");
+    // Preleva tutte le checkbox selezionate
+    const selected = [];
+    document.querySelectorAll("#permissions-list input[type='checkbox']").forEach(cb => {
+      if (cb.checked) selected.push(cb.value);
     });
+
+    // Aggiorna il record utente
+    const updatedUser = {
+      objectId: currentEditingUser.objectId,
+      editableFields: selected
+    };
+
+    await Backendless.Data.of(USER_TABLE_NAME).save(updatedUser);
+
+    showToast("✅ Permessi aggiornati con successo!", "success");
+
+    closePermissionsModal();
+
+    // Ricarica lista utenti
+    loadUsersAndRoles();
+
+  } catch (err) {
+    console.error("Errore salvataggio permessi:", err);
+    showToast("❌ Errore durante il salvataggio permessi.", "error");
+  }
 }
+
 
 /**
  * Abilita/disabilita i campi di un contenitore in base ai permessi dell'utente corrente.
@@ -1220,82 +1228,109 @@ async function confirmEanInput() {
 
 // Salva i dati operativi da maschera worker
 async function saveEanUpdates() {
+  const statusEl = document.getElementById("update-status");
+
   if (!currentEanInProcess || !currentEanInProcess.objectId) {
-    showFeedback("âš ï¸ Nessun EAN attivo. Scannerizza un codice prima.", 'error');
+    statusEl.textContent = "Errore: nessun ordine in modifica.";
+    statusEl.className = "status-message status-error";
+    statusEl.classList.remove("hidden");
     return;
   }
-  const objectId = currentEanInProcess.objectId;
-  const updatedOrder = { objectId };
 
-  ORDER_FIELDS.forEach(f => {
-    const el = document.getElementById(`field-${f.key}`);
-    if (!el) return;
-    updatedOrder[f.key] = parseValueFromInput(f.type, el.value);
-  });
-  updatedOrder.lastUpdated = new Date();
+  const orderId = currentEanInProcess.objectId;
 
   try {
-    showFeedback("â³ Salvataggio in corso...", 'info');
-    await Backendless.Data.of(ORDER_TABLE_NAME).save(updatedOrder);
+    // Ricarico l’ordine per evitare dati obsoleti
+    let order = await Backendless.Data.of("Orders").findById(orderId);
 
-    showFeedback(`âœ… Aggiornamenti per ${currentEanInProcess.ean} salvati correttamente!`, 'success');
+    if (!order) {
+      statusEl.textContent = "❌ Ordine non trovato.";
+      statusEl.className = "status-message status-error";
+      statusEl.classList.remove("hidden");
+      return;
+    }
 
-    setTimeout(async () => {
-      resetEanActionState(false);
-      try {
-        const updatedUser = await Backendless.UserService.getCurrentUser();
-        const reloadedRole = await getRoleFromUser(updatedUser);
-        currentUser = updatedUser;
-        currentRole = reloadedRole;
-        loadOrdersForUser(reloadedRole);
-      } catch (err) {
-        console.error("Errore nel ricaricare utente/ruolo:", err);
-        loadOrdersForUser(currentRole);
+    // --- Mappa campi operativi ---
+    const fieldMap = {
+      "field-shots": "shots",
+      "field-quantity": "quantity",
+      "field-s1-prog": "s1Prog",
+      "field-s2-prog": "s2Prog",
+      "field-prog-on-model": "progOnModel",
+      "field-still-shot": "stillShot",
+      "field-onmodel-shot": "onModelShot",
+      "field-priority": "priority",
+      "field-s1-stylist": "s1Stylist",
+      "field-s2-stylist": "s2Stylist",
+      "field-provenienza": "provenienza",
+      "field-tipologia": "tipologia",
+      "field-ordine": "ordine",
+      "field-data-ordine": "dataOrdine",
+      "field-entry-date": "entryDate",
+      "field-exit-date": "exitDate",
+      "field-collo": "collo",
+      "field-data-reso": "dataReso",
+      "field-ddt": "ddt",
+      "field-note-logistica": "noteLogistica",
+      "field-data-presa-post": "dataPresaPost",
+      "field-data-consegna-post": "dataConsegnaPost",
+      "field-calendario": "calendario",
+      "field-postpresa": "postPresa",
+    };
+
+    // --- Aggiorna campi modificabili ---
+    for (const [inputId, prop] of Object.entries(fieldMap)) {
+      const el = document.getElementById(inputId);
+      if (!el || el.disabled) continue; // rispetto permessi
+
+      let value = el.value;
+
+      // Gestione speciali
+      if (el.type === "date" && value) {
+        value = new Date(value).toISOString(); // ⚠ Backendless accetta solo ISO
       }
-    }, 1000);
-  } catch (err) {
-    console.error("Errore durante il salvataggio:", err);
-    showFeedback(`âŒ Errore durante il salvataggio su Backendless. ${err.message || ''}`, 'error');
-  }
-}
 
-async function handlePhotoUploadAndCompletion() {
-  const status = document.getElementById('upload-status-message');
-  const linksInput = document.getElementById('photo-drive-links');
+      if (el.tagName === "SELECT" && (value === "true" || value === "false")) {
+        value = value === "true";
+      }
 
-  if (!currentEanInProcess || !currentEanInProcess.objectId) {
-    status.textContent = 'Nessun EAN attivo.';
-    status.classList.remove('hidden');
-    return;
-  }
+      order[prop] = value;
+    }
 
-  const linksRaw = linksInput.value.trim();
-  if (!linksRaw) {
-    status.textContent = 'Inserisci almeno un link Google Drive.';
-    status.classList.remove('hidden');
-    return;
-  }
+    // --- Salvataggio Drive link (solo fotografo) ---
+    if (currentRole === ROLES.PHOTOGRAPHER) {
+      const rawLinks = document.getElementById("photo-drive-links")?.value.trim() || "";
 
-  const driveLinks = linksRaw.split('\n').map(l => l.trim()).filter(l => l !== '');
+      const driveLinks = rawLinks
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
 
-  status.textContent = 'Salvataggio link in corso...';
-  status.classList.remove('hidden');
+      if (driveLinks.length > 0) {
+        order.driveLinks = driveLinks;
+        order.status = "completed"; // ✔ Ordine completato dal fotografo
+      }
+    }
 
-  try {
-    await Backendless.Data.of(ORDER_TABLE_NAME).save({
-      objectId: currentEanInProcess.objectId,
-      driveLinks,
-      status: STATUS.WAITING_POST_PRODUCTION,
-      lastUpdated: new Date()
-    });
+    // --- Salvataggio su Backendless ---
+    await Backendless.Data.of("Orders").save(order);
 
-    status.textContent = 'Link salvati e ordine aggiornato con successo!';
-    linksInput.value = '';
-    resetEanActionState(false);
-    loadOrdersForUser(currentRole);
+    // Messaggio conferma
+    statusEl.textContent = "✔ Modifiche salvate con successo.";
+    statusEl.className = "status-message status-success";
+    statusEl.classList.remove("hidden");
+
+    // Chiudi maschera dopo mezzo secondo
+    setTimeout(() => {
+      resetEanActionState();
+      loadOrdersForUser(currentRole);
+    }, 600);
+
   } catch (error) {
-    console.error('Errore durante il salvataggio link:', error);
-    status.textContent = 'Errore durante il salvataggio dei link.';
+    console.error("Errore salvataggio EAN:", error);
+    statusEl.textContent = "❌ Errore durante il salvataggio.";
+    statusEl.className = "status-message status-error";
+    statusEl.classList.remove("hidden");
   }
 }
 
