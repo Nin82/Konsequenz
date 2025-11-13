@@ -1040,13 +1040,25 @@ async function openWorkerOrderEditor(orderId) {
     // Riempie EAN display
     document.getElementById("current-ean-display").textContent = order.eanCode;
 
-    // IMPOSTA IL CODICE EAN NEL BOX SCANSIONE
+    // Imposta il codice nel box scansione
     document.getElementById("ean-input").value = order.eanCode;
 
-    // CARICA CAMPi OPERATIVi (controlli permessi)
-    loadOperationalFields(order);
+    // Costruisce campi se necessario
+    buildWorkerOperationalFields();
 
-    // CARICA LINK FOTO SE ESISTENTI
+    // Popola campi operativi
+    ORDER_FIELDS.forEach(f => {
+      const el = document.getElementById(`field-${f.key}`);
+      if (!el) return;
+
+      if (f.type === "date") {
+        el.value = formatDateForInput(order[f.key]);
+      } else {
+        el.value = order[f.key] || "";
+      }
+    });
+
+    // Drive links
     if (order.driveLinks && order.driveLinks.length > 0) {
       document.getElementById("photo-upload-area").classList.remove("hidden");
       document.getElementById("current-ean-display-upload").textContent = order.eanCode;
@@ -1055,6 +1067,15 @@ async function openWorkerOrderEditor(orderId) {
       document.getElementById("photo-upload-area").classList.add("hidden");
       document.getElementById("photo-drive-links").value = "";
     }
+
+    // Permessi
+    applyFieldPermissions("ean-actions-area");
+
+    // Salva stato corrente
+    currentEanInProcess = {
+      objectId: order.objectId,
+      ean: order.eanCode
+    };
 
   } catch (err) {
     console.error("Errore nell'aprire l'editor:", err);
@@ -1118,11 +1139,11 @@ function resetEanActionState(hideAll = false) {
   document.getElementById("operational-fields").innerHTML = "";
 
   // SECTION FOTO
-  document.getElementById("photo-upload-area").classList.add("hidden");
+  const photo = document.getElementById("photo-upload-area");
+  photo.classList.add("hidden"); // ← UNICO MODO GIUSTO
   document.getElementById("current-ean-display-upload").textContent = "";
   document.getElementById("photo-drive-links").value = "";
 
-  // HIDE CARD COMPLETA (se richiesto)
   if (hideAll) {
     document.getElementById("ean-actions-area").classList.add("hidden");
   }
@@ -1329,20 +1350,19 @@ async function saveEanUpdates() {
     // --------------------------
 
     if (currentRole === ROLES.PHOTOGRAPHER) {
-      const raw = document.getElementById("photo-drive-links")?.value.trim() || "";
+  const raw = document.getElementById("photo-drive-links")?.value.trim() || "";
 
-      const driveLinks = raw
-        .split("\n")
-        .map(l => l.trim())
-        .filter(l => l !== "");
+  const driveLinks = raw
+    .split("\n")
+    .map(l => l.trim())
+    .filter(l => l !== "");
 
-      order.driveLinks = driveLinks;
+  order.driveLinks = driveLinks;
 
-      // Ordine completato se ho almeno 1 link
-      if (driveLinks.length > 0) {
-        order.status = STATUS.COMPLETED_PHOTO || "completed";
-      }
-    }
+  if (driveLinks.length > 0) {
+    order.status = STATUS.COMPLETED; // ← quello giusto
+  }
+}
 
     // --------------------------
     //   SALVA SU BACKENDLESS
