@@ -111,14 +111,8 @@
             <h4 class="font-semibold text-gray-700 mb-3 flex justify-between items-center">
               Dati Operativi EAN:
               <span id="current-ean-display"></span>
-
-              <button onclick="resetEanActionState(true)"
-                      class="btn-secondary py-1 px-3 text-sm font-medium">
-                &times; Chiudi
-              </button>
             </h4>
 
-            <!-- Qui JS inietterà i campi dinamici -->
             <div id="operational-fields" class="space-y-3"></div>
 
             <div class="mt-4 flex space-x-3">
@@ -138,19 +132,19 @@
                class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
           </div>
 
-          <!-- UPLOAD LINK DRIVE (solo per Photographer, gestito da JS) -->
-          <div id="photo-upload-area"
-               class="hidden mt-6 p-4 border border-green-300 rounded-lg bg-green-50">
+         <!-- Upload Foto (solo per ruolo Photographer) -->
+             <div id="photo-upload-area"
+             class="hidden mt-6 p-4 border border-green-300 rounded-lg bg-green-50">
 
-            <h4 class="font-bold text-md mb-2 text-green-700">
-              Link Foto per EAN: <span id="current-ean-display-upload"></span>
-            </h4>
+              <h4 class="font-bold text-md mb-2 text-green-700">
+               Link Foto per EAN: <span id="current-ean-display-upload"></span>
+                </h4>
 
-            <textarea id="photo-drive-links"
-                      placeholder="Inserisci i link Google Drive (uno per riga)"
-                      class="w-full p-2 border rounded-md h-28 mb-3 resize-y"></textarea>
-          </div>
-        </div>
+               <textarea id="photo-drive-links"
+            placeholder="Inserisci i link Google Drive (uno per riga)"
+            class="w-full p-2 border rounded-md h-28 mb-3 resize-y"></textarea>
+
+         </div>
 
         <!-- ORDINI IN CODA -->
         <div class="card lg:col-span-3">
@@ -482,7 +476,6 @@
 
   </div> <!-- fine main-content -->
 
-  <!-- JS principale -->
   <script src="app.js" defer></script>
 </body>
 </html>
