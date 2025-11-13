@@ -189,17 +189,7 @@
         <option value="Admin">Admin</option>
       </select>
     </div>
-    
-    <!-- Sezione campi modificabili (visibile solo se non Admin) -->
-<div id="editable-fields-section" class="mt-6 border-t pt-4 hidden">
-  <h5 class="text-md font-semibold mb-3 text-gray-700">
-    Seleziona i campi modificabili per questo utente:
-  </h5>
-  <div id="editable-fields-container" class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-700">
-    <!-- verrà popolato dinamicamente da JS -->
-  </div>
-</div>
-	
+
     <!-- 🔧 Campi modificabili (definiti dall'Admin) -->
     <div class="mt-4">
       <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -300,8 +290,8 @@
         </div>
       </div>
 
-<!-- 🔧 MODALE ASSEGNAZIONE ORDINE -->
-<div id="assign-modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+      <!-- Modifica Ordine Admin -->
+      <div id="assign-modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
   <div class="bg-white rounded-lg shadow-lg p-6 w-96">
     <h3 class="text-xl font-bold mb-3 text-gray-800">Assegna Ordine</h3>
     <p id="assign-ean-display" class="text-sm text-gray-600 mb-3"></p>
@@ -316,11 +306,11 @@
       <button onclick="closeAssignModal()" class="btn-secondary px-3 py-2">Annulla</button>
     </div>
   </div>
-</div>
-<!-- 🔚 FINE SEZIONE ADMIN DASHBOARD -->
-</div> <!-- 👈 chiude #admin-dashboard -->
-/div>
-<!-- JS principale -->
-<script src="app.js" defer></script>
+    </div>
+
+  </div>
+
+  <!-- JS principale -->
+  <script src="app.js" defer></script>
 </body>
 </html>
