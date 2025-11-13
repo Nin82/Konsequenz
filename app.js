@@ -764,27 +764,32 @@ async function loadAllOrdersForAdmin(highlightId = null) {
 async function handleAdminEdit(order) {
   if (!order) return;
 
-  // Nascondi tabella principale
+  // Nascondi tabella principale (ID ESATTO del tuo HTML)
   const ordersCard = document.getElementById('orders-admin-card');
   if (ordersCard) ordersCard.classList.add('hidden');
 
   // Mostra la card di modifica
   const editCard = document.getElementById('admin-order-edit-card');
+  if (!editCard) {
+    console.error("❌ ERRORE: #admin-order-edit-card non trovato!");
+    showToast("Impossibile aprire la maschera di modifica.", "error");
+    return;
+  }
   editCard.classList.remove('hidden');
 
-  // Mostra intestazione EAN
+  // Intestazione
   const eanDisplay = document.getElementById('admin-ean-display');
   if (eanDisplay) eanDisplay.textContent = order.eanCode || order.productCode || '';
 
-  // ✅ Contenitore corretto in base al tuo HTML
+  // Contenitore dinamico
   const container = document.getElementById("admin-order-fields");
   if (!container) {
-    console.error("❌ ERRORE: elemento #admin-order-fields non trovato nel DOM.");
+    console.error("❌ ERRORE: elemento #admin-order-fields non trovato.");
     return;
   }
-  container.innerHTML = ""; // pulisci prima
+  container.innerHTML = ""; // pulizia
 
-  // Definizione campi con tipo input
+  // Campo → tipo input
   const fields = {
     productCode: "text",
     eanCode: "text",
@@ -821,18 +826,33 @@ async function handleAdminEdit(order) {
     postPresa: "text"
   };
 
-  // Genera dinamicamente i campi
+  // Generazione dinamica
   for (const [key, type] of Object.entries(fields)) {
-    const value = order[key] ?? "";
-    let inputHTML = "";
+    let value = order[key] ?? "";
 
+    // Normalizza date → yyyy-MM-dd
+    if (type === "date" && value) {
+      try {
+        const d = new Date(value);
+        if (!isNaN(d.getTime())) {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          value = `${yyyy}-${mm}-${dd}`;
+        }
+      } catch (e) {
+        value = "";
+      }
+    }
+
+    // Select boolean SI/NO
+    let inputHTML = "";
     if (type === "boolean") {
       inputHTML = `
         <select id="admin-field-${key}" class="border rounded p-2 w-full">
-          <option value="true" ${value === true ? "selected" : ""}>Sì</option>
+          <option value="true"  ${value === true  ? "selected" : ""}>Sì</option>
           <option value="false" ${value === false ? "selected" : ""}>No</option>
-        </select>
-      `;
+        </select>`;
     } else {
       inputHTML = `<input type="${type}" id="admin-field-${key}" value="${value}" class="border rounded p-2 w-full">`;
     }
@@ -840,16 +860,17 @@ async function handleAdminEdit(order) {
     const fieldEl = document.createElement("div");
     fieldEl.innerHTML = `
       <label class="block text-sm font-medium text-gray-700 mb-1">${key}</label>
-      ${inputHTML}
-    `;
+      ${inputHTML}`;
     container.appendChild(fieldEl);
   }
 
-  // Applica permessi (Admin = tutto, altri = solo campi editabili)
+  // Applica permessi dinamici
   applyFieldPermissions("admin-order-edit-card");
 
-  // Memorizza l’ordine corrente
+  // Salva ordine in memoria
   currentAdminOrder = order;
+
+  showToast("📄 Maschera di modifica aperta", "info");
 }
 
 async function openWorkerOrderEditor(orderId) {
@@ -860,19 +881,17 @@ async function openWorkerOrderEditor(orderId) {
       return;
     }
 
-    // Apre la stessa maschera usata dagli admin
-    handleAdminEdit(order);
+    await handleAdminEdit(order); // stesso editor usato dagli admin
 
-    // Disabilita i campi non permessi in base ai permessi del fotografo
-    applyFieldPermissions('admin-order-edit-card');
+    // Rende read-only i campi non permessi
+    applyFieldPermissions("admin-order-edit-card");
 
     showToast(`📸 Modifica ordine ${order.eanCode || order.productCode}`, "info");
   } catch (err) {
-    console.error("Errore durante l'apertura dell'ordine:", err);
+    console.error("Errore apertura ordine:", err);
     showToast("Errore durante l'apertura dell'ordine.", "error");
   }
 }
-
 
 
 /**
@@ -1707,4 +1726,3 @@ window.onload = function() {
       showLoginArea();
     });
 };
-
