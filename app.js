@@ -1030,16 +1030,35 @@ async function loadOrdersForUser(role) {
 /** apre la stessa maschera di admin ma per un worker (rispettando i permessi) */
 async function openWorkerOrderEditor(orderId) {
   try {
-    const order = await Backendless.Data.of(ORDER_TABLE_NAME).findById(orderId);
-    if (!order) {
-      showToast("âŒ Ordine non trovato!", "error");
-      return;
+    const order = await Backendless.Data.of("Orders").findById(orderId);
+
+    if (!order) return alert("Ordine non trovato");
+
+    // Mostra sezione operativa
+    document.getElementById("ean-actions-area").classList.remove("hidden");
+
+    // Riempie EAN display
+    document.getElementById("current-ean-display").textContent = order.eanCode;
+
+    // IMPOSTA IL CODICE EAN NEL BOX SCANSIONE
+    document.getElementById("ean-input").value = order.eanCode;
+
+    // CARICA CAMPi OPERATIVi (controlli permessi)
+    loadOperationalFields(order);
+
+    // CARICA LINK FOTO SE ESISTENTI
+    if (order.driveLinks && order.driveLinks.length > 0) {
+      document.getElementById("photo-upload-area").classList.remove("hidden");
+      document.getElementById("current-ean-display-upload").textContent = order.eanCode;
+      document.getElementById("photo-drive-links").value = order.driveLinks.join("\n");
+    } else {
+      document.getElementById("photo-upload-area").classList.add("hidden");
+      document.getElementById("photo-drive-links").value = "";
     }
-    handleAdminEdit(order); // riusa la stessa maschera
-    applyFieldPermissions('admin-order-edit-card');
+
   } catch (err) {
-    console.error("Errore apertura ordine worker:", err);
-    showToast("Errore durante l'apertura dell'ordine.", "error");
+    console.error("Errore nell'aprire l'editor:", err);
+    alert("Impossibile aprire il dettaglio.");
   }
 }
 
@@ -1090,16 +1109,22 @@ function showFeedback(message, type) {
   }, 3000);
 }
 
-function resetEanActionState(showCancelFeedback = false) {
-  const eanActions = document.getElementById('ean-actions-area');
-  if (eanActions) eanActions.classList.add('hidden');
-  const photoUploadArea = document.getElementById('photo-upload-area');
-  if (photoUploadArea) photoUploadArea.classList.add('hidden');
-  const eanInput = document.getElementById('ean-input');
-  if (eanInput) eanInput.value = '';
-  currentEanInProcess = null;
-  if (showCancelFeedback) {
-    showFeedback("Operazione di aggiornamento annullata.", 'info');
+function resetEanActionState(hideAll = false) {
+
+  document.getElementById("ean-input").value = "";
+  document.getElementById("current-ean-display").textContent = "";
+
+  // CAMPI OPERATIVI
+  document.getElementById("operational-fields").innerHTML = "";
+
+  // SECTION FOTO
+  document.getElementById("photo-upload-area").classList.add("hidden");
+  document.getElementById("current-ean-display-upload").textContent = "";
+  document.getElementById("photo-drive-links").value = "";
+
+  // HIDE CARD COMPLETA (se richiesto)
+  if (hideAll) {
+    document.getElementById("ean-actions-area").classList.add("hidden");
   }
 }
 
@@ -1240,7 +1265,7 @@ async function saveEanUpdates() {
   const orderId = currentEanInProcess.objectId;
 
   try {
-    // Ricarico l’ordine per evitare dati obsoleti
+    // Ricarico l’ordine aggiornato
     let order = await Backendless.Data.of("Orders").findById(orderId);
 
     if (!order) {
@@ -1250,7 +1275,9 @@ async function saveEanUpdates() {
       return;
     }
 
-    // --- Mappa campi operativi ---
+    // --------------------------
+    //  AGGIORNA I CAMPI OPERATIVI
+    // --------------------------
     const fieldMap = {
       "field-shots": "shots",
       "field-quantity": "quantity",
@@ -1278,18 +1305,18 @@ async function saveEanUpdates() {
       "field-postpresa": "postPresa",
     };
 
-    // --- Aggiorna campi modificabili ---
     for (const [inputId, prop] of Object.entries(fieldMap)) {
       const el = document.getElementById(inputId);
-      if (!el || el.disabled) continue; // rispetto permessi
+      if (!el || el.disabled) continue;
 
       let value = el.value;
 
-      // Gestione speciali
+      // converti date in ISO
       if (el.type === "date" && value) {
-        value = new Date(value).toISOString(); // ⚠ Backendless accetta solo ISO
+        value = new Date(value).toISOString();
       }
 
+      // select booleano
       if (el.tagName === "SELECT" && (value === "true" || value === "false")) {
         value = value === "true";
       }
@@ -1297,32 +1324,37 @@ async function saveEanUpdates() {
       order[prop] = value;
     }
 
-    // --- Salvataggio Drive link (solo fotografo) ---
-    if (currentRole === ROLES.PHOTOGRAPHER) {
-      const rawLinks = document.getElementById("photo-drive-links")?.value.trim() || "";
+    // --------------------------
+    //   SALVATAGGIO LINK FOTO
+    // --------------------------
 
-      const driveLinks = rawLinks
+    if (currentRole === ROLES.PHOTOGRAPHER) {
+      const raw = document.getElementById("photo-drive-links")?.value.trim() || "";
+
+      const driveLinks = raw
         .split("\n")
         .map(l => l.trim())
-        .filter(l => l.length > 0);
+        .filter(l => l !== "");
 
+      order.driveLinks = driveLinks;
+
+      // Ordine completato se ho almeno 1 link
       if (driveLinks.length > 0) {
-        order.driveLinks = driveLinks;
-        order.status = "completed"; // ✔ Ordine completato dal fotografo
+        order.status = STATUS.COMPLETED_PHOTO || "completed";
       }
     }
 
-    // --- Salvataggio su Backendless ---
+    // --------------------------
+    //   SALVA SU BACKENDLESS
+    // --------------------------
     await Backendless.Data.of("Orders").save(order);
 
-    // Messaggio conferma
     statusEl.textContent = "✔ Modifiche salvate con successo.";
     statusEl.className = "status-message status-success";
     statusEl.classList.remove("hidden");
 
-    // Chiudi maschera dopo mezzo secondo
     setTimeout(() => {
-      resetEanActionState();
+      resetEanActionState(true);
       loadOrdersForUser(currentRole);
     }, 600);
 
@@ -1333,7 +1365,6 @@ async function saveEanUpdates() {
     statusEl.classList.remove("hidden");
   }
 }
-
 
 // =====================================================
 // DASHBOARD ADMIN (STATISTICHE + CHART)
