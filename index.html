@@ -103,63 +103,58 @@
             Conferma EAN
           </button>
 
-          <p id="scan-status" class="status-message status-info hidden"></p>
+          <p id="scan-status" class="status-message status-info hidden mt-3"></p>
 
-          <!-- SEZIONE OPERATIVA -->
+          <!-- SEZIONE OPERATIVA (dati EAN + campi) -->
           <div id="ean-actions-area"
                class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
-            <h4 class="font-semibold text-gray-700 mb-3 flex justify-between items-center">
-              Dati Operativi EAN:
-              <span id="current-ean-display"></span>
 
-
+            <h4 class="font-semibold text-gray-700 mb-3">
+              Dati Operativi EAN: <span id="current-ean-display" class="font-mono"></span>
             </h4>
 
-            <!-- Qui JS inietterà i campi dinamici -->
+            <!-- campi dinamici generati da JS -->
             <div id="operational-fields" class="space-y-3"></div>
 
-            <div class="mt-4 flex space-x-3">
+            <!-- AREA LINK DRIVE (solo Fotografo) -->
+            <div id="photo-upload-area"
+                 class="hidden mt-6 p-4 border border-green-300 rounded-lg bg-green-50">
+              <h5 class="font-semibold text-green-700 mb-2">
+                Link Google Drive per EAN: <span id="current-ean-display-upload" class="font-mono"></span>
+              </h5>
+              <textarea id="photo-drive-links"
+                        class="w-full p-2 border border-green-300 rounded-md h-24 mb-3 resize-y"
+                        placeholder="Inserisci un link per riga..."></textarea>
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-3">
               <button id="confirm-ean-updates"
                       class="btn-success py-2 px-4"
                       onclick="saveEanUpdates()">
-                Salva modifiche
+                Conferma Modifiche
+              </button>
+
+              <button onclick="markOrderDeliveredFromWorker()"
+                      class="btn-warning py-2 px-4">
+                Segna come consegnato
               </button>
 
               <button onclick="resetEanActionState(true)"
                       class="btn-secondary py-2 px-4">
                 Annulla
               </button>
-
-		<button onclick="markOrderAsDelivered()"
-                class="btn-warning py-2 px-4">
-                Segna come consegnato
-                </button>		
-
             </div>
 
             <p id="update-status"
                class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
-          </div>
-
-          <!-- UPLOAD LINK DRIVE (solo per Photographer, gestito da JS) -->
-          <div id="photo-upload-area"
-               class="hidden mt-6 p-4 border border-green-300 rounded-lg bg-green-50">
-
-            <h4 class="font-bold text-md mb-2 text-green-700">
-              Link Foto per EAN: <span id="current-ean-display-upload"></span>
-            </h4>
-
-            <textarea id="photo-drive-links"
-                      placeholder="Inserisci i link Google Drive (uno per riga)"
-                      class="w-full p-2 border rounded-md h-28 mb-3 resize-y"></textarea>
           </div>
         </div>
 
         <!-- ORDINI IN CODA -->
         <div class="card lg:col-span-3">
           <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-            2. Ordini in Coda per <span id="worker-role-display-queue"
-              class="text-indigo-600"></span>
+            2. Ordini in Coda per
+            <span id="worker-role-display-queue" class="text-indigo-600"></span>
           </h3>
 
           <p id="loading-orders" class="text-gray-500 p-4">
@@ -171,19 +166,14 @@
                    class="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr>
-                  <th>Codice Articolo</th>
-                  <th>EAN</th>
-                  <th>Brand</th>
-                  <th>Colore</th>
-                  <th>Taglia</th>
-                  <th>Stato</th>
-                  <th>Azioni</th>
+                  <!-- intestazioni generate da JS in base a ROLE_CONFIG -->
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
         </div>
+
       </div>
     </div>
 
@@ -195,7 +185,7 @@
       </h2>
 
       <!-- TOGGLE SEZIONI -->
-      <div class="admin-toggle-controls flex gap-6 items-center mb-6">
+      <div class="admin-toggle-controls flex flex-wrap gap-6 items-center mb-6">
         <label class="flex items-center gap-2">
           <input type="checkbox" id="toggle-users-card" checked />
           <span>Mostra Gestione Utenti e Ruoli</span>
@@ -229,14 +219,12 @@
 
         <!-- GESTIONE UTENTI -->
         <div id="card-users" class="card lg:col-span-2">
-
           <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">
             Gestione Utenti e Ruoli
           </h3>
 
           <!-- CREAZIONE UTENTE -->
           <div class="mb-6 p-6 border border-gray-200 rounded-lg bg-gray-50 shadow-inner">
-
             <h4 class="font-bold text-lg mb-3">Crea Nuovo Utente</h4>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -244,9 +232,11 @@
               <input type="password" id="new-user-password" placeholder="Password Iniziale" />
               <select id="new-user-role">
                 <option value="" disabled selected>Seleziona Ruolo</option>
+                <option value="Admin">Admin</option>
+                <option value="Warehouse">Magazzino</option>
                 <option value="Photographer">Photographer</option>
                 <option value="PostProducer">Post Producer</option>
-                <option value="Admin">Admin</option>
+                <option value="Partner">Partner</option>
               </select>
             </div>
 
@@ -258,6 +248,7 @@
               </h5>
               <div id="editable-fields-container"
                    class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-700">
+                <!-- popolato da JS -->
               </div>
             </div>
 
@@ -267,7 +258,7 @@
             </button>
 
             <p id="user-creation-status"
-               class="status-message status-info hidden"></p>
+               class="status-message status-info hidden mt-3"></p>
           </div>
 
           <!-- UTENTI ESISTENTI -->
@@ -292,7 +283,6 @@
               <tbody></tbody>
             </table>
           </div>
-
         </div>
 
         <!-- MODALE PERMESSI -->
@@ -311,6 +301,7 @@
             <div id="permissions-list"
                  class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-96 overflow-y-auto 
                         border p-4 rounded-lg bg-gray-50">
+              <!-- checkbox dinamiche -->
             </div>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -338,7 +329,7 @@
           </h3>
 
           <p class="text-sm text-gray-600 mb-4">
-            Carica un file XLSX/XLS con colonne “EAN” e “Cliente”.
+            Carica un file XLSX/XLS con colonne “Codice Articolo”, “Ean Code”, ecc.
           </p>
 
           <div class="grid grid-cols-4 gap-2 mb-2">
@@ -369,7 +360,7 @@
           </button>
 
           <p id="import-status"
-             class="status-message status-success hidden"></p>
+             class="status-message status-success hidden mt-3"></p>
 
           <div id="import-ui" class="mt-4">
             <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
@@ -430,7 +421,9 @@
         </h3>
 
         <div id="admin-order-fields"
-             class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+             class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- campi generati da JS -->
+        </div>
 
         <div class="mt-4 flex space-x-3">
           <button onclick="saveAdminOrderUpdates()"
@@ -485,7 +478,7 @@
 
   </div> <!-- fine main-content -->
 
-  <!-- JS principale -->
   <script src="app.js" defer></script>
 </body>
 </html>
+
