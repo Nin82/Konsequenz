@@ -509,6 +509,43 @@ async function assignOrderManually(orderId, newEmail) {
     }
 }
 
+/**
+ * Salva la data e ora corrente (timestamp) per un campo specifico dell'ordine.
+ * @param {string} orderId L'ID dell'oggetto ordine.
+ * @param {string} fieldKey La chiave del campo data da aggiornare (es. 'entryDate').
+ * @param {HTMLElement} dateSpan L'elemento <span> da aggiornare nella UI.
+ */
+async function saveDateStamp(orderId, fieldKey, dateSpan) {
+    if (!confirm(`Sei sicuro di voler valorizzare il campo ${fieldKey} con la data/ora attuale?`)) {
+        return;
+    }
+
+    const now = new Date(); // Data e ora attuali
+    const updateObj = {
+        objectId: orderId,
+        lastUpdated: now // Aggiorna sempre la data di ultima modifica
+    };
+    
+    // Assegna il timestamp al campo dinamico (es. updateObj.entryDate = now)
+    updateObj[fieldKey] = now; 
+
+    try {
+        await Backendless.Data.of(ORDER_TABLE).save(updateObj);
+
+        // Aggiorna l'interfaccia utente in modo immediato
+        dateSpan.textContent = now.toLocaleDateString('it-IT');
+        
+        // Puoi anche ricaricare l'intera tabella se preferisci che gli altri campi si aggiornino
+        // loadAdminOrders(); 
+        
+        toast(`${fieldKey} aggiornato a ${now.toLocaleDateString('it-IT')}`, "success");
+
+    } catch (err) {
+        console.error(`Errore salvataggio data per ${fieldKey}`, err);
+        toast(`Errore salvataggio data per ${fieldKey}`, "error");
+    }
+}
+
 // ===== MODALE PERMESSI (VERSIONE FINALE) =====
 
 function openPermissionsModal(user) {
@@ -860,24 +897,44 @@ async function loadAdminOrders() {
         orders.forEach((o) => {
             const tr = document.createElement("tr");
             tr.className = "hover:bg-slate-50 text-[11px]";
-            tr.dataset.objectId = o.objectId;
-
             fieldConfig.forEach((f) => {
-                const td = document.createElement("td");
-                td.className = "px-3 py-2";
-                let val = o[f.key];
+    const td = document.createElement("td");
+    td.className = "px-3 py-2";
+    let val = o[f.key];
 
-                if (f.key === "status") {
-                    // Badge per lo stato
-                    const colorClass = STATUS_COLORS[val] || 'bg-slate-50 text-slate-600 border-slate-200';
-                    td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${val.replace('_', ' ').toUpperCase() || ''}</span>`;
-                } else if (f.key === "lastUpdated") {
-                    td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
-                } else {
-                    td.textContent = val || "";
-                }
-                tr.appendChild(td);
-            });
+    if (f.key === "status") {
+        // ... (logica badge stato, lasciala invariata)
+    } else if (f.key === "lastUpdated") {
+        td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
+    } else {
+        td.textContent = val || "";
+    }
+    
+    // 🔥 NUOVA LOGICA: PULSANTE DATETIME
+    if (f.type === "date-string" && f.key !== "lastUpdated") { 
+        // Usiamo un contenitore flessibile per allineare testo e pulsante
+        td.className += " flex items-center justify-between"; 
+
+        // Crea un <span> per il testo della data (per separarlo dal pulsante)
+        const dateSpan = document.createElement("span");
+        // Se la data è valorizzata, formattala
+        dateSpan.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
+        td.textContent = ''; // Svuota td dal precedente textContent
+        td.appendChild(dateSpan);
+
+        // Pulsante "Time"
+        const btnTime = document.createElement("button");
+        btnTime.className = "ml-2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
+        btnTime.textContent = "⏱"; // Emoji or text 'TIME'
+
+        // Collega il click alla nuova funzione di salvataggio
+        btnTime.onclick = () => saveDateStamp(o.objectId, f.key, dateSpan);
+        td.appendChild(btnTime);
+    }
+    // 🔥 FINE NUOVA LOGICA
+
+    tr.appendChild(td);
+})
 
             // ==========================
             // BOTTONI AZIONI E ASSEGNAZIONE (NUOVO BLOCCO)
