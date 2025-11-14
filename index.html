@@ -135,7 +135,9 @@
           </label>
         </div>
 
-        <!-- CARD: Gestione utenti -->
+        <!-- =======================
+             GESTIONE UTENTI ADMIN
+        ======================== -->
         <div id="card-users" class="card">
           <h3 class="card-title">Gestione Utenti e Ruoli</h3>
 
@@ -352,6 +354,42 @@
     </main>
   </div>
 
+<!-- MODALE CAMBIO RUOLO -->
+<div id="role-modal"
+     class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+
+  <div class="bg-gray-800 p-6 rounded-lg w-80 shadow-xl">
+    <h3 class="text-lg font-semibold mb-4 text-white">
+      Cambia Ruolo Utente
+    </h3>
+
+    <input type="hidden" id="role-user-id">
+
+    <label class="block text-gray-300 mb-2">Ruolo:</label>
+    <select id="role-selector"
+            class="w-full p-2 rounded bg-gray-900 border border-gray-600 text-white">
+      <option value="">— Seleziona —</option>
+      <option value="ADMIN">Admin</option>
+      <option value="MAGAZZINO">Magazzino</option>
+      <option value="PHOTOGRAPHER">Photographer</option>
+      <option value="POSTPRODUCER">PostProducer</option>
+      <option value="PARTNER">Partner</option>
+      <option value="CUSTOMER">Customer</option>
+    </select>
+
+    <div class="flex justify-end space-x-3 mt-5">
+      <button onclick="closeRoleModal()"
+              class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded">
+        Annulla
+      </button>
+
+      <button onclick="saveNewUserRole()"
+              class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded">
+        Salva
+      </button>
+    </div>
+  </div>
+</div>
   <!-- SCRIPT PRINCIPALE -->
   <script src="app.js"></script>
 </body>
