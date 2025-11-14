@@ -3,476 +3,312 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#10b981" />
-  <title>Workflow Foto Prodotto PWA</title>
+  <title>Konsequenz</title>
 
-  <!-- Tailwind CSS -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Backendless SDK -->
-  <script src="https://unpkg.com/backendless@6.7.0/dist/backendless.min.js"></script>
-
-  <!-- SheetJS per Excel -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- CSS personalizzato -->
-  <link rel="stylesheet" href="style.css">
+  <!-- XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- Backendless -->
+  <script src="https://cdn.jsdelivr.net/npm/backendless"></script>
+
+  <link rel="stylesheet" href="styles.css" />
 </head>
+<body class="bg-gray-100">
 
-<body class="min-h-screen bg-gray-100">
+  <!-- =============================== -->
+  <!-- LOGIN AREA -->
+  <!-- =============================== -->
+  <div id="login-area" class="flex flex-col items-center justify-center h-screen">
+    <div class="bg-white p-6 rounded shadow w-80">
+      <h2 class="text-xl font-bold mb-4 text-center">Accesso</h2>
 
-  <!-- SIDEBAR -->
-  <div id="sidebar"
-       class="hidden md:block fixed top-0 left-0 h-full w-64 bg-gray-900 text-white p-6 overflow-y-auto">
+      <label class="block text-sm font-medium">Email</label>
+      <input id="user-email" type="email" class="w-full border rounded p-2 mb-3" />
 
-    <div class="text-center mb-10">
-      <h1 class="text-3xl font-extrabold">Quiet Propaganda Studio</h1>
-      <p class="text-sm text-gray-400">Workflow Prodotti</p>
+      <label class="block text-sm font-medium">Password</label>
+      <input id="user-password" type="password" class="w-full border rounded p-2 mb-4" />
+
+      <button onclick="handleStandardLogin(
+        document.getElementById('user-email').value,
+        document.getElementById('user-password').value
+      )"
+      class="btn-primary w-full py-2 mb-3">Accedi</button>
+
+      <button onclick="handlePasswordRecovery()" class="btn-secondary w-full py-2 text-sm">
+        Password dimenticata
+      </button>
+
+      <p id="login-status" class="status-message hidden mt-3"></p>
     </div>
-
-    <div id="user-info"
-         class="p-3 bg-gray-700 rounded-lg shadow-inner mb-8">
-      <p class="text-xs text-gray-400 mb-1">Utente Corrente:</p>
-      <span id="worker-name" class="block text-lg font-semibold text-green-300">Ospite</span>
-      <span id="worker-role" class="block text-sm text-gray-300">Non Loggato</span>
-    </div>
-
-    <button id="logout-button"
-            onclick="handleLogout()"
-            class="btn-danger w-full mt-4 py-3 font-semibold shadow-lg">
-      Esci (Logout)
-    </button>
   </div>
 
-  <!-- MAIN CONTENT -->
-  <div id="main-content" class="md:ml-64 p-6">
+  <!-- =============================== -->
+  <!-- DASHBOARD ADMIN -->
+  <!-- =============================== -->
+  <div id="admin-dashboard" class="hidden p-6">
 
-    <!-- LOGIN AREA -->
-    <div id="login-area" class="card max-w-md mx-auto p-8 text-center mt-[10vh]">
-      <h2 class="text-3xl font-bold mb-6 text-gray-800">Accesso al Sistema</h2>
-
-      <div class="space-y-4 mb-6">
-        <input type="email" id="user-email" placeholder="Email" />
-        <input type="password" id="user-password" placeholder="Password" />
-      </div>
-
-      <button
-        onclick="handleStandardLogin(
-          document.getElementById('user-email').value,
-          document.getElementById('user-password').value
-        )"
-        class="btn-primary w-full py-3 text-lg font-semibold shadow-md"
-      >
-        Accedi
-      </button>
-
-      <button onclick="handlePasswordRecovery()"
-              class="mt-4 text-sm text-gray-500 hover:text-gray-700">
-        Password Dimenticata?
-      </button>
-
-      <p id="login-status" class="status-message status-error hidden mt-3"></p>
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold">Pannello Amministratore</h2>
+      <button onclick="handleLogout()" class="btn-danger px-4 py-2">Logout</button>
     </div>
 
-    <!-- WORKER DASHBOARD (Photographer / PostProducer / Warehouse / Partner / Customer) -->
-    <div id="worker-dashboard" class="space-y-8 hidden">
-      <h2 class="text-3xl font-bold text-gray-800 mb-6">Area Lavoratori</h2>
+    <!-- SWITCH CARDS -->
+    <div class="flex space-x-6 mb-6">
+
+      <label class="flex items-center space-x-2 cursor-pointer">
+        <input type="checkbox" id="toggle-users-card" />
+        <span>Gestione Utenti</span>
+      </label>
+
+      <label class="flex items-center space-x-2 cursor-pointer">
+        <input type="checkbox" id="toggle-import-card" />
+        <span>Import Ordini</span>
+      </label>
+
+      <label class="flex items-center space-x-2 cursor-pointer">
+        <input type="checkbox" id="toggle-stats-card" />
+        <span>Statistiche</span>
+      </label>
+    </div>
+
+    <!-- CARD UTENTI -->
+    <div id="card-users" class="card mb-8 hidden">
+      <h3 class="card-title">Gestione Utenti</h3>
+
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <input id="new-user-email" class="input" placeholder="Email" />
+        <input id="new-user-password" type="password" class="input" placeholder="Password" />
+        <select id="new-user-role" class="input">
+          <option value="">Ruolo...</option>
+          <option value="Magazzino">Magazzino</option>
+          <option value="Photographer">Photographer</option>
+          <option value="PostProducer">PostProducer</option>
+          <option value="Partner">Partner</option>
+          <option value="Customer">Customer</option>
+        </select>
+      </div>
+
+      <button onclick="handleUserCreation()" class="btn-primary px-4 py-2 mb-4">Crea Utente</button>
+
+      <p id="user-creation-status" class="status-message hidden"></p>
+
+      <table id="users-table" class="table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Ruolo</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <p id="loading-users" class="text-gray-500 mt-3"></p>
+    </div>
+
+    <!-- CARD IMPORT ORDINI -->
+    <div id="card-import" class="card mb-10 hidden">
+      <h3 class="card-title">Importa Ordini Excel</h3>
+
+      <div class="grid grid-cols-4 gap-4 mb-3">
+        <input id="admin-provenienza" class="input" placeholder="Provenienza" />
+        <input id="admin-tipologia" class="input" placeholder="Tipologia" />
+        <input id="admin-ordine" class="input" placeholder="Numero Ordine" />
+        <input id="admin-data-ordine" type="date" class="input" />
+      </div>
+
+      <input id="excel-file-input" type="file" accept=".xlsx,.xls" class="mb-3" />
+
+      <button onclick="handleFileUpload()" class="btn-primary px-4 py-2">Importa File</button>
+
+      <div class="w-full bg-gray-200 h-2 mt-4 rounded">
+        <div id="import-progress-bar" class="bg-green-500 h-2 rounded" style="width:0;"></div>
+      </div>
+
+      <p id="import-status" class="status-message hidden mt-4"></p>
+
+      <pre id="import-log" class="bg-gray-100 p-3 rounded mt-4 hidden"></pre>
+    </div>
+
+    <!-- CARD STATISTICHE -->
+    <div id="admin-stats-section" class="card hidden">
+      <h3 class="card-title">Statistiche Ordini</h3>
+
+      <div id="admin-stats" class="grid grid-cols-4 gap-4 my-6"></div>
+
+      <canvas id="admin-stats-chart" height="100"></canvas>
+    </div>
+ <!-- =============================== -->
+    <!-- LISTA ORDINI ADMIN -->
+    <!-- =============================== -->
+    <div id="orders-admin-card" class="card mt-10 hidden">
+
+      <h3 class="card-title">Ordini Importati</h3>
+      <p id="loading-admin-orders" class="text-gray-500 mb-3"></p>
+
+      <table id="admin-orders-table" class="table">
+        <thead>
+          <tr>
+            <th>EAN</th>
+            <th>Codice Articolo</th>
+            <th>Brand</th>
+            <th>Colore</th>
+            <th>Taglia</th>
+            <th>Stato</th>
+            <th>Assegnato a</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+    </div>
+
+    <!-- =============================== -->
+    <!-- MODALE EDIT ORDINE ADMIN -->
+    <!-- =============================== -->
+    <div id="admin-order-edit-card"
+         class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+
+      <div class="bg-white w-11/12 max-w-3xl p-6 rounded shadow-md relative">
+
+        <h3 class="text-xl font-bold mb-4">
+          Modifica Ordine – <span id="admin-ean-display" class="text-indigo-600"></span>
+        </h3>
+
+        <div id="admin-order-fields" class="grid grid-cols-2 gap-4 mb-4"></div>
+
+        <div class="flex space-x-3 mt-4">
+          <button onclick="saveAdminOrderUpdates()" class="btn-success px-4 py-2">Salva</button>
+          <button onclick="cancelAdminOrderEdit()" class="btn-secondary px-4 py-2">Annulla</button>
+        </div>
+
+        <p id="admin-update-feedback" class="status-message hidden mt-3"></p>
+
+        <button onclick="cancelAdminOrderEdit()"
+                class="absolute right-3 top-2 text-2xl text-gray-400 hover:text-gray-600">&times;</button>
+      </div>
+    </div>
+     <!-- =============================== -->
+    <!--     WORKER DASHBOARD (ruoli)   -->
+    <!-- =============================== -->
+    <div id="worker-dashboard" class="space-y-10 hidden">
+
+      <h2 class="text-2xl font-bold text-gray-800">Area Operativa</h2>
 
       <p id="operation-feedback" class="status-message hidden"></p>
 
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
 
-        <!-- BLOCCO 1 – LAVORAZIONE ATTUALE -->
+        <!-- ================================= -->
+        <!--             BOX EAN INPUT         -->
+        <!-- ================================= -->
         <div class="card lg:col-span-1">
-          <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-            1. Lavorazione Attuale
-          </h3>
 
-          <p class="text-sm text-gray-500 mb-4">
-            Scannerizza o inserisci il codice EAN del prodotto da lavorare.
-          </p>
+          <h3 class="card-title">1. Lavorazione Attuale</h3>
 
-          <input type="text" id="ean-input" placeholder="Codice EAN" class="mb-4" />
+          <p class="text-sm text-gray-600 mb-3">Inserisci o scansiona il codice EAN</p>
+
+          <input id="ean-input" class="input mb-3" placeholder="Codice EAN">
 
           <button id="confirm-ean-btn"
                   onclick="confirmEanInput()"
-                  class="btn-primary w-full py-2 font-medium">
+                  class="btn-primary w-full py-2">
             Conferma EAN
           </button>
 
-          <p id="scan-status" class="status-message status-info hidden"></p>
+          <p id="scan-status" class="status-message mt-3 hidden"></p>
 
-          <!-- SEZIONE OPERATIVA DETTAGLIO EAN -->
+
+          <!-- =============================== -->
+          <!--   SEZIONE EDIT EAN OPERATIVA   -->
+          <!-- =============================== -->
           <div id="ean-actions-area"
-               class="mt-6 p-4 border border-dashed border-gray-400 rounded-lg bg-gray-50 hidden">
+               class="hidden mt-5 border border-gray-300 rounded p-4 bg-gray-50">
 
-            <h4 class="font-semibold text-gray-700 mb-3 flex justify-between items-center">
-              Dati Operativi EAN:
-              <span id="current-ean-display" class="font-mono text-sm text-indigo-700"></span>
+            <h4 class="flex justify-between items-center mb-3 text-sm font-semibold text-gray-700">
+              Dati Operativi – <span id="current-ean-display"></span>
+              <button onclick="resetEanActionState(true)" class="btn-secondary px-2 py-1 text-sm">
+                × Chiudi
+              </button>
             </h4>
 
-            <!-- Campi operativi dinamici -->
             <div id="operational-fields" class="space-y-3"></div>
 
-            <!-- Upload Foto (solo fotografo) -->
-            <div id="photo-upload-area"
-                 class="mt-4 p-3 border border-green-300 rounded-lg bg-green-50 hidden">
-              <h5 class="font-bold text-md mb-2 text-green-700">
-                Link Foto per EAN: <span id="current-ean-display-upload"></span>
-              </h5>
-
-              <textarea id="photo-drive-links"
-                        placeholder="Inserisci i link Google Drive (uno per riga)"
-                        class="w-full p-2 border rounded-md h-28 mb-3 resize-y"></textarea>
-            </div>
-
-            <!-- Pulsanti di azione -->
-            <div class="mt-4 flex flex-wrap gap-3">
-              <button id="confirm-ean-updates"
-                      class="btn-success py-2 px-4"
-                      onclick="saveEanUpdates()">
+            <div class="flex space-x-2 mt-3">
+              <button onclick="saveEanUpdates()" class="btn-success flex-1 py-2">
                 Conferma Modifiche
               </button>
-
-              <button id="mark-delivered-btn"
-                      class="btn-warning py-2 px-4 hidden"
-                      onclick="markOrderDeliveredFromWorker()">
-                Segna come consegnato
-              </button>
-
-              <button onclick="resetEanActionState(true)"
-                      class="btn-secondary py-2 px-4">
-                Annulla / Chiudi
-              </button>
-            </div>
-
-            <p id="update-status"
-               class="status-message bg-green-100 text-green-700 hidden mt-3"></p>
-          </div>
-
-        </div> <!-- fine colonna 1 -->
-
-        <!-- BLOCCO 2 – ORDINI IN CODA -->
-        <div class="card lg:col-span-3">
-          <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-            2. Ordini in Coda per
-            <span id="worker-role-display-queue" class="text-indigo-600"></span>
-          </h3>
-
-          <p id="loading-orders" class="text-gray-500 p-4">
-            In attesa di caricamento ordini...
-          </p>
-
-          <div class="overflow-x-auto">
-            <table id="orders-table"
-                   class="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr id="orders-header-row">
-                  <!-- intestazioni generate da JS -->
-                </tr>
-                <tr id="orders-filter-row">
-                  <!-- filtri per colonna generati da JS -->
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div> <!-- fine colonna 3 -->
-
-      </div> <!-- fine grid -->
-    </div> <!-- fine worker-dashboard -->
-
-    <!-- ADMIN DASHBOARD -->
-    <div id="admin-dashboard" class="space-y-8 hidden">
-
-      <h2 class="text-3xl font-bold text-gray-800 mb-6">
-        Pannello Amministratore
-      </h2>
-
-      <!-- TOGGLE SEZIONI -->
-      <div class="admin-toggle-controls flex gap-6 items-center mb-6">
-        <label class="flex items-center gap-2">
-          <input type="checkbox" id="toggle-users-card" checked />
-          <span>Mostra Gestione Utenti e Ruoli</span>
-        </label>
-        <label class="flex items-center gap-2">
-          <input type="checkbox" id="toggle-import-card" checked />
-          <span>Mostra Importazione Ordini (Excel)</span>
-        </label>
-        <label class="flex items-center gap-2">
-          <input type="checkbox" id="toggle-stats-card" checked />
-          <span>Mostra Riepilogo Ordini</span>
-        </label>
-      </div>
-
-      <!-- RIEPILOGO ORDINI -->
-      <section id="admin-stats-section">
-        <h3 class="text-xl font-semibold mb-4 text-gray-800">
-          Riepilogo Ordini
-        </h3>
-
-        <div id="admin-stats"
-             class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
-
-        <div class="mt-8 bg-white border rounded-lg p-4 shadow-sm">
-          <canvas id="admin-stats-chart" class="w-full h-64"></canvas>
-        </div>
-      </section>
-
-      <!-- GESTIONE UTENTI + IMPORT ORDINI -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-
-        <!-- GESTIONE UTENTI -->
-        <div id="card-users" class="card lg:col-span-2">
-
-          <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">
-            Gestione Utenti e Ruoli
-          </h3>
-
-          <!-- CREAZIONE UTENTE -->
-          <div class="mb-6 p-6 border border-gray-200 rounded-lg bg-gray-50 shadow-inner">
-
-            <h4 class="font-bold text-lg mb-3">Crea Nuovo Utente</h4>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <input type="email" id="new-user-email" placeholder="Email" />
-              <input type="password" id="new-user-password" placeholder="Password Iniziale" />
-              <select id="new-user-role">
-                <option value="" disabled selected>Seleziona Ruolo</option>
-                <option value="Admin">Admin</option>
-                <option value="Photographer">Photographer</option>
-                <option value="PostProducer">PostProducer</option>
-                <option value="Warehouse">Warehouse</option>
-                <option value="Partner">Partner</option>
-                <option value="Customer">Customer</option>
-              </select>
-            </div>
-
-            <button onclick="handleUserCreation()"
-                    class="btn-primary mt-4 py-2 font-medium">
-              Crea Utente
-            </button>
-
-            <p id="user-creation-status"
-               class="status-message status-info hidden"></p>
-          </div>
-
-          <!-- UTENTI ESISTENTI -->
-          <h4 class="font-bold text-lg mt-8 mb-4 border-b pb-2">
-            Utenti Esistenti
-          </h4>
-
-          <p id="loading-users" class="text-gray-500 p-4">
-            Caricamento lista utenti...
-          </p>
-
-          <div class="overflow-x-auto">
-            <table id="users-table"
-                   class="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Ruolo</th>
-                  <th>Azioni</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-
-        </div>
-
-        <!-- MODALE PERMESSI -->
-        <div id="permissions-modal"
-             class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-          <div class="bg-white rounded-xl p-6 max-w-3xl w-full shadow-2xl relative">
-
-            <h3 class="text-2xl font-bold mb-4 text-gray-800">
-              Configura Permessi Utente
-            </h3>
-
-            <p class="text-gray-500 mb-4">
-              Seleziona i campi visibili e modificabili per questo utente.
-            </p>
-
-            <div id="permissions-list"
-                 class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-96 overflow-y-auto 
-                        border p-4 rounded-lg bg-gray-50">
-              <!-- righe dinamiche: ogni riga = campo con 2 checkbox (visibile/modificabile) -->
-            </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-              <button onclick="closePermissionsModal()"
-                      class="btn-secondary px-4 py-2">
+              <button onclick="resetEanActionState(true)" class="btn-secondary px-4 py-2">
                 Annulla
               </button>
-              <button onclick="saveUserPermissions()"
-                      class="btn-primary px-4 py-2">
-                Salva Permessi
-              </button>
             </div>
 
-            <button onclick="closePermissionsModal()"
-                    class="absolute top-3 right-4 text-2xl font-bold text-gray-400 hover:text-gray-700">
-              &times;
+            <button onclick="markOrderAsDelivered()"
+                    id="btn-mark-delivered"
+                    class="btn-warning w-full mt-3 hidden">
+              Segna come CONSEGNATO
             </button>
+
+            <p id="update-status" class="status-message mt-3 hidden"></p>
+
           </div>
+
+
+          <!-- ================================= -->
+          <!--           UPLOAD FOTO DRIVE       -->
+          <!-- ================================= -->
+          <div id="photo-upload-area"
+               class="hidden mt-6 p-4 bg-green-50 border border-green-300 rounded">
+
+            <h4 class="font-semibold text-green-700 mb-2">
+              Link Foto Drive – <span id="current-ean-display-upload"></span>
+            </h4>
+
+            <textarea id="photo-drive-links"
+                      class="w-full p-2 border rounded h-24 resize-y mb-3"
+                      placeholder="https://drive.google.com/... (uno per riga)"></textarea>
+
+          </div>
+
         </div>
 
-        <!-- IMPORT ORDINI -->
-        <div id="card-import" class="card lg:col-span-1 h-fit">
-          <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">
-            Importazione Ordini (Excel)
+
+
+        <!-- ================================= -->
+        <!--       TABELLA ORDINI RUOLO        -->
+        <!-- ================================= -->
+        <div class="card lg:col-span-3">
+          <h3 class="card-title">
+            2. Ordini assegnati a:
+            <span id="worker-role-display-queue" class="text-indigo-700"></span>
           </h3>
 
-          <p class="text-sm text-gray-600 mb-4">
-            Carica un file XLSX/XLS con colonne “Codice Articolo”, “Ean Code” ecc.
-          </p>
+          <p id="loading-orders" class="text-gray-500 p-3"></p>
 
-          <div class="grid grid-cols-4 gap-2 mb-2">
-            <input type="text" id="admin-provenienza"
-                   placeholder="Provenienza"
-                   class="border p-1 rounded" />
-
-            <input type="text" id="admin-tipologia"
-                   placeholder="Tipologia"
-                   class="border p-1 rounded" />
-
-            <input type="text" id="admin-ordine"
-                   placeholder="Ordine"
-                   class="border p-1 rounded" />
-
-            <input type="date" id="admin-data-ordine"
-                   class="border p-1 rounded" />
+          <!-- TABELLA -->
+          <div class="overflow-x-auto">
+            <table id="orders-table" class="table">
+              <thead>
+                <tr id="orders-table-header">
+                  <!-- intestazioni generate da JS in base al ruolo -->
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
 
-          <input type="file" id="excel-file-input"
-                 accept=".xlsx, .xls"
-                 class="w-full mb-4 p-2 border border-gray-300 rounded-md bg-white" />
-
-          <button id="import-button"
-                  onclick="handleFileUpload()"
-                  class="btn-warning w-full py-2 font-medium">
-            Carica e Importa
-          </button>
-
-          <p id="import-status"
-             class="status-message status-success hidden"></p>
-
-          <div id="import-ui" class="mt-4">
-            <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-              <div id="import-progress-bar"
-                   class="h-4 rounded-full"
-                   style="width:0%; background-color:#10b981;"></div>
-            </div>
-
-            <p id="import-progress-text"
-               class="text-sm text-gray-600 mt-2">
-              Nessuna importazione in corso.
-            </p>
-
-            <pre id="import-log"
-                 class="mt-3 p-3 bg-gray-50 rounded-md text-sm text-gray-700"
-                 style="display:none; max-height:220px; overflow:auto;">
-            </pre>
-          </div>
         </div>
       </div>
+    </div>
 
-      <!-- LISTA ORDINI ADMIN -->
-      <div id="orders-admin-card" class="card mt-8">
-
-        <h3 class="text-xl font-semibold mb-4 text-indigo-700 border-b pb-2">
-          Ordini Importati
-        </h3>
-
-        <p id="loading-admin-orders" class="text-gray-500 p-4">
-          Caricamento ordini...
-        </p>
-
-        <div class="overflow-x-auto">
-          <table id="admin-orders-table"
-                 class="min-w-full divide-y divide-gray-200">
-            <thead>
-              <tr id="admin-orders-header-row">
-                <!-- intestazioni generate da JS -->
-              </tr>
-              <tr id="admin-orders-filter-row">
-                <!-- filtri per colonna generati da JS -->
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- MODIFICA ORDINE ADMIN (FORM COMPLETO) -->
-      <div id="admin-order-edit-card"
-           class="card max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md hidden">
-
-        <h3 class="text-2xl font-bold mb-4 text-gray-800">
-          Modifica Ordine: <span id="admin-ean-display"></span>
-        </h3>
-
-        <div id="admin-order-fields"
-             class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-
-        <div class="mt-4 flex space-x-3">
-          <button onclick="saveAdminOrderUpdates()"
-                  class="btn-success py-2 px-4">
-            Salva Aggiornamenti
-          </button>
-
-          <button onclick="cancelAdminOrderEdit()"
-                  class="btn-secondary py-2 px-4">
-            Annulla
-          </button>
-        </div>
-
-        <p id="admin-update-feedback"
-           class="status-message mt-3 hidden"></p>
-      </div>
-
-      <!-- MODALE ASSEGNAZIONE ORDINE -->
-      <div id="assign-modal"
-           class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-lg p-6 w-96">
-
-          <h3 class="text-xl font-bold mb-3 text-gray-800">
-            Assegna Ordine
-          </h3>
-
-          <p id="assign-ean-display"
-             class="text-sm text-gray-600 mb-3"></p>
-
-          <label for="assign-user-select"
-                 class="block text-sm font-medium text-gray-700 mb-2">
-            Seleziona utente
-          </label>
-
-          <select id="assign-user-select"
-                  class="w-full border p-2 rounded mb-4"></select>
-
-          <div class="flex justify-end space-x-2">
-            <button onclick="confirmOrderAssignment()"
-                    class="btn-success px-3 py-2">
-              Conferma
-            </button>
-            <button onclick="closeAssignModal()"
-                    class="btn-secondary px-3 py-2">
-              Annulla
-            </button>
-          </div>
-        </div>
-      </div>
-
-    </div> <!-- fine admin-dashboard -->
-
-  </div> <!-- fine main-content -->
-
+      <!-- JS principale -->
   <script src="app.js" defer></script>
 </body>
 </html>
