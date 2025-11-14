@@ -11,17 +11,58 @@ const USER_TABLE = "Users";
 Backendless.initApp(APP_ID, API_KEY);
 
 
-// =====================================================
-//  COSTANTI RUOLI E STATI
-// =====================================================
-
+// ---------------------------------------------------
+//          RUOLI UFFICIALI (devono esistere 
+//          IDENTICI su Backendless -> Users -> Roles)
+// ---------------------------------------------------
 const ROLES = {
-  ADMIN: "Admin",
-  WAREHOUSE: "Warehouse",
+  ADMIN:        "Admin",
+  WAREHOUSE:    "Magazzino",
   PHOTOGRAPHER: "Photographer",
-  POST_PRODUCER: "PostProducer",
-  PARTNER: "Partner",
-  CUSTOMER: "Customer",
+  POST_PRODUCER:"PostProducer",
+  PARTNER:      "Partner",
+  CUSTOMER:     "Customer"
+};
+
+// ---------------------------------------------------
+//           CONFIGURAZIONE BASE PER RUOLI
+// ---------------------------------------------------
+const ROLE_CONFIG = {
+  [ROLES.ADMIN]: {
+    label: "Admin",
+    canSeeAllOrders: true,
+    queueFilter: "", // vede tutto
+  },
+
+  [ROLES.WAREHOUSE]: {
+    label: "Magazzino",
+    canSeeAllOrders: true,                 // MAGAZZINO vede tutto sempre
+    queueFilter: "currentStep = 'Magazzino'"
+  },
+
+  [ROLES.PHOTOGRAPHER]: {
+    label: "Fotografo",
+    canSeeAllOrders: false,
+    queueFilter: "currentStep = 'Photographer'"
+  },
+
+  [ROLES.POST_PRODUCER]: {
+    label: "Post-produzione",
+    canSeeAllOrders: false,
+    queueFilter: "currentStep = 'PostProducer'"
+  },
+
+  [ROLES.PARTNER]: {
+    label: "Partner",
+    canSeeAllOrders: false,
+    queueFilter: "currentStep = 'Partner'"
+  },
+
+  [ROLES.CUSTOMER]: {
+    label: "Cliente",
+    canSeeAllOrders: false,
+    queueFilter: "currentStep = 'Customer'"
+  }
 };
 
 const STATUS = {
@@ -1061,4 +1102,27 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
+
+// ==========================
+// LOGOUT UTENTE
+// ==========================
+function logoutUser() {
+  try {
+    Backendless.UserService.logout()
+      .then(() => {
+        localStorage.removeItem("userToken");
+        localStorage.removeItem("currentUser");
+
+        // Torna alla schermata di login
+        window.location.reload();
+      })
+      .catch(err => {
+        console.error("Errore logout:", err);
+        alert("Errore durante il logout");
+      });
+
+  } catch (error) {
+    console.error("Logout fallito:", error);
+  }
+}
 
