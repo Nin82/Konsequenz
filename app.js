@@ -864,77 +864,52 @@ async function loadAdminOrders() {
         const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
 
         // header
-        fieldConfig.forEach((f) => {
-            const th = document.createElement("th");
-            th.className = "th";
-            th.textContent = f.label;
-            headerRow.appendChild(th);
-        });
-        // azioni
-        const thAct = document.createElement("th");
-        thAct.className = "th";
-        thAct.textContent = "Azioni";
-        headerRow.appendChild(thAct);
-
-        // filter row
-        fieldConfig.forEach((f) => {
-            const td = document.createElement("td");
-            td.className = "px-2 py-1";
-            const input = document.createElement("input");
-            input.type = "text";
-            input.className =
-                "w-full rounded border border-slate-200 px-2 py-1 text-[10px]";
-            input.placeholder = "Filtro";
-            input.dataset.fieldKey = f.key;
-            input.addEventListener("input", applyOrdersFilters);
-            td.appendChild(input);
-            filterRow.appendChild(td);
-        });
-        const tdFilterEmpty = document.createElement("td");
-        filterRow.appendChild(tdFilterEmpty);
-
-        // righe
-        orders.forEach((o) => {
-            const tr = document.createElement("tr");
-            tr.className = "hover:bg-slate-50 text-[11px]";
-            fieldConfig.forEach((f) => {
-    const td = document.createElement("td");
+        const td = document.createElement("td");
     td.className = "px-3 py-2";
     let val = o[f.key];
 
-    if (f.key === "status") {
-        // ... (logica badge stato, lasciala invariata)
-    } else if (f.key === "lastUpdated") {
-        td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
-    } else {
-        td.textContent = val || "";
-    }
-    
-    // 🔥 NUOVA LOGICA: PULSANTE DATETIME
-    if (f.type === "date-string" && f.key !== "lastUpdated") { 
-        // Usiamo un contenitore flessibile per allineare testo e pulsante
+    // --- LOGICA PULSANTE DATETIME E FORMATTAZIONE ---
+    if (f.type === "date-string" && f.key !== "lastUpdated") {
+        
+        // 1. Applica il layout flex per allineare data e pulsante
         td.className += " flex items-center justify-between"; 
 
-        // Crea un <span> per il testo della data (per separarlo dal pulsante)
+        // 2. Crea il contenitore del testo della data (usiamo l'oggetto Date per formattare)
         const dateSpan = document.createElement("span");
-        // Se la data è valorizzata, formattala
+        // Formatta la data se presente, altrimenti è vuoto
         dateSpan.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
-        td.textContent = ''; // Svuota td dal precedente textContent
-        td.appendChild(dateSpan);
-
-        // Pulsante "Time"
+        
+        // 3. Pulsante "Time"
         const btnTime = document.createElement("button");
-        btnTime.className = "ml-2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
-        btnTime.textContent = "⏱"; // Emoji or text 'TIME'
+        // Aggiusta il margine destro del TD per gestire l'icona (opzionale)
+        td.className = td.className.replace("px-3", "pr-1 pl-3"); 
 
-        // Collega il click alla nuova funzione di salvataggio
+        btnTime.className = "ml-2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
+        btnTime.textContent = "⏱";
+
+        // Collega il click alla funzione
         btnTime.onclick = () => saveDateStamp(o.objectId, f.key, dateSpan);
+        
+        // 4. Inserisce gli elementi nel TD
+        td.appendChild(dateSpan);
         td.appendChild(btnTime);
+        
+    } 
+    // --- LOGICA STANDARD PER TUTTI GLI ALTRI CAMPI ---
+    else if (f.key === "status") {
+        // Logica per il badge di stato (lasciala invariata)
+        // ...
+    } else if (f.key === "lastUpdated") {
+        // Formattazione per lastUpdated (senza pulsante)
+        td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
+    } else {
+        // Campo testo/numerico standard
+        td.textContent = val || "";
     }
-    // 🔥 FINE NUOVA LOGICA
+    // --------------------------------------------------
 
     tr.appendChild(td);
-})
+});
 
             // ==========================
             // BOTTONI AZIONI E ASSEGNAZIONE (NUOVO BLOCCO)
