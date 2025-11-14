@@ -3,356 +3,105 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Konsequenz – Workflow Foto Prodotto</title>
 
-  <!-- Tailwind (va bene anche in CDN per ora) -->
+  <title>Konsequenz Workflow</title>
+
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Backendless -->
-  <script src="https://cdn.jsdelivr.net/npm/backendless"></script>
+  <!-- Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-  <!-- XLSX per import Excel -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- CSS custom -->
+  <!-- Custom CSS -->
   <link rel="stylesheet" href="styles.css" />
+
 </head>
-<body class="min-h-screen bg-slate-100 text-slate-800">
 
-  <!-- Layout principale -->
-  <div class="flex min-h-screen">
+<body class="bg-gray-900 text-gray-100">
 
-    <!-- SIDEBAR -->
-    <aside id="sidebar"
-           class="hidden md:flex flex-col w-64 bg-slate-900 text-slate-100 py-6 px-4 shadow-lg">
+  <!-- =======================
+       TOP BAR + HAMBURGER
+  ======================== -->
+  <header class="fixed top-0 left-0 w-full h-14 bg-gray-800 shadow-lg flex items-center px-4 z-40">
+    <button id="menu-toggle" class="text-gray-200 hover:text-white">
+      <i data-lucide="menu" class="w-6 h-6"></i>
+    </button>
+    <h1 class="ml-4 text-xl font-bold">Konsequenz Workflow</h1>
+  </header>
 
-      <div class="px-3 mb-8">
-        <h1 class="text-2xl font-extrabold tracking-tight">Quiet Propaganda</h1>
-        <p class="text-xs text-slate-400">Workflow prodotti – Konsequenz</p>
-      </div>
 
-      <div id="sidebar-user"
-           class="px-3 py-3 mb-6 bg-slate-800/80 rounded-xl border border-slate-700">
-        <p class="text-xs text-slate-400 mb-1">Utente corrente</p>
-        <p id="sidebar-username" class="text-sm font-semibold">Ospite</p>
-        <p id="sidebar-role" class="text-xs text-emerald-300 font-medium">Non loggato</p>
-      </div>
+  <!-- =======================
+       SIDEBAR MOBILE / DARK
+  ======================== -->
+  <aside id="sidebar"
+         class="fixed top-0 left-0 h-full w-64 bg-gray-850 shadow-xl transform -translate-x-full
+                transition-transform duration-300 z-50">
 
-      <nav class="flex-1 space-y-2 text-sm">
-        <button id="nav-admin"
-                class="sidebar-btn hidden"
-                onclick="showSection('admin')">
-          Pannello Admin
-        </button>
-        <button id="nav-worker"
-                class="sidebar-btn hidden"
-                onclick="showSection('worker')">
-          Area Lavoratori
-        </button>
-      </nav>
+    <!-- Header Sidebar -->
+    <div class="h-14 flex items-center px-4 border-b border-gray-700">
+      <h2 class="text-lg font-semibold text-green-400">Menu</h2>
+    </div>
 
-      <button id="logout-btn"
-              class="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-700 px-3 py-2 text-sm font-semibold shadow-md hidden"
-              onclick="handleLogout()">
-        <span>Logout</span>
+    <!-- User Box -->
+    <div class="p-4 border-b border-gray-700">
+      <p class="text-sm text-gray-400">Utente:</p>
+      <p id="user-name-sidebar" class="text-lg font-semibold text-white">Ospite</p>
+
+      <p class="text-sm mt-1 text-gray-400">Ruolo:</p>
+      <p id="user-role-sidebar" class="text-md font-semibold text-indigo-400">N/A</p>
+    </div>
+
+    <!-- Menu -->
+    <nav id="sidebar-menu" class="p-4 space-y-3">
+      <button class="sidebar-item" data-section="dashboard-admin">Dashboard Admin</button>
+      <button class="sidebar-item" data-section="dashboard-worker">Dashboard Lavoratore</button>
+      <button class="sidebar-item" data-section="settings">Impostazioni</button>
+
+      <button onclick="logoutUser()"
+              class="w-full mt-6 py-2 bg-red-600 hover:bg-red-700 rounded-md font-semibold">
+        Logout
       </button>
-    </aside>
+    </nav>
 
-    <!-- CONTENUTO PRINCIPALE -->
-    <main class="flex-1 p-4 md:p-8">
+  </aside>
 
-      <!-- LOGIN VIEW -->
-      <section id="login-view"
-               class="max-w-md mx-auto mt-16 bg-white/90 rounded-2xl shadow-xl border border-slate-200 p-8">
-        <h2 class="text-2xl font-bold mb-4 text-slate-800 text-center">
-          Accesso al sistema
-        </h2>
-        <p class="text-sm text-slate-500 mb-6 text-center">
-          Inserisci le tue credenziali. Il primo accesso lo gestisce lo sviluppatore
-          fornendo le credenziali Admin iniziali.
-        </p>
+  <!-- Overlay click-to-close -->
+  <div id="sidebar-overlay"
+       class="fixed inset-0 bg-black bg-opacity-40 hidden z-40"></div>
 
-        <div class="space-y-4 mb-4">
-          <div>
-            <label class="form-label" for="login-email">Email</label>
-            <input id="login-email" type="email" class="form-input" placeholder="nome@azienda.it" />
-          </div>
-          <div>
-            <label class="form-label" for="login-password">Password</label>
-            <input id="login-password" type="password" class="form-input" placeholder="••••••••" />
-          </div>
-        </div>
 
-        <button class="w-full btn-primary py-2.5 text-sm font-semibold"
-                onclick="handleLoginClick()">
-          Accedi
-        </button>
+  <!-- =======================
+        MAIN CONTENT AREA
+  ======================== -->
+  <main id="main-content"
+        class="pt-16 p-4 transition-all duration-300">
 
-        <p id="login-status"
-           class="mt-4 text-xs text-center hidden"></p>
-      </section>
+    <!-- PLACEHOLDER: qui JS inserirà le dashboard -->
+    <div id="dynamic-content" class="mt-4"></div>
 
-      <!-- ADMIN DASHBOARD -->
-      <section id="admin-view" class="hidden space-y-6">
+  </main>
 
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 class="text-2xl font-bold tracking-tight">Pannello Amministratore</h2>
-            <p class="text-sm text-slate-500">
-              Gestione utenti, import ordini, pipeline e statistiche.
-            </p>
-          </div>
-          <div class="flex gap-2 items-center">
-            <span id="admin-badge"
-                  class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">
-              Admin attivo
-            </span>
-            <button class="btn-secondary text-xs" onclick="handleLogout()">Logout</button>
-          </div>
-        </div>
+  <!-- JS -->
+  <script src="app.js" defer></script>
 
-        <!-- Toggle sezioni -->
-        <div class="flex flex-wrap gap-4 text-sm">
-          <label class="flex items-center gap-2">
-            <input id="toggle-users" type="checkbox" class="toggle-switch" checked />
-            <span>Gestione Utenti</span>
-          </label>
-          <label class="flex items-center gap-2">
-            <input id="toggle-import" type="checkbox" class="toggle-switch" checked />
-            <span>Import Ordini</span>
-          </label>
-          <label class="flex items-center gap-2">
-            <input id="toggle-orders" type="checkbox" class="toggle-switch" checked />
-            <span>Tabella Ordini</span>
-          </label>
-          <label class="flex items-center gap-2">
-            <input id="toggle-stats" type="checkbox" class="toggle-switch" checked />
-            <span>Statistiche</span>
-          </label>
-        </div>
+  <script>
+    // Init icons
+    lucide.createIcons();
 
-        <!-- CARD: Gestione utenti -->
-        <div id="card-users" class="card">
-          <h3 class="card-title">Gestione Utenti e Ruoli</h3>
+    // Sidebar toggle
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebar-overlay");
 
-          <!-- Crea utente -->
-          <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-4">
-            <h4 class="font-semibold text-sm mb-3">Crea nuovo utente</h4>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-              <input id="new-user-email" type="email" class="form-input" placeholder="Email utente" />
-              <input id="new-user-password" type="password" class="form-input" placeholder="Password iniziale" />
-              <select id="new-user-role" class="form-input">
-                <option value="">Ruolo…</option>
-                <option value="Admin">Admin</option>
-                <option value="Warehouse">Magazzino</option>
-                <option value="Photographer">Photographer</option>
-                <option value="PostProducer">PostProducer</option>
-                <option value="Partner">Partner</option>
-                <option value="Customer">Customer</option>
-              </select>
-              <button class="btn-primary text-sm" onclick="handleCreateUser()">Crea Utente</button>
-            </div>
-            <p id="user-create-status" class="text-xs mt-1 hidden"></p>
-          </div>
+    document.getElementById("menu-toggle").addEventListener("click", () => {
+      sidebar.classList.remove("-translate-x-full");
+      overlay.classList.remove("hidden");
+    });
 
-          <!-- Tabella utenti -->
-          <div class="flex items-center justify-between mb-2">
-            <h4 class="font-semibold text-sm">Utenti esistenti</h4>
-            <span id="users-loading" class="text-xs text-slate-400">Caricamento…</span>
-          </div>
+    overlay.addEventListener("click", () => {
+      sidebar.classList.add("-translate-x-full");
+      overlay.classList.add("hidden");
+    });
+  </script>
 
-          <div class="overflow-x-auto border rounded-xl bg-white">
-            <table class="min-w-full text-xs">
-              <thead class="bg-slate-100 text-slate-600">
-                <tr>
-                  <th class="th">Email</th>
-                  <th class="th">Ruolo</th>
-                  <th class="th">Azioni</th>
-                </tr>
-              </thead>
-              <tbody id="users-table-body" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- MODALE PERMESSI UTENTE -->
-        <div id="permissions-modal"
-             class="modal hidden">
-          <div class="modal-backdrop" onclick="closePermissionsModal()"></div>
-          <div class="modal-panel max-w-3xl">
-            <div class="flex justify-between items-start mb-4">
-              <div>
-                <h3 class="text-lg font-semibold">Permessi utente</h3>
-                <p id="permissions-user-email" class="text-xs text-slate-500"></p>
-              </div>
-              <button class="text-xl leading-none text-slate-400 hover:text-slate-700"
-                      onclick="closePermissionsModal()">&times;</button>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-              <div class="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
-                <h4 class="text-xs font-semibold mb-2">Colonne VISIBILI</h4>
-                <div id="perm-visible-fields" class="space-y-1 text-xs"></div>
-              </div>
-
-              <div class="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
-                <h4 class="text-xs font-semibold mb-2">Colonne MODIFICABILI</h4>
-                <div id="perm-editable-fields" class="space-y-1 text-xs"></div>
-              </div>
-            </div>
-
-            <div class="flex justify-end gap-2 mt-4">
-              <button class="btn-secondary text-xs px-3 py-1.5" onclick="closePermissionsModal()">Annulla</button>
-              <button class="btn-primary text-xs px-3 py-1.5" onclick="saveUserPermissions()">Salva permessi</button>
-            </div>
-
-            <p id="permissions-status" class="text-xs mt-2 hidden"></p>
-          </div>
-        </div>
-
-        <!-- CARD: Import ordini -->
-        <div id="card-import" class="card">
-          <h3 class="card-title">Import Ordini da Excel</h3>
-          <p class="text-xs text-slate-500 mb-4">
-            Carica un file XLSX/XLS con le colonne configurate (Codice Articolo, Ean Code, Brand, Colore, Taglia, ecc.).
-            Ogni nuova riga viene creata come ordine <strong>"In attesa magazzino"</strong>.
-          </p>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-            <input id="import-origin" class="form-input" placeholder="Provenienza" />
-            <input id="import-type" class="form-input" placeholder="Tipologia" />
-            <input id="import-order-number" class="form-input" placeholder="Numero ordine" />
-            <input id="import-order-date" type="date" class="form-input" />
-          </div>
-
-          <div class="flex flex-wrap items-center gap-3 mb-3">
-            <input id="import-file" type="file"
-                   accept=".xlsx, .xls"
-                   class="text-xs" />
-            <button class="btn-primary text-xs px-4 py-1.5"
-                    onclick="handleImportClick()">
-              Importa file
-            </button>
-            <span id="import-status" class="text-xs text-slate-500"></span>
-          </div>
-
-          <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden mb-3">
-            <div id="import-progress" class="h-2 bg-emerald-500 w-0"></div>
-          </div>
-
-          <pre id="import-log"
-               class="text-[10px] bg-slate-900 text-slate-100 rounded-lg p-3 max-h-48 overflow-auto hidden"></pre>
-        </div>
-
-        <!-- CARD: Tabella ordini -->
-        <div id="card-orders" class="card">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="card-title mb-0">Ordini (vista Admin)</h3>
-            <span id="orders-loading" class="text-xs text-slate-400">Caricamento…</span>
-          </div>
-
-          <div class="overflow-x-auto border rounded-xl bg-white text-xs">
-            <table class="min-w-full" id="admin-orders-table">
-              <thead class="bg-slate-100 text-slate-600">
-                <tr id="orders-header-row"></tr>
-                <tr id="orders-filter-row" class="border-t border-slate-200"></tr>
-              </thead>
-              <tbody id="orders-table-body" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- MODALE MODIFICA ORDINE -->
-        <div id="order-modal" class="modal hidden">
-          <div class="modal-backdrop" onclick="closeOrderModal()"></div>
-          <div class="modal-panel max-w-4xl">
-            <div class="flex justify-between items-start mb-4">
-              <div>
-                <h3 class="text-lg font-semibold">Modifica Ordine</h3>
-                <p id="order-modal-id" class="text-[11px] text-slate-500"></p>
-              </div>
-              <button class="text-xl leading-none text-slate-400 hover:text-slate-700"
-                      onclick="closeOrderModal()">&times;</button>
-            </div>
-
-            <div id="order-modal-fields"
-                 class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto"></div>
-
-            <div class="flex justify-between items-center mt-4">
-              <div class="space-x-2 text-[11px]">
-                <button class="btn-secondary text-[11px] px-3 py-1"
-                        onclick="changeOrderStatusFromModal('In attesa magazzino')">
-                  In attesa magazzino
-                </button>
-                <button class="btn-secondary text-[11px] px-3 py-1"
-                        onclick="changeOrderStatusFromModal('In attesa foto')">
-                  In attesa foto
-                </button>
-                <button class="btn-secondary text-[11px] px-3 py-1"
-                        onclick="changeOrderStatusFromModal('In attesa post')">
-                  In attesa post
-                </button>
-                <button class="btn-secondary text-[11px] px-3 py-1"
-                        onclick="changeOrderStatusFromModal('Consegnato')">
-                  Consegnato
-                </button>
-              </div>
-              <div class="flex gap-2">
-                <button class="btn-secondary text-xs px-3 py-1.5" onclick="closeOrderModal()">Annulla</button>
-                <button class="btn-primary text-xs px-3 py-1.5" onclick="saveOrderFromModal()">Salva</button>
-              </div>
-            </div>
-
-            <p id="order-modal-status" class="text-xs mt-2 hidden"></p>
-          </div>
-        </div>
-
-        <!-- CARD: Statistiche -->
-        <div id="card-stats" class="card">
-          <h3 class="card-title">Statistiche</h3>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="stats-summary"></div>
-
-          <div class="bg-white rounded-xl border border-slate-200 p-4">
-            <canvas id="stats-chart" class="w-full h-64"></canvas>
-          </div>
-        </div>
-
-      </section>
-
-      <!-- WORKER DASHBOARD (bozza, la completiamo dopo) -->
-      <section id="worker-view" class="hidden space-y-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-2xl font-bold tracking-tight">Area Lavoratori</h2>
-            <p class="text-xs text-slate-500" id="worker-role-info"></p>
-          </div>
-          <button class="btn-secondary text-xs" onclick="handleLogout()">Logout</button>
-        </div>
-
-        <div class="card">
-          <h3 class="card-title">I tuoi ordini</h3>
-          <p id="worker-orders-loading" class="text-xs text-slate-400">Caricamento…</p>
-
-          <div class="overflow-x-auto border rounded-xl bg-white text-xs mt-2">
-            <table class="min-w-full" id="worker-orders-table">
-              <thead class="bg-slate-100 text-slate-600">
-                <tr id="worker-orders-header"></tr>
-              </thead>
-              <tbody id="worker-orders-body" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-    </main>
-  </div>
-
-  <!-- SCRIPT PRINCIPALE -->
-  <script src="app.js"></script>
 </body>
 </html>
