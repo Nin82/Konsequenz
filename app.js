@@ -2,7 +2,7 @@
 //  CONFIGURAZIONE BACKENDLESS & COSTANTI
 // =====================================================
 
-const APPLICATION_ID = '9F3D7639-61BE-4751-A0B9-E5FE1812764A';
+const APPLICATION_ID = 'C2A5C327-CF80-4BB0-8017-010681F0481C';
 const API_KEY        = 'B266000F-684B-4889-9174-2D1734001E08';
 
 const USER_TABLE_NAME  = "Users";
@@ -1396,3 +1396,4 @@ window.onload = function () {
       showLoginArea();
     });
 };
+
