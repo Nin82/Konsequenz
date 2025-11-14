@@ -2,7 +2,7 @@
 //  CONFIGURAZIONE BACKENDLESS
 // =====================================================
 
-const APP_ID = "C2A5C327-CF80-4BB0-8017-010681F0481C";
+const APP_ID = "9F3D7639-61BE-4751-A0B9-E5FE1812764A";
 const API_KEY = "B266000F-684B-4889-9174-2D1734001E08";
 
 const ORDER_TABLE = "Orders";
@@ -24,10 +24,12 @@ const ROLES = {
 };
 
 const STATUS = {
+  IMPORTED: "Importato",
   WAREHOUSE_PENDING: "In attesa magazzino",
   PHOTO_PENDING: "In attesa foto",
   POST_PENDING: "In attesa post",
-  DELIVERED: "Consegnato",
+  PARTNER_PENDING: "In attesa partner",
+  ADMIN_REVIEW: "In revisione admin",
   COMPLETED: "Completato",
 };
 
@@ -318,24 +320,57 @@ async function loadAdminUsers() {
 }
 
 function openRoleSelect(user) {
-  const newRole = prompt(
-    `Ruolo attuale: ${user.role || "Nessuno"}\nInserisci nuovo ruolo (Admin, Warehouse, Photographer, PostProducer, Partner, Customer):`,
-    user.role || ""
-  );
-  if (!newRole) return;
+  // Apri un modal semplice
+  const modal = document.createElement("div");
+  modal.className =
+    "fixed inset-0 bg-black/50 flex items-center justify-center z-50";
 
-  const roleTrim = newRole.trim();
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl p-4 shadow-xl w-80">
+      <h3 class="text-lg font-semibold mb-2">Cambia ruolo</h3>
+      <p class="text-xs text-slate-500 mb-3">${user.email}</p>
 
-  Backendless.Data.of(USER_TABLE)
-    .save({ objectId: user.objectId, role: roleTrim })
-    .then(() => {
+      <label class="text-xs text-slate-600">Nuovo ruolo:</label>
+      <select id="role-select" class="form-input mt-1">
+        <option value="Admin">Admin</option>
+        <option value="Warehouse">Warehouse</option>
+        <option value="Photographer">Photographer</option>
+        <option value="PostProducer">PostProducer</option>
+        <option value="Partner">Partner</option>
+        <option value="Customer">Customer</option>
+      </select>
+
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="role-cancel"
+                class="btn-secondary text-xs px-3 py-1.5">Annulla</button>
+        <button id="role-save"
+                class="btn-primary text-xs px-3 py-1.5">Salva</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  $("role-select").value = user.role || "Customer";
+
+  $("role-cancel").onclick = () => modal.remove();
+
+  $("role-save").onclick = async () => {
+    const newRole = $("role-select").value;
+
+    try {
+      await Backendless.Data.of(USER_TABLE).save({
+        objectId: user.objectId,
+        role: newRole,
+      });
+
       toast("Ruolo aggiornato");
+      modal.remove();
       loadAdminUsers();
-    })
-    .catch((err) => {
-      console.error("Errore update ruolo", err);
+    } catch (err) {
       alert("Errore aggiornando il ruolo: " + (err.message || ""));
-    });
+    }
+  };
 }
 
 async function handleCreateUser() {
@@ -861,27 +896,73 @@ async function saveOrderFromModal() {
   }
 }
 
-function assignOrderPrompt(order) {
-  const email = prompt(
-    "Inserisci l'email del collaboratore a cui assegnare l'ordine:",
-    order.assignedToEmail || ""
-  );
-  if (!email) return;
+async function assignOrderPrompt(order) {
+  try {
+    const nextByStatus = {
+      [STATUS.WAREHOUSE_PENDING]: ROLES.WAREHOUSE,
+      [STATUS.PHOTO_PENDING]: ROLES.PHOTOGRAPHER,
+      [STATUS.POST_PENDING]: ROLES.POST_PRODUCER,
+      [STATUS.PARTNER_PENDING]: ROLES.PARTNER,
+      [STATUS.ADMIN_REVIEW]: ROLES.ADMIN,
+    };
 
-  Backendless.Data.of(ORDER_TABLE)
-    .save({
-      objectId: order.objectId,
-      assignedToEmail: email,
-      lastUpdated: new Date(),
-    })
-    .then(() => {
-      loadAdminOrders();
-      toast("Ordine assegnato");
-    })
-    .catch((err) => {
-      console.error("Errore assegnazione", err);
-      alert("Errore nell'assegnazione: " + (err.message || ""));
-    });
+    const nextRole = nextByStatus[order.status];
+
+    if (!nextRole) {
+      alert("Impossibile determinare il prossimo step del workflow.");
+      return;
+    }
+
+    // Trova un utente del ruolo richiesto
+    const qb = Backendless.DataQueryBuilder.create()
+      .setWhereClause(`role = '${nextRole}'`)
+      .setPageSize(1);
+
+    const users = await Backendless.Data.of(USER_TABLE).find(qb);
+
+    if (users.length === 0) {
+      alert(`Nessun utente con ruolo ${nextRole}`);
+      return;
+    }
+
+    const assignedUser = users[0];
+
+    // Aggiorna l’ordine
+    order.assignedToEmail = assignedUser.email;
+    order.assignedToId = assignedUser.objectId;
+
+    await Backendless.Data.of(ORDER_TABLE).save(order);
+
+    toast(`Ordine assegnato a ${assignedUser.email}`);
+    loadAdminOrders();
+
+  } catch (err) {
+    console.error("Errore assegnazione workflow:", err);
+    alert(err.message);
+  }
+}
+
+async function moveOrderToNextStep(order) {
+  const transitions = {
+    [STATUS.WAREHOUSE_PENDING]: STATUS.PHOTO_PENDING,
+    [STATUS.PHOTO_PENDING]: STATUS.POST_PENDING,
+    [STATUS.POST_PENDING]: STATUS.PARTNER_PENDING,
+    [STATUS.PARTNER_PENDING]: STATUS.ADMIN_REVIEW,
+    [STATUS.ADMIN_REVIEW]: STATUS.COMPLETED,
+  };
+
+  const next = transitions[order.status];
+
+  if (!next) {
+    toast("Nessun step successivo.");
+    return;
+  }
+
+  order.status = next;
+  await Backendless.Data.of(ORDER_TABLE).save(order);
+
+  toast(`Avanzato a: ${next}`);
+  loadWorkerOrders();
 }
 
 async function markOrderDelivered(objectId) {
@@ -1033,6 +1114,148 @@ async function loadWorkerOrders() {
 }
 
 // =====================================================
+//  MODALE CAMBIO RUOLO UTENTE (NUOVO BLOCCO)
+// =====================================================
+
+let roleChangeUserId = null;
+
+// Apre la modale
+function openChangeRoleModal(userId, currentRole) {
+  roleChangeUserId = userId;
+
+  const modal = document.getElementById("role-change-modal");
+  const select = document.getElementById("role-change-select");
+
+  select.value = currentRole || "";
+
+  modal.classList.remove("hidden");
+}
+
+// Chiude
+function closeChangeRoleModal() {
+  roleChangeUserId = null;
+  document.getElementById("role-change-modal").classList.add("hidden");
+}
+
+// Salva il nuovo ruolo
+async function confirmRoleChange() {
+  if (!roleChangeUserId) return;
+
+  const newRole = document.getElementById("role-change-select").value;
+  if (!newRole) {
+    alert("Seleziona un ruolo valido!");
+    return;
+  }
+
+  try {
+    const user = await Backendless.Data.of("Users").findById(roleChangeUserId);
+    user.role = newRole;
+
+    await Backendless.Data.of("Users").save(user);
+
+    closeChangeRoleModal();
+
+    alert("Ruolo aggiornato con successo.");
+    loadUsersList(); // refresh tabella utenti
+
+  } catch (err) {
+    console.error("Errore cambio ruolo", err);
+    alert("Errore durante il salvataggio.");
+  }
+}
+
+async function loadUsersList() {
+  const tbody = document.getElementById("users-table-body");
+  const loading = document.getElementById("users-loading");
+
+  tbody.innerHTML = "";
+  loading.textContent = "Caricamento…";
+
+  try {
+    const qb = Backendless.DataQueryBuilder.create()
+      .setWhereClause("email != null")
+      .setSortBy(["email ASC"])
+      .setPageSize(100);
+
+    const users = await Backendless.Data.of("Users").find(qb);
+
+    loading.textContent = "";
+
+    users.forEach((u) => {
+      const tr = document.createElement("tr");
+      tr.className = "hover:bg-slate-50";
+
+      // ---- EMAIL ----
+      const tdEmail = document.createElement("td");
+      tdEmail.className = "px-3 py-2";
+      tdEmail.textContent = u.email;
+      tr.appendChild(tdEmail);
+
+      // ---- RUOLO (SELECT) ----
+      const tdRole = document.createElement("td");
+      tdRole.className = "px-3 py-2";
+
+      const select = document.createElement("select");
+      select.className = "form-input text-xs";
+
+      const roles = [
+        "Admin",
+        "Warehouse",
+        "Photographer",
+        "PostProducer",
+        "Partner",
+        "Customer"
+      ];
+
+      roles.forEach((r) => {
+        const opt = document.createElement("option");
+        opt.value = r;
+        opt.textContent = r;
+        if (u.role === r) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener("change", () => changeUserRole(u.objectId, select.value));
+
+      tdRole.appendChild(select);
+      tr.appendChild(tdRole);
+
+      // ---- AZIONI ----
+      const tdActions = document.createElement("td");
+      tdActions.className = "px-3 py-2";
+
+      const btn = document.createElement("button");
+      btn.className = "btn-secondary text-xs";
+      btn.textContent = "Permessi";
+      btn.onclick = () => openPermissionsModal(u);
+
+      tdActions.appendChild(btn);
+      tr.appendChild(tdActions);
+
+      tbody.appendChild(tr);
+    });
+
+  } catch (err) {
+    console.error("Errore loadUsersList", err);
+    loading.textContent = "Errore caricamento utenti";
+  }
+}
+
+async function changeUserRole(userId, newRole) {
+  try {
+    const user = await Backendless.Data.of("Users").findById(userId);
+    user.role = newRole;
+
+    await Backendless.Data.of("Users").save(user);
+
+    showToast("Ruolo aggiornato");
+  } catch (err) {
+    console.error("Errore cambio ruolo", err);
+    showToast("Errore aggiornamento ruolo", "error");
+  }
+}
+
+// =====================================================
 //  INIT
 // =====================================================
 
@@ -1060,4 +1283,5 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
+
 
