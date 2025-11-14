@@ -473,6 +473,8 @@ function getVisibleFieldsForAdminTable() {
 	"gender",
 	"entryDate",
 	"exitDate",
+	"noteLogistica",
+	"photoStoragePath",
         "assignedToRole",
         "assignedToEmail", // Campo cruciale ora per l'assegnazione
         "noteAdmin",
