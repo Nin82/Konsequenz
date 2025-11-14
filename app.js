@@ -413,40 +413,56 @@ async function handleCreateUser() {
 // ===== MODALE PERMESSI =====
 
 function openPermissionsModal(user) {
-  permissionsEditingUser = user;
+  currentPermissionUser = user;
 
-  $("permissions-user-email").textContent = user.email || "";
-  const visible = parseJsonField(user.visibleFields);
-  const editable = parseJsonField(user.editableFields);
+  // Set email header
+  document.getElementById("permissions-user-email").textContent = user.email;
 
-  const visibleContainer = $("perm-visible-fields");
-  const editableContainer = $("perm-editable-fields");
-  visibleContainer.innerHTML = "";
-  editableContainer.innerHTML = "";
+  // Lista colonne (modifica se vuoi aggiungerne)
+  const fields = [
+    "productCode", "eanCode", "brand", "color", "size", "status", "quantity",
+    "shots", "priority", "provenienza", "tipologia", "ordine", "dataOrdine",
+    "entryDate", "exitDate", "collo", "dataReso", "ddt", "noteLogistica",
+    "onModelShot", "stillShot", "progOnModel", "s1Prog", "s2Prog",
+    "s1Stylist", "s2Stylist", "calendar"
+  ];
 
-  ORDER_FIELDS.forEach((f) => {
-    const idVis = `vis-${f.key}`;
-    const idEd = `ed-${f.key}`;
+  // Parsing valori user
+  const visible = Array.isArray(user.visibleFields) ? user.visibleFields : [];
+  const editable = Array.isArray(user.editableFields) ? user.editableFields : [];
 
-    const rowVis = document.createElement("label");
-    rowVis.className = "flex items-center gap-2";
-    rowVis.innerHTML = `
-      <input type="checkbox" id="${idVis}" class="h-3 w-3"
-             ${visible.includes(f.key) ? "checked" : ""} />
-      <span>${f.label}</span>`;
-    visibleContainer.appendChild(rowVis);
+  // Container
+  const boxVisible = document.getElementById("perm-visible-fields");
+  const boxEditable = document.getElementById("perm-editable-fields");
 
-    const rowEd = document.createElement("label");
-    rowEd.className = "flex items-center gap-2";
-    rowEd.innerHTML = `
-      <input type="checkbox" id="${idEd}" class="h-3 w-3"
-             ${editable.includes(f.key) ? "checked" : ""} />
-      <span>${f.label}</span>`;
-    editableContainer.appendChild(rowEd);
+  boxVisible.innerHTML = "";
+  boxEditable.innerHTML = "";
+
+  // Costruzione checkbox
+  fields.forEach(f => {
+    // VISIBILI
+    const rowV = document.createElement("div");
+    rowV.innerHTML = `
+      <label class="flex items-center gap-2">
+        <input type="checkbox" data-field-visible="${f}" ${visible.includes(f) ? "checked" : ""}>
+        <span>${f}</span>
+      </label>
+    `;
+    boxVisible.appendChild(rowV);
+
+    // EDITABILI
+    const rowE = document.createElement("div");
+    rowE.innerHTML = `
+      <label class="flex items-center gap-2">
+        <input type="checkbox" data-field-edit="${f}" ${editable.includes(f) ? "checked" : ""}>
+        <span>${f}</span>
+      </label>
+    `;
+    boxEditable.appendChild(rowE);
   });
 
-  $("permissions-status").classList.add("hidden");
-  show($("permissions-modal"));
+  // Mostra modale
+  document.getElementById("permissions-modal").classList.remove("hidden");
 }
 
 function closePermissionsModal() {
@@ -487,6 +503,46 @@ async function saveUserPermissions() {
     console.error("Errore salvataggio permessi", err);
     statusEl.textContent = err.message || "Errore salvando i permessi.";
     statusEl.className = "text-xs mt-2 text-rose-600";
+  }
+}
+
+
+async function saveUserPermissions() {
+  const modal = document.getElementById("permissions-modal");
+  const statusEl = document.getElementById("permissions-status");
+
+  try {
+    const visible = [];
+    const editable = [];
+
+    document.querySelectorAll("[data-field-visible]").forEach(ch => {
+      if (ch.checked) visible.push(ch.getAttribute("data-field-visible"));
+    });
+
+    document.querySelectorAll("[data-field-edit]").forEach(ch => {
+      if (ch.checked) editable.push(ch.getAttribute("data-field-edit"));
+    });
+
+    currentPermissionUser.visibleFields = visible;
+    currentPermissionUser.editableFields = editable;
+
+    await Backendless.Data.of("Users").save(currentPermissionUser);
+
+    statusEl.textContent = "Permessi salvati con successo ✔";
+    statusEl.classList.remove("hidden");
+    statusEl.classList.add("text-green-600");
+
+    setTimeout(() => {
+      modal.classList.add("hidden");
+      statusEl.classList.add("hidden");
+      loadUsersList();
+    }, 600);
+
+  } catch (err) {
+    console.error("Errore salvataggio permessi", err);
+    statusEl.textContent = "Errore durante il salvataggio";
+    statusEl.classList.remove("hidden");
+    statusEl.classList.add("text-red-600");
   }
 }
 
@@ -1283,6 +1339,5 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
-
 
 
