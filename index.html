@@ -3,99 +3,311 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <title>Konsequenz Workflow</title>
+  <title>Konsequenz</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Backendless SDK (MANDATORY) -->
+  <!-- XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- Backendless -->
   <script src="https://cdn.jsdelivr.net/npm/backendless"></script>
 
-  <!-- Custom CSS -->
   <link rel="stylesheet" href="styles.css" />
 </head>
+<body class="bg-gray-100">
 
-<body class="bg-gray-900 text-gray-100">
+  <!-- =============================== -->
+  <!-- LOGIN AREA -->
+  <!-- =============================== -->
+  <div id="login-area" class="flex flex-col items-center justify-center h-screen">
+    <div class="bg-white p-6 rounded shadow w-80">
+      <h2 class="text-xl font-bold mb-4 text-center">Accesso</h2>
 
-  <!-- =======================
-       TOP BAR + HAMBURGER
-  ======================== -->
-  <header class="fixed top-0 left-0 w-full h-14 bg-gray-800 shadow-lg flex items-center px-4 z-40">
-    <button id="menu-toggle" class="text-gray-200 hover:text-white">
-      <i data-lucide="menu" class="w-6 h-6"></i>
-    </button>
-    <h1 class="ml-4 text-xl font-bold">Konsequenz Workflow</h1>
-  </header>
+      <label class="block text-sm font-medium">Email</label>
+      <input id="user-email" type="email" class="w-full border rounded p-2 mb-3" />
 
+      <label class="block text-sm font-medium">Password</label>
+      <input id="user-password" type="password" class="w-full border rounded p-2 mb-4" />
 
-  <!-- =======================
-       SIDEBAR MOBILE / DARK
-  ======================== -->
-  <aside id="sidebar"
-         class="fixed top-0 left-0 h-full w-64 bg-gray-850 shadow-xl transform -translate-x-full
-                transition-transform duration-300 z-50">
+      <button onclick="handleStandardLogin(
+        document.getElementById('user-email').value,
+        document.getElementById('user-password').value
+      )"
+      class="btn-primary w-full py-2 mb-3">Accedi</button>
 
-    <div class="h-14 flex items-center px-4 border-b border-gray-700">
-      <h2 class="text-lg font-semibold text-green-400">Menu</h2>
-    </div>
-
-    <div class="p-4 border-b border-gray-700">
-      <p class="text-sm text-gray-400">Utente:</p>
-      <p id="user-name-sidebar" class="text-lg font-semibold text-white">Ospite</p>
-
-      <p class="text-sm mt-1 text-gray-400">Ruolo:</p>
-      <p id="user-role-sidebar" class="text-md font-semibold text-indigo-400">N/A</p>
-    </div>
-
-    <nav id="sidebar-menu" class="p-4 space-y-3">
-      <button class="sidebar-item" data-section="dashboard-admin">Dashboard Admin</button>
-      <button class="sidebar-item" data-section="dashboard-worker">Dashboard Lavoratore</button>
-      <button class="sidebar-item" data-section="settings">Impostazioni</button>
-
-      <button onclick="logoutUser()"
-              class="w-full mt-6 py-2 bg-red-600 hover:bg-red-700 rounded-md font-semibold">
-        Logout
+      <button onclick="handlePasswordRecovery()" class="btn-secondary w-full py-2 text-sm">
+        Password dimenticata
       </button>
-    </nav>
 
-  </aside>
+      <p id="login-status" class="status-message hidden mt-3"></p>
+    </div>
+  </div>
 
-  <!-- Overlay -->
-  <div id="sidebar-overlay"
-       class="fixed inset-0 bg-black bg-opacity-40 hidden z-40"></div>
+  <!-- =============================== -->
+  <!-- DASHBOARD ADMIN -->
+  <!-- =============================== -->
+  <div id="admin-dashboard" class="hidden p-6">
+
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold">Pannello Amministratore</h2>
+      <button onclick="handleLogout()" class="btn-danger px-4 py-2">Logout</button>
+    </div>
+
+    <!-- SWITCH CARDS -->
+    <div class="flex space-x-6 mb-6">
+
+      <label class="flex items-center space-x-2 cursor-pointer">
+        <input type="checkbox" id="toggle-users-card" />
+        <span>Gestione Utenti</span>
+      </label>
+
+      <label class="flex items-center space-x-2 cursor-pointer">
+        <input type="checkbox" id="toggle-import-card" />
+        <span>Import Ordini</span>
+      </label>
+
+      <label class="flex items-center space-x-2 cursor-pointer">
+        <input type="checkbox" id="toggle-stats-card" />
+        <span>Statistiche</span>
+      </label>
+    </div>
+
+    <!-- CARD UTENTI -->
+    <div id="card-users" class="card mb-8 hidden">
+      <h3 class="card-title">Gestione Utenti</h3>
+
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <input id="new-user-email" class="input" placeholder="Email" />
+        <input id="new-user-password" type="password" class="input" placeholder="Password" />
+        <select id="new-user-role" class="input">
+          <option value="">Ruolo...</option>
+          <option value="Magazzino">Magazzino</option>
+          <option value="Photographer">Photographer</option>
+          <option value="PostProducer">PostProducer</option>
+          <option value="Partner">Partner</option>
+          <option value="Customer">Customer</option>
+        </select>
+      </div>
+
+      <button onclick="handleUserCreation()" class="btn-primary px-4 py-2 mb-4">Crea Utente</button>
+
+      <p id="user-creation-status" class="status-message hidden"></p>
+
+      <table id="users-table" class="table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Ruolo</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <p id="loading-users" class="text-gray-500 mt-3"></p>
+    </div>
+
+    <!-- CARD IMPORT ORDINI -->
+    <div id="card-import" class="card mb-10 hidden">
+      <h3 class="card-title">Importa Ordini Excel</h3>
+
+      <div class="grid grid-cols-4 gap-4 mb-3">
+        <input id="admin-provenienza" class="input" placeholder="Provenienza" />
+        <input id="admin-tipologia" class="input" placeholder="Tipologia" />
+        <input id="admin-ordine" class="input" placeholder="Numero Ordine" />
+        <input id="admin-data-ordine" type="date" class="input" />
+      </div>
+
+      <input id="excel-file-input" type="file" accept=".xlsx,.xls" class="mb-3" />
+
+      <button onclick="handleFileUpload()" class="btn-primary px-4 py-2">Importa File</button>
+
+      <div class="w-full bg-gray-200 h-2 mt-4 rounded">
+        <div id="import-progress-bar" class="bg-green-500 h-2 rounded" style="width:0;"></div>
+      </div>
+
+      <p id="import-status" class="status-message hidden mt-4"></p>
+
+      <pre id="import-log" class="bg-gray-100 p-3 rounded mt-4 hidden"></pre>
+    </div>
+
+    <!-- CARD STATISTICHE -->
+    <div id="admin-stats-section" class="card hidden">
+      <h3 class="card-title">Statistiche Ordini</h3>
+
+      <div id="admin-stats" class="grid grid-cols-4 gap-4 my-6"></div>
+
+      <canvas id="admin-stats-chart" height="100"></canvas>
+    </div>
+
+    <!-- =============================== -->
+    <!-- LISTA ORDINI ADMIN -->
+    <!-- =============================== -->
+    <div id="orders-admin-card" class="card mt-10 hidden">
+
+      <h3 class="card-title">Ordini Importati</h3>
+      <p id="loading-admin-orders" class="text-gray-500 mb-3"></p>
+
+      <table id="admin-orders-table" class="table">
+        <thead>
+          <tr>
+            <th>EAN</th>
+            <th>Codice Articolo</th>
+            <th>Brand</th>
+            <th>Colore</th>
+            <th>Taglia</th>
+            <th>Stato</th>
+            <th>Assegnato a</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+    </div>
+
+    <!-- =============================== -->
+    <!-- MODALE EDIT ORDINE ADMIN -->
+    <!-- =============================== -->
+    <div id="admin-order-edit-card"
+         class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+
+      <div class="bg-white w-11/12 max-w-3xl p-6 rounded shadow-md relative">
+
+        <h3 class="text-xl font-bold mb-4">
+          Modifica Ordine – <span id="admin-ean-display" class="text-indigo-600"></span>
+        </h3>
+
+        <div id="admin-order-fields" class="grid grid-cols-2 gap-4 mb-4"></div>
+
+        <div class="flex space-x-3 mt-4">
+          <button onclick="saveAdminOrderUpdates()" class="btn-success px-4 py-2">Salva</button>
+          <button onclick="cancelAdminOrderEdit()" class="btn-secondary px-4 py-2">Annulla</button>
+        </div>
+
+        <p id="admin-update-feedback" class="status-message hidden mt-3"></p>
+
+        <button onclick="cancelAdminOrderEdit()"
+                class="absolute right-3 top-2 text-2xl text-gray-400 hover:text-gray-600">&times;</button>
+      </div>
+    </div>
+    <!-- =============================== -->
+    <!--     WORKER DASHBOARD (ruoli)   -->
+    <!-- =============================== -->
+    <div id="worker-dashboard" class="space-y-10 hidden">
+
+      <h2 class="text-2xl font-bold text-gray-800">Area Operativa</h2>
+
+      <p id="operation-feedback" class="status-message hidden"></p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+
+        <!-- ================================= -->
+        <!--             BOX EAN INPUT         -->
+        <!-- ================================= -->
+        <div class="card lg:col-span-1">
+
+          <h3 class="card-title">1. Lavorazione Attuale</h3>
+
+          <p class="text-sm text-gray-600 mb-3">Inserisci o scansiona il codice EAN</p>
+
+          <input id="ean-input" class="input mb-3" placeholder="Codice EAN">
+
+          <button id="confirm-ean-btn"
+                  onclick="confirmEanInput()"
+                  class="btn-primary w-full py-2">
+            Conferma EAN
+          </button>
+
+          <p id="scan-status" class="status-message mt-3 hidden"></p>
 
 
-  <!-- =======================
-        MAIN CONTENT AREA
-  ======================== -->
-  <main id="main-content"
-        class="pt-16 p-4 transition-all duration-300">
-    <div id="dynamic-content" class="mt-4"></div>
-  </main>
+          <!-- =============================== -->
+          <!--   SEZIONE EDIT EAN OPERATIVA   -->
+          <!-- =============================== -->
+          <div id="ean-actions-area"
+               class="hidden mt-5 border border-gray-300 rounded p-4 bg-gray-50">
 
-  <!-- JS -->
-  <script src="app.js" defer></script>
+            <h4 class="flex justify-between items-center mb-3 text-sm font-semibold text-gray-700">
+              Dati Operativi – <span id="current-ean-display"></span>
+              <button onclick="resetEanActionState(true)" class="btn-secondary px-2 py-1 text-sm">
+                × Chiudi
+              </button>
+            </h4>
 
-  <script>
-    lucide.createIcons();
+            <div id="operational-fields" class="space-y-3"></div>
 
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("sidebar-overlay");
+            <div class="flex space-x-2 mt-3">
+              <button onclick="saveEanUpdates()" class="btn-success flex-1 py-2">
+                Conferma Modifiche
+              </button>
+              <button onclick="resetEanActionState(true)" class="btn-secondary px-4 py-2">
+                Annulla
+              </button>
+            </div>
 
-    document.getElementById("menu-toggle").addEventListener("click", () => {
-      sidebar.classList.remove("-translate-x-full");
-      overlay.classList.remove("hidden");
-    });
+            <button onclick="markOrderAsDelivered()"
+                    id="btn-mark-delivered"
+                    class="btn-warning w-full mt-3 hidden">
+              Segna come CONSEGNATO
+            </button>
 
-    overlay.addEventListener("click", () => {
-      sidebar.classList.add("-translate-x-full");
-      overlay.classList.add("hidden");
-    });
-  </script>
+            <p id="update-status" class="status-message mt-3 hidden"></p>
 
+          </div>
+
+
+          <!-- ================================= -->
+          <!--           UPLOAD FOTO DRIVE       -->
+          <!-- ================================= -->
+          <div id="photo-upload-area"
+               class="hidden mt-6 p-4 bg-green-50 border border-green-300 rounded">
+
+            <h4 class="font-semibold text-green-700 mb-2">
+              Link Foto Drive – <span id="current-ean-display-upload"></span>
+            </h4>
+
+            <textarea id="photo-drive-links"
+                      class="w-full p-2 border rounded h-24 resize-y mb-3"
+                      placeholder="https://drive.google.com/... (uno per riga)"></textarea>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- ================================= -->
+        <!--       TABELLA ORDINI RUOLO        -->
+        <!-- ================================= -->
+        <div class="card lg:col-span-3">
+          <h3 class="card-title">
+            2. Ordini assegnati a:
+            <span id="worker-role-display-queue" class="text-indigo-700"></span>
+          </h3>
+
+          <p id="loading-orders" class="text-gray-500 p-3"></p>
+
+          <!-- TABELLA -->
+          <div class="overflow-x-auto">
+            <table id="orders-table" class="table">
+              <thead>
+                <tr id="orders-table-header">
+                  <!-- intestazioni generate da JS in base al ruolo -->
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+<script src="app.js" defer></script>
 </body>
 </html>
