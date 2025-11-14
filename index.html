@@ -305,7 +305,7 @@
               </div>
               <div class="flex gap-2">
                 <button class="btn-secondary text-xs px-3 py-1.5" onclick="closeOrderModal()">Annulla</button>
-                <button class="btn-primary text-xs px-3 py-1.5" onclick="saveOrderFromModal()">Salva</button>
+                <button id="order-modal-save-btn" class="btn-primary text-xs px-3 py-1.5" onclick="saveOrderFromModal()">Salva</button>
               </div>
             </div>
 
@@ -390,6 +390,7 @@
     </div>
   </div>
 </div>
+<div id="toast-container" class="fixed bottom-4 right-4 z-50 p-2 rounded-md text-xs text-white bg-slate-700 hidden"></div>
   <!-- SCRIPT PRINCIPALE -->
   <script src="app.js"></script>
 </body>
