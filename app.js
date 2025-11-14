@@ -700,111 +700,136 @@ function getVisibleFieldsForAdminTable() {
   ];
 }
 
-async function loadAdminOrders() {
-  const loading = $("orders-loading");
-  loading.textContent = "Caricamento…";
+async function loadWorkerOrders() {
+    const loading = $("worker-orders-loading");
+    const header = $("worker-orders-header");
+    const body = $("worker-orders-body");
 
-  const headerRow = $("orders-header-row");
-  const filterRow = $("orders-filter-row");
-  const body = $("orders-table-body");
+    loading.textContent = "Caricamento…";
+    header.innerHTML = "";
+    body.innerHTML = "";
+    
+    const workerRole = currentUser.role;
+    let allOrders = []; // Array per accumulare tutti i risultati
+    const MAX_PAGE_SIZE = 100; 
+    let offset = 0;
+    let ordersChunk;
 
-  headerRow.innerHTML = "";
-  filterRow.innerHTML = "";
-  body.innerHTML = "";
+    try {
+        // Implementazione della paginazione (ciclo do...while)
+        do {
+            // Mostra solo ordini assegnati a questo utente
+            const qb = Backendless.DataQueryBuilder.create()
+                .setWhereClause(buildWhereEquals("assignedToEmail", currentUser.email))
+                .setPageSize(MAX_PAGE_SIZE) // Limite Backendless
+                .setOffset(offset)          // 0, 100, 200, ecc.
+                .setSortBy(["lastUpdated DESC"]);
 
-  try {
-    const qb = Backendless.DataQueryBuilder.create()
-      .setPageSize(100)
-      .setSortBy(["lastUpdated DESC"]);
+            ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
 
-    const orders = await Backendless.Data.of(ORDER_TABLE).find(qb);
-    adminOrdersCache = orders;
+            allOrders.push(...ordersChunk); // Aggiunge i risultati
+            offset += MAX_PAGE_SIZE;      // Incrementa l'offset per la prossima pagina
+            
+        } while (ordersChunk.length === MAX_PAGE_SIZE); // Continua finché la pagina è piena
 
-    const visFields = getVisibleFieldsForAdminTable();
-    const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
 
-    // header
-    fieldConfig.forEach((f) => {
-      const th = document.createElement("th");
-      th.className = "th";
-      th.textContent = f.label;
-      headerRow.appendChild(th);
-    });
-    // azioni
-    const thAct = document.createElement("th");
-    thAct.className = "th";
-    thAct.textContent = "Azioni";
-    headerRow.appendChild(thAct);
+        const orders = allOrders; // 'orders' contiene TUTTI i record
 
-    // filter row
-    fieldConfig.forEach((f) => {
-      const td = document.createElement("td");
-      td.className = "px-2 py-1";
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className =
-        "w-full rounded border border-slate-200 px-2 py-1 text-[10px]";
-      input.placeholder = "Filtro";
-      input.dataset.fieldKey = f.key;
-      input.addEventListener("input", applyOrdersFilters);
-      td.appendChild(input);
-      filterRow.appendChild(td);
-    });
-    const tdFilterEmpty = document.createElement("td");
-    filterRow.appendChild(tdFilterEmpty);
 
-    // righe
-    orders.forEach((o) => {
-      const tr = document.createElement("tr");
-      tr.className = "hover:bg-slate-50 text-[11px]";
-      tr.dataset.objectId = o.objectId;
+        // Determina i campi visibili per questo ruolo
+        const defaultVisible = ["productCode", "eanCode", "status"];
+        // Assicurati che currentUser.visibleFields sia parsato correttamente (da stringa JSON)
+        const visibleFields = parseJsonField(currentUser.visibleFields); 
+        
+        // Filtra i campi da mostrare in base alla configurazione del ruolo
+        const fieldsToShow = ORDER_FIELDS.filter((f) =>
+            visibleFields.length > 0 ? visibleFields.includes(f.key) : defaultVisible.includes(f.key)
+        );
+        
+        // Determina se il worker ha permessi di modifica per mostrare il bottone "Modifica"
+        const editableFields = parseJsonField(currentUser.editableFields);
+        const hasEditPermission = editableFields.length > 0;
+        
+        // Determina il testo del bottone "Avanza"
+        const advanceBtnText = PIPELINE_FLOW[workerRole]?.nextState ? 
+            `Avanza a ${PIPELINE_FLOW[workerRole].nextState.replace('_', ' ').toUpperCase()}` : 
+            'Avanza a FINE';
 
-      fieldConfig.forEach((f) => {
-        const td = document.createElement("td");
-        td.className = "px-3 py-2";
-        let val = o[f.key];
 
-        if (f.key === "status") {
-          td.textContent = val || "";
-        } else if (f.key === "assignedToEmail") {
-          td.textContent = o.assignedToEmail || "";
-        } else {
-          td.textContent = val || "";
-        }
-        tr.appendChild(td);
-      });
+        // ==========================
+        // HEADER TABELLA
+        // ==========================
+        fieldsToShow.forEach((f) => {
+            const th = document.createElement("th");
+            th.className = "th";
+            th.textContent = f.label;
+            header.appendChild(th);
+        });
 
-      const tdAct2 = document.createElement("td");
-      tdAct2.className = "px-3 py-2 space-x-1 whitespace-nowrap";
+        const thActions = document.createElement("th");
+        thActions.className = "th";
+        thActions.textContent = "Azioni";
+        header.appendChild(thActions);
 
-      const btnEdit = document.createElement("button");
-      btnEdit.className = "btn-secondary text-[10px]";
-      btnEdit.textContent = "Modifica";
-      btnEdit.onclick = () => openOrderModal(o.objectId);
-      tdAct2.appendChild(btnEdit);
+        // ==========================
+        // RIGHE ORDINI
+        // ==========================
+        orders.forEach((o) => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-slate-50 text-[11px]";
 
-      const btnAssign = document.createElement("button");
-      btnAssign.className = "btn-secondary text-[10px]";
-      btnAssign.textContent = "Assegna";
-      btnAssign.onclick = () => assignOrderPrompt(o);
-      tdAct2.appendChild(btnAssign);
+            // colonne dei campi
+            fieldsToShow.forEach((f) => {
+                const td = document.createElement("td");
+                td.className = "px-3 py-2";
+                
+                if (f.key === 'status') {
+                     // Logica per il badge di stato colorato
+                     const colorClass = STATUS_COLORS[o.status] || 'bg-slate-50 text-slate-600 border-slate-200';
+                     td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${o.status.replace('_', ' ') || ''}</span>`;
+                } else if (f.key === 'lastUpdated') {
+                    td.textContent = o[f.key] ? new Date(o[f.key]).toLocaleDateString('it-IT') : "";
+                } else {
+                     td.textContent = o[f.key] || "";
+                }
+                tr.appendChild(td);
+            });
 
-      const btnDelivered = document.createElement("button");
-      btnDelivered.className = "btn-primary text-[10px]";
-      btnDelivered.textContent = "Consegnato";
-      btnDelivered.onclick = () => markOrderDelivered(o.objectId);
-      tdAct2.appendChild(btnDelivered);
+            // BOTTONI AZIONI
+            const tdAct = document.createElement("td");
+            tdAct.className = "px-3 py-2 space-x-1 whitespace-nowrap";
 
-      tr.appendChild(tdAct2);
+            // Bottone Modifica (mostrato solo se l'utente ha permessi di modifica su almeno un campo)
+            if (hasEditPermission) {
+                const btnEdit = document.createElement("button");
+                btnEdit.className = "btn-secondary text-[10px]";
+                btnEdit.textContent = "Modifica";
+                btnEdit.onclick = () => openOrderModal(o.objectId);
+                tdAct.appendChild(btnEdit);
+            }
+            
+            // Bottone Avanza
+            const btnAdvance = document.createElement("button");
+            btnAdvance.className = "btn-primary text-[10px]";
+            btnAdvance.textContent = advanceBtnText;
+            btnAdvance.onclick = () => advanceOrder(o.objectId);
+            
+            // Mostra Avanza solo se l'ordine è assegnato a lui E non è Admin Validation/Completed
+            if (o.assignedToRole === workerRole && o.status !== ORDER_STATES.ADMIN_VALIDATION && o.status !== ORDER_STATES.COMPLETED) {
+                tdAct.appendChild(btnAdvance);
+            }
 
-      body.appendChild(tr);
-    });
 
-    loading.textContent = "";
-  } catch (err) {
-    console.error("Errore loadAdminOrders", err);
-    loading.textContent = "Errore durante il caricamento ordini.";
-  }
+            tr.appendChild(tdAct);
+            body.appendChild(tr);
+        });
+
+        loading.textContent =
+            orders.length === 0 ? "Nessun ordine assegnato." : "";
+    } catch (err) {
+        console.error("Errore loadWorkerOrders", err);
+        loading.textContent = "Errore caricamento ordini.";
+    }
 }
 
 // filtro client-side
