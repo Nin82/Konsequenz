@@ -108,6 +108,7 @@ let adminOrdersCache = [];
 let currentOrderEditing = null;
 let currentPermissionUser = null; // Usato per il modale permessi
 let statsChartInstance = null;
+let allWorkersCache = [];
 
 // =====================================================
 //  UTILITY UI
@@ -220,7 +221,8 @@ async function afterLogin() {
     show($("admin-view"));
     hide($("worker-view"));
 
-    await loadUsersList(); // Usa la nuova funzione
+    await loadUsersList();
+    await loadAllWorkers(); // <-- NUOVA CHIAMATA
     await loadAdminOrders();
     await loadAdminStats();
   } else {
@@ -421,6 +423,47 @@ async function handleCreateUser() {
     statusEl.textContent = err.message || "Errore creando l'utente.";
     statusEl.className = "text-xs mt-1 text-rose-600";
   }
+}
+
+
+// Carica tutti i lavoratori (non Admin e non Customer) in una cache globale
+async function loadAllWorkers() {
+    try {
+        const qb = Backendless.DataQueryBuilder.create()
+            .setWhereClause("role != 'Admin' AND role != 'Customer' AND email != null")
+            .setPageSize(MAX_PAGE_SIZE * 10); // Carica un numero sufficiente di lavoratori (sperando basti 1000)
+            
+        allWorkersCache = await Backendless.Data.of("Users").find(qb); 
+    } catch (err) {
+        console.error("Errore caricamento lavoratori", err);
+    }
+}
+
+// Gestisce l'assegnazione manuale tramite il menu a tendina Admin
+async function assignOrderManually(orderId, newEmail) {
+    if (!newEmail) {
+        toast("Assegnazione annullata.", "info");
+        return;
+    }
+    
+    try {
+        const update = { 
+            objectId: orderId, 
+            assignedToEmail: newEmail,
+            lastUpdated: new Date()
+        };
+
+        await Backendless.Data.of(ORDER_TABLE).save(update);
+
+        toast(`Ordine assegnato a ${newEmail}.`, "success");
+        
+        // Ricarica la tabella per aggiornare la visualizzazione
+        loadAdminOrders(); 
+        
+    } catch (err) {
+        console.error("Errore assegnazione manuale", err);
+        toast("Errore durante l'assegnazione manuale.", "error");
+    }
 }
 
 // ===== MODALE PERMESSI (VERSIONE FINALE) =====
@@ -701,20 +744,6 @@ async function handleImportClick() {
 //  ORDINI ADMIN – TABELLONE + MODALE (CON PAGINAZIONE)
 // =====================================================
 
-function getVisibleFieldsForAdminTable() {
-  // Admin vede sempre solo i campi principali in tabella (per non renderla troppo larga)
-  return [
-    "productCode",
-    "eanCode",
-    "brand",
-    "color",
-    "size",
-    "status",
-    "assignedToEmail",
-    "lastUpdated", // Utile per l'admin
-  ];
-}
-
 async function loadAdminOrders() {
     const loading = $("orders-loading");
     loading.textContent = "Caricamento…";
@@ -729,52 +758,45 @@ async function loadAdminOrders() {
 
     let allOrders = []; // Array per accumulare tutti i risultati
     let offset = 0;
+    const MAX_PAGE_SIZE = 100; // Usa la costante definita
     let ordersChunk;
-    
-    // Assicurati che MAX_PAGE_SIZE sia definito a 100 all'inizio del tuo app.js
-    const MAX_PAGE_SIZE = 100;
 
     try {
         // Implementazione della paginazione per recuperare TUTTI i record
         do {
             const qb = Backendless.DataQueryBuilder.create()
-                .setPageSize(MAX_PAGE_SIZE) // 100
-                .setOffset(offset)          // Inizia da 0, poi 100, 200...
+                .setPageSize(MAX_PAGE_SIZE) 
+                .setOffset(offset)         
                 .setSortBy(["lastUpdated DESC"]);
 
             ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
 
-            allOrders.push(...ordersChunk); // Aggiunge i risultati al totale
-            offset += MAX_PAGE_SIZE;      // Incrementa l'offset per la prossima pagina
+            allOrders.push(...ordersChunk); 
+            offset += MAX_PAGE_SIZE;      
             
-        } while (ordersChunk.length === MAX_PAGE_SIZE); // Continua finché la pagina è piena
+        } while (ordersChunk.length === MAX_PAGE_SIZE); 
 
 
-        const orders = allOrders; // 'orders' contiene TUTTI i record
-        adminOrdersCache = orders; // Memorizza per il filtro lato client
+        const orders = allOrders; 
+        adminOrdersCache = orders; 
 
-        // Helper function (deve esistere altrove nel tuo codice)
-        const visFields = getVisibleFieldsForAdminTable(); 
+        const visFields = getVisibleFieldsForAdminTable();
         const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
 
-        // ==========================
-        // COSTRUZIONE HEADER (intestazioni)
-        // ==========================
+        // header
         fieldConfig.forEach((f) => {
             const th = document.createElement("th");
             th.className = "th";
             th.textContent = f.label;
             headerRow.appendChild(th);
         });
-        // colonna azioni
+        // azioni
         const thAct = document.createElement("th");
         thAct.className = "th";
         thAct.textContent = "Azioni";
         headerRow.appendChild(thAct);
 
-        // ==========================
-        // COSTRUZIONE FILTER ROW
-        // ==========================
+        // filter row
         fieldConfig.forEach((f) => {
             const td = document.createElement("td");
             td.className = "px-2 py-1";
@@ -784,17 +806,14 @@ async function loadAdminOrders() {
                 "w-full rounded border border-slate-200 px-2 py-1 text-[10px]";
             input.placeholder = "Filtro";
             input.dataset.fieldKey = f.key;
-            // Funzione filtro (deve esistere altrove nel tuo codice)
-            input.addEventListener("input", applyOrdersFilters); 
+            input.addEventListener("input", applyOrdersFilters);
             td.appendChild(input);
             filterRow.appendChild(td);
         });
         const tdFilterEmpty = document.createElement("td");
         filterRow.appendChild(tdFilterEmpty);
 
-        // ==========================
-        // COSTRUZIONE RIGHE DATI
-        // ==========================
+        // righe
         orders.forEach((o) => {
             const tr = document.createElement("tr");
             tr.className = "hover:bg-slate-50 text-[11px]";
@@ -806,9 +825,8 @@ async function loadAdminOrders() {
                 let val = o[f.key];
 
                 if (f.key === "status") {
-                    // Aggiungere un badge per lo stato (con conversione del colore)
+                    // Badge per lo stato
                     const colorClass = STATUS_COLORS[val] || 'bg-slate-50 text-slate-600 border-slate-200';
-                    // Sostituisce underscore con spazio e mette in maiuscolo per leggibilità
                     td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${val.replace('_', ' ').toUpperCase() || ''}</span>`;
                 } else if (f.key === "lastUpdated") {
                     td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
@@ -819,10 +837,11 @@ async function loadAdminOrders() {
             });
 
             // ==========================
-            // BOTTONI AZIONI
+            // BOTTONI AZIONI E ASSEGNAZIONE (NUOVO BLOCCO)
             // ==========================
             const tdAct2 = document.createElement("td");
-            tdAct2.className = "px-3 py-2 space-x-1 whitespace-nowrap";
+            // Usiamo flex per allineare tutto sulla stessa riga
+            tdAct2.className = "px-3 py-2 space-x-1 flex items-center gap-2 whitespace-nowrap"; 
 
             const btnEdit = document.createElement("button");
             btnEdit.className = "btn-secondary text-[10px]";
@@ -835,7 +854,51 @@ async function loadAdminOrders() {
             btnAdvance.textContent = "Avanza";
             btnAdvance.onclick = () => advanceOrder(o.objectId);
             tdAct2.appendChild(btnAdvance);
+            
+            // --- MENU A TENDINA PER L'ASSEGNAZIONE ---
 
+            // Il ruolo target è quello a cui l'ordine è attualmente assegnato
+            const roleTarget = o.assignedToRole; 
+            
+            // Filtra i lavoratori che hanno quel ruolo dalla cache
+            const workersForRole = allWorkersCache.filter(w => w.role === roleTarget);
+            
+            if (workersForRole.length > 0) {
+                const selectAssign = document.createElement("select");
+                selectAssign.className = "form-input text-[10px] w-32";
+                selectAssign.title = `Assegna a un ${roleTarget}`;
+
+                // Opzione di default (istruzione)
+                const optDefault = document.createElement("option");
+                optDefault.value = "";
+                optDefault.textContent = `Assegna ${roleTarget}...`;
+                selectAssign.appendChild(optDefault);
+
+                // Opzioni Lavoratori Filtrati
+                workersForRole.forEach(w => {
+                    const opt = document.createElement("option");
+                    opt.value = w.email;
+                    // Mostra solo il nome utente per non occupare troppo spazio
+                    opt.textContent = w.email.split('@')[0]; 
+                    if (o.assignedToEmail === w.email) {
+                        opt.selected = true;
+                    }
+                    selectAssign.appendChild(opt);
+                });
+                
+                // Listener: chiama la funzione di assegnazione manuale
+                selectAssign.addEventListener('change', (e) => 
+                    assignOrderManually(o.objectId, e.target.value)
+                );
+
+                tdAct2.appendChild(selectAssign);
+            } else if (roleTarget && roleTarget !== ROLES.ADMIN) {
+                // Messaggio se non ci sono lavoratori per quel ruolo (solo se non è l'Admin)
+                const span = document.createElement('span');
+                span.className = 'text-rose-500 text-[10px]';
+                span.textContent = `(Manca ${roleTarget})`;
+                tdAct2.appendChild(span);
+            }
 
             tr.appendChild(tdAct2);
 
@@ -1327,4 +1390,3 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
-
