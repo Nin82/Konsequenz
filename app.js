@@ -428,15 +428,47 @@ async function handleCreateUser() {
 
 // Carica tutti i lavoratori (non Admin e non Customer) in una cache globale
 async function loadAllWorkers() {
+    let allWorkers = []; // Array per accumulare tutti i lavoratori
+    let offset = 0;
+    const MAX_PAGE_SIZE = 100; // Limite fisso di Backendless
+    let workersChunk;
+
     try {
-        const qb = Backendless.DataQueryBuilder.create()
-            .setWhereClause("role != 'Admin' AND role != 'Customer' AND email != null")
-            .setPageSize(MAX_PAGE_SIZE * 10); // Carica un numero sufficiente di lavoratori (sperando basti 1000)
+        // Implementazione della paginazione ricorsiva per gli utenti
+        do {
+            const qb = Backendless.DataQueryBuilder.create()
+                .setWhereClause("role != 'Admin' AND role != 'Customer' AND email != null")
+                .setPageSize(MAX_PAGE_SIZE)
+                .setOffset(offset);
+
+            workersChunk = await Backendless.Data.of("Users").find(qb);
             
-        allWorkersCache = await Backendless.Data.of("Users").find(qb); 
+            allWorkers.push(...workersChunk);
+            offset += MAX_PAGE_SIZE;
+
+        } while (workersChunk.length === MAX_PAGE_SIZE);
+
+        allWorkersCache = allWorkers; // Popola la cache globale
+        
     } catch (err) {
         console.error("Errore caricamento lavoratori", err);
+        // È utile sapere se c'è un errore, ma non deve bloccare l'intera app
     }
+}
+
+
+// Ritorna l'elenco dei campi (chiavi) che devono essere mostrati nella tabella Admin.
+function getVisibleFieldsForAdminTable() {
+    // Lista di campi di default per l'Admin. L'ordine qui determina l'ordine delle colonne.
+    return [
+        "productCode", 
+        "eanCode", 
+        "status", 
+        "assignedToRole",
+        "assignedToEmail", // Campo cruciale ora per l'assegnazione
+        "noteAdmin",
+        "lastUpdated" // Utile per l'ordinamento
+    ];
 }
 
 // Gestisce l'assegnazione manuale tramite il menu a tendina Admin
