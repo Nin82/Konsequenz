@@ -716,122 +716,137 @@ function getVisibleFieldsForAdminTable() {
 }
 
 async function loadAdminOrders() {
-  const loading = $("orders-loading");
-  loading.textContent = "Caricamento…";
+    const loading = $("orders-loading");
+    loading.textContent = "Caricamento…";
 
-  const headerRow = $("orders-header-row");
-  const filterRow = $("orders-filter-row");
-  const body = $("orders-table-body");
+    const headerRow = $("orders-header-row");
+    const filterRow = $("orders-filter-row");
+    const body = $("orders-table-body");
 
-  headerRow.innerHTML = "";
-  filterRow.innerHTML = "";
-  body.innerHTML = "";
+    headerRow.innerHTML = "";
+    filterRow.innerHTML = "";
+    body.innerHTML = "";
 
-  let allOrders = []; // Array per accumulare tutti i risultati
-  let offset = 0;
-  let ordersChunk;
+    let allOrders = []; // Array per accumulare tutti i risultati
+    let offset = 0;
+    let ordersChunk;
+    
+    // Assicurati che MAX_PAGE_SIZE sia definito a 100 all'inizio del tuo app.js
+    const MAX_PAGE_SIZE = 100;
 
-  try {
-    // Implementazione della paginazione
-    do {
-        const qb = Backendless.DataQueryBuilder.create()
-          .setPageSize(MAX_PAGE_SIZE) // 100
-          .setOffset(offset)          // 0, 100, 200...
-          .setSortBy(["lastUpdated DESC"]);
+    try {
+        // Implementazione della paginazione per recuperare TUTTI i record
+        do {
+            const qb = Backendless.DataQueryBuilder.create()
+                .setPageSize(MAX_PAGE_SIZE) // 100
+                .setOffset(offset)          // Inizia da 0, poi 100, 200...
+                .setSortBy(["lastUpdated DESC"]);
 
-        ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
+            ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
 
-        allOrders.push(...ordersChunk); // Aggiunge i risultati
-        offset += MAX_PAGE_SIZE;      // Incrementa l'offset per la prossima pagina
-        
-    } while (ordersChunk.length === MAX_PAGE_SIZE); // Continua finché la pagina è piena
-
-
-    const orders = allOrders; // 'orders' contiene TUTTI i record
-    adminOrdersCache = orders;
-
-    const visFields = getVisibleFieldsForAdminTable();
-    const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
-
-    // header
-    fieldConfig.forEach((f) => {
-      const th = document.createElement("th");
-      th.className = "th";
-      th.textContent = f.label;
-      headerRow.appendChild(th);
-    });
-    // azioni
-    const thAct = document.createElement("th");
-    thAct.className = "th";
-    thAct.textContent = "Azioni";
-    headerRow.appendChild(thAct);
-
-    // filter row
-    fieldConfig.forEach((f) => {
-      const td = document.createElement("td");
-      td.className = "px-2 py-1";
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className =
-        "w-full rounded border border-slate-200 px-2 py-1 text-[10px]";
-      input.placeholder = "Filtro";
-      input.dataset.fieldKey = f.key;
-      input.addEventListener("input", applyOrdersFilters);
-      td.appendChild(input);
-      filterRow.appendChild(td);
-    });
-    const tdFilterEmpty = document.createElement("td");
-    filterRow.appendChild(tdFilterEmpty);
-
-    // righe
-    orders.forEach((o) => {
-      const tr = document.createElement("tr");
-      tr.className = "hover:bg-slate-50 text-[11px]";
-      tr.dataset.objectId = o.objectId;
-
-      fieldConfig.forEach((f) => {
-        const td = document.createElement("td");
-        td.className = "px-3 py-2";
-        let val = o[f.key];
-
-        if (f.key === "status") {
-            // Aggiungere un badge per lo stato
-            const colorClass = STATUS_COLORS[val] ? STATUS_COLORS[val].replace('bg-', 'bg-').replace('text-', 'text-') : 'text-slate-600';
-            td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${val || ''}</span>`;
-        } else if (f.key === "lastUpdated") {
-            td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
-        } else {
-            td.textContent = val || "";
-        }
-        tr.appendChild(td);
-      });
-
-      const tdAct2 = document.createElement("td");
-      tdAct2.className = "px-3 py-2 space-x-1 whitespace-nowrap";
-
-      const btnEdit = document.createElement("button");
-      btnEdit.className = "btn-secondary text-[10px]";
-      btnEdit.textContent = "Modifica";
-      btnEdit.onclick = () => openOrderModal(o.objectId);
-      tdAct2.appendChild(btnEdit);
-
-      const btnAdvance = document.createElement("button");
-      btnAdvance.className = "btn-primary text-[10px]";
-      btnAdvance.textContent = "Avanza";
-      btnAdvance.onclick = () => advanceOrder(o.objectId);
-      tdAct2.appendChild(btnAdvance);
+            allOrders.push(...ordersChunk); // Aggiunge i risultati al totale
+            offset += MAX_PAGE_SIZE;      // Incrementa l'offset per la prossima pagina
+            
+        } while (ordersChunk.length === MAX_PAGE_SIZE); // Continua finché la pagina è piena
 
 
-      tr.appendChild(tdAct2);
+        const orders = allOrders; // 'orders' contiene TUTTI i record
+        adminOrdersCache = orders; // Memorizza per il filtro lato client
 
-      body.appendChild(tr);
-    });
+        // Helper function (deve esistere altrove nel tuo codice)
+        const visFields = getVisibleFieldsForAdminTable(); 
+        const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
 
-    loading.textContent = "";
-  } catch (err) {
-    console.error("Errore loadAdminOrders", err);
-    loading.textContent = "Errore durante il caricamento ordini.";
-  }
+        // ==========================
+        // COSTRUZIONE HEADER (intestazioni)
+        // ==========================
+        fieldConfig.forEach((f) => {
+            const th = document.createElement("th");
+            th.className = "th";
+            th.textContent = f.label;
+            headerRow.appendChild(th);
+        });
+        // colonna azioni
+        const thAct = document.createElement("th");
+        thAct.className = "th";
+        thAct.textContent = "Azioni";
+        headerRow.appendChild(thAct);
+
+        // ==========================
+        // COSTRUZIONE FILTER ROW
+        // ==========================
+        fieldConfig.forEach((f) => {
+            const td = document.createElement("td");
+            td.className = "px-2 py-1";
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className =
+                "w-full rounded border border-slate-200 px-2 py-1 text-[10px]";
+            input.placeholder = "Filtro";
+            input.dataset.fieldKey = f.key;
+            // Funzione filtro (deve esistere altrove nel tuo codice)
+            input.addEventListener("input", applyOrdersFilters); 
+            td.appendChild(input);
+            filterRow.appendChild(td);
+        });
+        const tdFilterEmpty = document.createElement("td");
+        filterRow.appendChild(tdFilterEmpty);
+
+        // ==========================
+        // COSTRUZIONE RIGHE DATI
+        // ==========================
+        orders.forEach((o) => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-slate-50 text-[11px]";
+            tr.dataset.objectId = o.objectId;
+
+            fieldConfig.forEach((f) => {
+                const td = document.createElement("td");
+                td.className = "px-3 py-2";
+                let val = o[f.key];
+
+                if (f.key === "status") {
+                    // Aggiungere un badge per lo stato (con conversione del colore)
+                    const colorClass = STATUS_COLORS[val] || 'bg-slate-50 text-slate-600 border-slate-200';
+                    // Sostituisce underscore con spazio e mette in maiuscolo per leggibilità
+                    td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${val.replace('_', ' ').toUpperCase() || ''}</span>`;
+                } else if (f.key === "lastUpdated") {
+                    td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
+                } else {
+                    td.textContent = val || "";
+                }
+                tr.appendChild(td);
+            });
+
+            // ==========================
+            // BOTTONI AZIONI
+            // ==========================
+            const tdAct2 = document.createElement("td");
+            tdAct2.className = "px-3 py-2 space-x-1 whitespace-nowrap";
+
+            const btnEdit = document.createElement("button");
+            btnEdit.className = "btn-secondary text-[10px]";
+            btnEdit.textContent = "Modifica";
+            btnEdit.onclick = () => openOrderModal(o.objectId);
+            tdAct2.appendChild(btnEdit);
+
+            const btnAdvance = document.createElement("button");
+            btnAdvance.className = "btn-primary text-[10px]";
+            btnAdvance.textContent = "Avanza";
+            btnAdvance.onclick = () => advanceOrder(o.objectId);
+            tdAct2.appendChild(btnAdvance);
+
+
+            tr.appendChild(tdAct2);
+
+            body.appendChild(tr);
+        });
+
+        loading.textContent = "";
+    } catch (err) {
+        console.error("Errore loadAdminOrders", err);
+        loading.textContent = "Errore durante il caricamento ordini.";
+    }
 }
 
 // filtro client-side
@@ -1312,3 +1327,4 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
+
