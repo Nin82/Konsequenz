@@ -1125,4 +1125,3 @@ function logoutUser() {
     console.error("Logout fallito:", error);
   }
 }
-
