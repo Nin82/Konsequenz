@@ -8,6 +8,9 @@ const API_KEY = "B266000F-684B-4889-9174-2D1734001E08";
 const ORDER_TABLE = "Orders";
 const USER_TABLE = "Users";
 
+// Limite massimo di record per chiamata API imposto da Backendless
+const MAX_PAGE_SIZE = 100; 
+
 Backendless.initApp(APP_ID, API_KEY);
 
 // =====================================================
@@ -23,12 +26,6 @@ const ROLES = {
   CUSTOMER: "Customer",
 };
 
-
-
-// =====================================================
-// PIPELINE STATI ORDINI
-// =====================================================
-
 const ORDER_STATES = {
   WAREHOUSE_PENDING: "warehouse_pending",
   PHOTO_PENDING: "photo_pending",
@@ -39,35 +36,30 @@ const ORDER_STATES = {
 
 // Ruolo → stato successivo + ruolo assegnatario
 const PIPELINE_FLOW = {
-  Warehouse: {
+  [ROLES.WAREHOUSE]: {
     nextState: ORDER_STATES.PHOTO_PENDING,
-    assignToRole: "Photographer",
+    assignToRole: ROLES.PHOTOGRAPHER,
   },
-
-  Photographer: {
+  [ROLES.PHOTOGRAPHER]: {
     nextState: ORDER_STATES.POST_PENDING,
-    assignToRole: "PostProducer",
+    assignToRole: ROLES.POST_PRODUCER,
   },
-
-  PostProducer: {
+  [ROLES.POST_PRODUCER]: {
     nextState: ORDER_STATES.ADMIN_VALIDATION,
-    assignToRole: "Admin",
+    assignToRole: ROLES.ADMIN, // Assegna all'admin per la validazione finale
   },
-
-  Admin: {
+  [ROLES.ADMIN]: {
     nextState: ORDER_STATES.COMPLETED,
-    assignToRole: "Admin",
+    assignToRole: ROLES.ADMIN,
   },
 };
 
-
-
-// Per i box colorati stats
+// Per i box colorati stats (CORRETTO con ORDER_STATES)
 const STATUS_COLORS = {
   [ORDER_STATES.WAREHOUSE_PENDING]: "bg-amber-50 text-amber-700 border-amber-200",
   [ORDER_STATES.PHOTO_PENDING]: "bg-sky-50 text-sky-700 border-sky-200",
   [ORDER_STATES.POST_PENDING]: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  [ORDER_STATES.ADMIN_VALIDATION]: "bg-orange-50 text-orange-700 border-orange-200", // Aggiunto per coerenza
+  [ORDER_STATES.ADMIN_VALIDATION]: "bg-orange-50 text-orange-700 border-orange-200",
   [ORDER_STATES.COMPLETED]: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
@@ -114,9 +106,8 @@ let currentUser = null;
 let currentRole = null;
 let adminOrdersCache = [];
 let currentOrderEditing = null;
-let permissionsEditingUser = null;
+let currentPermissionUser = null; // Usato per il modale permessi
 let statsChartInstance = null;
-let currentPermissionUser = null;
 
 // =====================================================
 //  UTILITY UI
@@ -139,8 +130,19 @@ function setText(id, text) {
   if (el) el.textContent = text;
 }
 
+// Mostra un messaggio di notifica (sostituisce alert/console.log)
 function toast(msg, type = "info") {
-  console.log("[TOAST]", type, msg);
+  console.log(`[TOAST - ${type.toUpperCase()}]`, msg);
+  // Qui potresti implementare la logica per mostrare il toast visivamente nell'interfaccia
+  const statusEl = document.getElementById("toast-container"); // Assumi che esista
+  if (!statusEl) return;
+  
+  statusEl.textContent = msg;
+  statusEl.className = `p-2 rounded-md text-xs text-white fixed bottom-4 right-4 z-50 ${
+      type === 'error' ? 'bg-red-500' : 'bg-slate-700'
+  }`;
+  show(statusEl);
+  setTimeout(() => hide(statusEl), 3000);
 }
 
 // parse JSON string field safely
@@ -165,7 +167,7 @@ function buildWhereEquals(field, value) {
 }
 
 // =====================================================
-//  LOGIN / LOGOUT
+//  LOGIN / LOGOUT / NAVIGAZIONE
 // =====================================================
 
 async function handleLoginClick() {
@@ -186,8 +188,13 @@ async function handleLoginClick() {
   try {
     const user = await Backendless.UserService.login(email, pw, true);
 
-    currentUser = user;
-    currentRole = user.role || ROLES.CUSTOMER;
+    // Recupera l'utente completo (in caso il login non restituisca tutti i campi)
+    const qb = Backendless.DataQueryBuilder.create().setWhereClause(`objectId = '${user.objectId}'`);
+    const fullUser = await Backendless.Data.of(USER_TABLE).find(qb);
+
+
+    currentUser = fullUser[0] || user;
+    currentRole = currentUser.role || ROLES.CUSTOMER;
 
     await afterLogin();
   } catch (err) {
@@ -204,20 +211,19 @@ async function afterLogin() {
   $("sidebar-username").textContent = currentUser.email || currentUser.name || "Utente";
   $("sidebar-role").textContent = currentRole || "Ruolo non definito";
   show($("logout-btn"));
+  show($("sidebar"));
 
   if (currentRole === ROLES.ADMIN) {
-    show($("sidebar"));
     show($("nav-admin"));
     hide($("nav-worker"));
 
     show($("admin-view"));
     hide($("worker-view"));
 
-    await loadUsersList();
+    await loadUsersList(); // Usa la nuova funzione
     await loadAdminOrders();
     await loadAdminStats();
   } else {
-    show($("sidebar"));
     show($("nav-worker"));
     hide($("nav-admin"));
 
@@ -290,10 +296,94 @@ function initAdminToggles() {
 }
 
 // =====================================================
-//  GESTIONE UTENTI ADMIN
+//  GESTIONE UTENTI ADMIN (VERSIONE CONSOLIDATA)
 // =====================================================
 
+// Nuova funzione consolidata per caricare la lista utenti
+async function loadUsersList() {
+    const tbody = document.getElementById("users-table-body");
+    const loading = document.getElementById("users-loading");
 
+    tbody.innerHTML = "";
+    loading.textContent = "Caricamento…";
+
+    try {
+        const qb = Backendless.DataQueryBuilder.create()
+            .setWhereClause("email != null")
+            .setSortBy(["email ASC"])
+            .setPageSize(MAX_PAGE_SIZE); // Massima dimensione di pagina
+
+        const users = await Backendless.Data.of("Users").find(qb);
+
+        loading.textContent = users.length === 0 ? "Nessun utente trovato." : "";
+
+        users.filter(u => u.objectId !== currentUser.objectId).forEach((u) => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-slate-50";
+
+            // ---- EMAIL ----
+            const tdEmail = document.createElement("td");
+            tdEmail.className = "px-3 py-2";
+            tdEmail.textContent = u.email;
+            tr.appendChild(tdEmail);
+
+            // ---- RUOLO (SELECT) ----
+            const tdRole = document.createElement("td");
+            tdRole.className = "px-3 py-2";
+
+            const select = document.createElement("select");
+            select.className = "form-input text-xs";
+
+            const roles = Object.values(ROLES);
+
+            roles.forEach((r) => {
+                const opt = document.createElement("option");
+                opt.value = r;
+                opt.textContent = r;
+                if (u.role === r) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            select.addEventListener("change", () => changeUserRole(u.objectId, select.value));
+
+            tdRole.appendChild(select);
+            tr.appendChild(tdRole);
+
+            // ---- AZIONI ----
+            const tdActions = document.createElement("td");
+            tdActions.className = "px-3 py-2";
+
+            const btn = document.createElement("button");
+            btn.className = "btn-secondary text-xs";
+            btn.textContent = "Permessi";
+            btn.onclick = () => openPermissionsModal(u);
+
+            tdActions.appendChild(btn);
+            tr.appendChild(tdActions);
+
+            tbody.appendChild(tr);
+        });
+
+    } catch (err) {
+        console.error("Errore loadUsersList", err);
+        loading.textContent = "Errore caricamento utenti";
+    }
+}
+
+async function changeUserRole(userId, newRole) {
+    try {
+        // Recupera solo l'oggetto da aggiornare, non l'intera riga (più efficiente)
+        await Backendless.Data.of("Users").save({
+             objectId: userId,
+             role: newRole,
+        });
+
+        toast("Ruolo aggiornato", "success");
+    } catch (err) {
+        console.error("Errore cambio ruolo", err);
+        toast("Errore aggiornamento ruolo", "error");
+    }
+}
 
 async function handleCreateUser() {
   const email = $("new-user-email").value.trim();
@@ -311,10 +401,11 @@ async function handleCreateUser() {
   }
 
   try {
+    // Backendless richiede registrazione standard, poi aggiungiamo il ruolo
     const newUser = await Backendless.UserService.register({
       email,
       password: pw,
-      role,
+      role, // Aggiungiamo il ruolo al momento della registrazione
     });
 
     statusEl.textContent = `Utente ${email} creato.`;
@@ -324,7 +415,7 @@ async function handleCreateUser() {
     $("new-user-password").value = "";
     $("new-user-role").value = "";
 
-    await loadUsersList();
+    await loadUsersList(); // Usa la nuova funzione
   } catch (err) {
     console.error("Errore creazione utente", err);
     statusEl.textContent = err.message || "Errore creando l'utente.";
@@ -332,20 +423,17 @@ async function handleCreateUser() {
   }
 }
 
-// ===== MODALE PERMESSI =====
+// ===== MODALE PERMESSI (VERSIONE FINALE) =====
 
 function openPermissionsModal(user) {
     currentPermissionUser = user;
 
-    // Set email header
     document.getElementById("permissions-user-email").textContent = user.email;
 
-    // Parsing valori user
-    // Assicurati che visibleFields e editableFields siano array, non stringhe JSON
+    // Parsing valori user (usa parseJsonField)
     const visible = parseJsonField(user.visibleFields);
     const editable = parseJsonField(user.editableFields);
 
-    // Container
     const boxVisible = document.getElementById("perm-visible-fields");
     const boxEditable = document.getElementById("perm-editable-fields");
 
@@ -383,7 +471,7 @@ function openPermissionsModal(user) {
         boxEditable.appendChild(rowE);
     });
 
-    // Mostra modale
+    document.getElementById("permissions-status").classList.add("hidden");
     document.getElementById("permissions-modal").classList.remove("hidden");
 }
 
@@ -394,21 +482,18 @@ function closePermissionsModal() {
 
 
 async function saveUserPermissions() {
-    const modal = document.getElementById("permissions-modal");
     const statusEl = document.getElementById("permissions-status");
 
     if (!currentPermissionUser) return;
 
-    // Reset status
     statusEl.textContent = "Salvataggio in corso...";
-    statusEl.classList.remove("hidden", "text-green-600", "text-red-600");
+    statusEl.classList.remove("hidden", "text-emerald-600", "text-rose-600");
     statusEl.classList.add("text-slate-600");
 
     try {
         const visible = [];
         const editable = [];
 
-        // Raccogli i campi dalle checkbox basate su ORDER_FIELDS
         document.querySelectorAll("[data-field-visible]").forEach(ch => {
             if (ch.checked) visible.push(ch.getAttribute("data-field-visible"));
         });
@@ -432,7 +517,7 @@ async function saveUserPermissions() {
 
         setTimeout(() => {
             closePermissionsModal();
-            loadUsersList(); // Ricarica la lista utenti
+            loadUsersList();
         }, 700);
 
     } catch (err) {
@@ -443,84 +528,9 @@ async function saveUserPermissions() {
     }
 }
 
-async function saveUserPermissions() {
-  if (!permissionsEditingUser) return;
-
-  const visible = [];
-  const editable = [];
-
-  ORDER_FIELDS.forEach((f) => {
-    const vis = $(`vis-${f.key}`);
-    const ed = $(`ed-${f.key}`);
-    if (vis && vis.checked) visible.push(f.key);
-    if (ed && ed.checked) editable.push(f.key);
-  });
-
-  const statusEl = $("permissions-status");
-  statusEl.classList.remove("hidden");
-  statusEl.className = "text-xs mt-2 text-slate-600";
-  statusEl.textContent = "Salvataggio in corso...";
-
-  try {
-    await Backendless.Data.of(USER_TABLE).save({
-      objectId: permissionsEditingUser.objectId,
-      visibleFields: JSON.stringify(visible),
-      editableFields: JSON.stringify(editable),
-    });
-
-    statusEl.textContent = "Permessi salvati.";
-    statusEl.className = "text-xs mt-2 text-emerald-600";
-
-    setTimeout(() => closePermissionsModal(), 700);
-  } catch (err) {
-    console.error("Errore salvataggio permessi", err);
-    statusEl.textContent = err.message || "Errore salvando i permessi.";
-    statusEl.className = "text-xs mt-2 text-rose-600";
-  }
-}
-
-
-async function saveUserPermissions() {
-  const modal = document.getElementById("permissions-modal");
-  const statusEl = document.getElementById("permissions-status");
-
-  try {
-    const visible = [];
-    const editable = [];
-
-    document.querySelectorAll("[data-field-visible]").forEach(ch => {
-      if (ch.checked) visible.push(ch.getAttribute("data-field-visible"));
-    });
-
-    document.querySelectorAll("[data-field-edit]").forEach(ch => {
-      if (ch.checked) editable.push(ch.getAttribute("data-field-edit"));
-    });
-
-    currentPermissionUser.visibleFields = visible;
-    currentPermissionUser.editableFields = editable;
-
-    await Backendless.Data.of("Users").save(currentPermissionUser);
-
-    statusEl.textContent = "Permessi salvati con successo ✔";
-    statusEl.classList.remove("hidden");
-    statusEl.classList.add("text-green-600");
-
-    setTimeout(() => {
-      modal.classList.add("hidden");
-      statusEl.classList.add("hidden");
-      loadUsersList();
-    }, 600);
-
-  } catch (err) {
-    console.error("Errore salvataggio permessi", err);
-    statusEl.textContent = "Errore durante il salvataggio";
-    statusEl.classList.remove("hidden");
-    statusEl.classList.add("text-red-600");
-  }
-}
 
 // =====================================================
-//  IMPORT EXCEL
+//  IMPORT EXCEL (CORRETTO)
 // =====================================================
 
 async function handleImportClick() {
@@ -576,11 +586,11 @@ async function handleImportClick() {
 
       show(logEl);
 
-      // Recupera il MAGAZZINIERE per assegnazione automatica
+      // Recupera il MAGAZZINIERE per assegnazione automatica (qualsiasi utente Warehouse)
       let warehouseUser = null;
       try {
         const qbUser = Backendless.DataQueryBuilder.create()
-          .setWhereClause("role = 'Warehouse'")
+          .setWhereClause(`role = '${ROLES.WAREHOUSE}'`)
           .setPageSize(1);
 
         const users = await Backendless.Data.of("Users").find(qbUser);
@@ -588,6 +598,8 @@ async function handleImportClick() {
       } catch (e) {
         console.warn("Impossibile recuperare magazziniere", e);
       }
+      
+      const assignedEmail = warehouseUser ? warehouseUser.email : "";
 
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
@@ -596,19 +608,21 @@ async function handleImportClick() {
         const ean = r["Ean Code"] || r["eanCode"] || "";
 
         if (!productCode && !ean) {
-          logEl.textContent += `⚠ Riga ${i + 1}: nessun Codice Articolo/EAN.\n`;
+          logEl.textContent += `⚠ Riga ${i + 1}: nessun Codice Articolo/EAN. Ignorata.\n`;
           err++;
           continue;
         }
 
         // Controllo duplicato
+        const whereClause = productCode ? buildWhereEquals("productCode", productCode) : buildWhereEquals("eanCode", ean);
+
         const qb = Backendless.DataQueryBuilder.create()
-          .setWhereClause(buildWhereEquals("productCode", productCode))
+          .setWhereClause(whereClause)
           .setPageSize(1);
 
-        const existing = await Backendless.Data.of("Orders").find(qb);
+        const existing = await Backendless.Data.of(ORDER_TABLE).find(qb);
         if (existing.length > 0) {
-          logEl.textContent += `❌ Duplicato: ${productCode}\n`;
+          logEl.textContent += `❌ Duplicato: ${productCode || ean}\n`;
           dup++;
           progressBar.style.width = `${Math.round(((i + 1) / rows.length) * 100)}%`;
           continue;
@@ -645,10 +659,10 @@ async function handleImportClick() {
           ddtNumber: r["DDT N."] || "",
           noteLogistica: r["Note Logistica"] || "",
 
-          // 🔥 Pipeline automatica → parte dal Magazzino
-          status: ORDER_STATES.WAREHOUSE_PENDING,
-          assignedToRole: "Warehouse",
-          assignedToEmail: warehouseUser ? warehouseUser.email : "",
+          // 🔥 Pipeline automatica → parte dal Magazzino (CORRETTO)
+          status: ORDER_STATES.WAREHOUSE_PENDING, 
+          assignedToRole: ROLES.WAREHOUSE,
+          assignedToEmail: assignedEmail,
 
           lastUpdated: new Date(),
         };
@@ -665,14 +679,12 @@ async function handleImportClick() {
         progressBar.style.width = `${Math.round(((i + 1) / rows.length) * 100)}%`;
       }
 
-      statusEl.textContent = `Importazione completata: ${ok} ok, ${dup} duplicati, ${err} errori.`;
+      statusEl.textContent = `Importazione completata: ${ok} ordini creati, ${dup} duplicati, ${err} errori.`;
       statusEl.className = "text-xs text-emerald-600";
 
-      // aggiorna viste admin
       await loadAdminOrders();
       await loadAdminStats();
 
-      // reset input file
       fileInput.value = "";
     } catch (error) {
       console.error("Errore lettura/import", error);
@@ -683,12 +695,14 @@ async function handleImportClick() {
 
   reader.readAsArrayBuffer(file);
 }
+
+
 // =====================================================
-//  ORDINI ADMIN – TABELLONE + MODALE
+//  ORDINI ADMIN – TABELLONE + MODALE (CON PAGINAZIONE)
 // =====================================================
 
 function getVisibleFieldsForAdminTable() {
-  // Admin vede sempre TUTTI i campi + status + assignedToEmail
+  // Admin vede sempre solo i campi principali in tabella (per non renderla troppo larga)
   return [
     "productCode",
     "eanCode",
@@ -697,139 +711,127 @@ function getVisibleFieldsForAdminTable() {
     "size",
     "status",
     "assignedToEmail",
+    "lastUpdated", // Utile per l'admin
   ];
 }
 
-async function loadWorkerOrders() {
-    const loading = $("worker-orders-loading");
-    const header = $("worker-orders-header");
-    const body = $("worker-orders-body");
+async function loadAdminOrders() {
+  const loading = $("orders-loading");
+  loading.textContent = "Caricamento…";
 
-    loading.textContent = "Caricamento…";
-    header.innerHTML = "";
-    body.innerHTML = "";
-    
-    const workerRole = currentUser.role;
-    let allOrders = []; // Array per accumulare tutti i risultati
-    const MAX_PAGE_SIZE = 100; 
-    let offset = 0;
-    let ordersChunk;
+  const headerRow = $("orders-header-row");
+  const filterRow = $("orders-filter-row");
+  const body = $("orders-table-body");
 
-    try {
-        // Implementazione della paginazione (ciclo do...while)
-        do {
-            // Mostra solo ordini assegnati a questo utente
-            const qb = Backendless.DataQueryBuilder.create()
-                .setWhereClause(buildWhereEquals("assignedToEmail", currentUser.email))
-                .setPageSize(MAX_PAGE_SIZE) // Limite Backendless
-                .setOffset(offset)          // 0, 100, 200, ecc.
-                .setSortBy(["lastUpdated DESC"]);
+  headerRow.innerHTML = "";
+  filterRow.innerHTML = "";
+  body.innerHTML = "";
 
-            ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
+  let allOrders = []; // Array per accumulare tutti i risultati
+  let offset = 0;
+  let ordersChunk;
 
-            allOrders.push(...ordersChunk); // Aggiunge i risultati
-            offset += MAX_PAGE_SIZE;      // Incrementa l'offset per la prossima pagina
-            
-        } while (ordersChunk.length === MAX_PAGE_SIZE); // Continua finché la pagina è piena
+  try {
+    // Implementazione della paginazione
+    do {
+        const qb = Backendless.DataQueryBuilder.create()
+          .setPageSize(MAX_PAGE_SIZE) // 100
+          .setOffset(offset)          // 0, 100, 200...
+          .setSortBy(["lastUpdated DESC"]);
 
+        ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
 
-        const orders = allOrders; // 'orders' contiene TUTTI i record
-
-
-        // Determina i campi visibili per questo ruolo
-        const defaultVisible = ["productCode", "eanCode", "status"];
-        // Assicurati che currentUser.visibleFields sia parsato correttamente (da stringa JSON)
-        const visibleFields = parseJsonField(currentUser.visibleFields); 
+        allOrders.push(...ordersChunk); // Aggiunge i risultati
+        offset += MAX_PAGE_SIZE;      // Incrementa l'offset per la prossima pagina
         
-        // Filtra i campi da mostrare in base alla configurazione del ruolo
-        const fieldsToShow = ORDER_FIELDS.filter((f) =>
-            visibleFields.length > 0 ? visibleFields.includes(f.key) : defaultVisible.includes(f.key)
-        );
-        
-        // Determina se il worker ha permessi di modifica per mostrare il bottone "Modifica"
-        const editableFields = parseJsonField(currentUser.editableFields);
-        const hasEditPermission = editableFields.length > 0;
-        
-        // Determina il testo del bottone "Avanza"
-        const advanceBtnText = PIPELINE_FLOW[workerRole]?.nextState ? 
-            `Avanza a ${PIPELINE_FLOW[workerRole].nextState.replace('_', ' ').toUpperCase()}` : 
-            'Avanza a FINE';
+    } while (ordersChunk.length === MAX_PAGE_SIZE); // Continua finché la pagina è piena
 
 
-        // ==========================
-        // HEADER TABELLA
-        // ==========================
-        fieldsToShow.forEach((f) => {
-            const th = document.createElement("th");
-            th.className = "th";
-            th.textContent = f.label;
-            header.appendChild(th);
-        });
+    const orders = allOrders; // 'orders' contiene TUTTI i record
+    adminOrdersCache = orders;
 
-        const thActions = document.createElement("th");
-        thActions.className = "th";
-        thActions.textContent = "Azioni";
-        header.appendChild(thActions);
+    const visFields = getVisibleFieldsForAdminTable();
+    const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
 
-        // ==========================
-        // RIGHE ORDINI
-        // ==========================
-        orders.forEach((o) => {
-            const tr = document.createElement("tr");
-            tr.className = "hover:bg-slate-50 text-[11px]";
+    // header
+    fieldConfig.forEach((f) => {
+      const th = document.createElement("th");
+      th.className = "th";
+      th.textContent = f.label;
+      headerRow.appendChild(th);
+    });
+    // azioni
+    const thAct = document.createElement("th");
+    thAct.className = "th";
+    thAct.textContent = "Azioni";
+    headerRow.appendChild(thAct);
 
-            // colonne dei campi
-            fieldsToShow.forEach((f) => {
-                const td = document.createElement("td");
-                td.className = "px-3 py-2";
-                
-                if (f.key === 'status') {
-                     // Logica per il badge di stato colorato
-                     const colorClass = STATUS_COLORS[o.status] || 'bg-slate-50 text-slate-600 border-slate-200';
-                     td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${o.status.replace('_', ' ') || ''}</span>`;
-                } else if (f.key === 'lastUpdated') {
-                    td.textContent = o[f.key] ? new Date(o[f.key]).toLocaleDateString('it-IT') : "";
-                } else {
-                     td.textContent = o[f.key] || "";
-                }
-                tr.appendChild(td);
-            });
+    // filter row
+    fieldConfig.forEach((f) => {
+      const td = document.createElement("td");
+      td.className = "px-2 py-1";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className =
+        "w-full rounded border border-slate-200 px-2 py-1 text-[10px]";
+      input.placeholder = "Filtro";
+      input.dataset.fieldKey = f.key;
+      input.addEventListener("input", applyOrdersFilters);
+      td.appendChild(input);
+      filterRow.appendChild(td);
+    });
+    const tdFilterEmpty = document.createElement("td");
+    filterRow.appendChild(tdFilterEmpty);
 
-            // BOTTONI AZIONI
-            const tdAct = document.createElement("td");
-            tdAct.className = "px-3 py-2 space-x-1 whitespace-nowrap";
+    // righe
+    orders.forEach((o) => {
+      const tr = document.createElement("tr");
+      tr.className = "hover:bg-slate-50 text-[11px]";
+      tr.dataset.objectId = o.objectId;
 
-            // Bottone Modifica (mostrato solo se l'utente ha permessi di modifica su almeno un campo)
-            if (hasEditPermission) {
-                const btnEdit = document.createElement("button");
-                btnEdit.className = "btn-secondary text-[10px]";
-                btnEdit.textContent = "Modifica";
-                btnEdit.onclick = () => openOrderModal(o.objectId);
-                tdAct.appendChild(btnEdit);
-            }
-            
-            // Bottone Avanza
-            const btnAdvance = document.createElement("button");
-            btnAdvance.className = "btn-primary text-[10px]";
-            btnAdvance.textContent = advanceBtnText;
-            btnAdvance.onclick = () => advanceOrder(o.objectId);
-            
-            // Mostra Avanza solo se l'ordine è assegnato a lui E non è Admin Validation/Completed
-            if (o.assignedToRole === workerRole && o.status !== ORDER_STATES.ADMIN_VALIDATION && o.status !== ORDER_STATES.COMPLETED) {
-                tdAct.appendChild(btnAdvance);
-            }
+      fieldConfig.forEach((f) => {
+        const td = document.createElement("td");
+        td.className = "px-3 py-2";
+        let val = o[f.key];
+
+        if (f.key === "status") {
+            // Aggiungere un badge per lo stato
+            const colorClass = STATUS_COLORS[val] ? STATUS_COLORS[val].replace('bg-', 'bg-').replace('text-', 'text-') : 'text-slate-600';
+            td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${val || ''}</span>`;
+        } else if (f.key === "lastUpdated") {
+            td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
+        } else {
+            td.textContent = val || "";
+        }
+        tr.appendChild(td);
+      });
+
+      const tdAct2 = document.createElement("td");
+      tdAct2.className = "px-3 py-2 space-x-1 whitespace-nowrap";
+
+      const btnEdit = document.createElement("button");
+      btnEdit.className = "btn-secondary text-[10px]";
+      btnEdit.textContent = "Modifica";
+      btnEdit.onclick = () => openOrderModal(o.objectId);
+      tdAct2.appendChild(btnEdit);
+
+      const btnAdvance = document.createElement("button");
+      btnAdvance.className = "btn-primary text-[10px]";
+      btnAdvance.textContent = "Avanza";
+      btnAdvance.onclick = () => advanceOrder(o.objectId);
+      tdAct2.appendChild(btnAdvance);
 
 
-            tr.appendChild(tdAct);
-            body.appendChild(tr);
-        });
+      tr.appendChild(tdAct2);
 
-        loading.textContent =
-            orders.length === 0 ? "Nessun ordine assegnato." : "";
-    } catch (err) {
-        console.error("Errore loadWorkerOrders", err);
-        loading.textContent = "Errore caricamento ordini.";
-    }
+      body.appendChild(tr);
+    });
+
+    loading.textContent = "";
+  } catch (err) {
+    console.error("Errore loadAdminOrders", err);
+    loading.textContent = "Errore durante il caricamento ordini.";
+  }
 }
 
 // filtro client-side
@@ -864,12 +866,14 @@ function applyOrdersFilters() {
   });
 }
 
-// ===== MODALE ORDINE =====
+// ===== MODALE ORDINE (ADMIN E WORKER) =====
 
 async function openOrderModal(objectId) {
-  const order = adminOrdersCache.find((o) => o.objectId === objectId);
+  const isWorker = currentRole !== ROLES.ADMIN;
+  
+  const order = adminOrdersCache.find((o) => o.objectId === objectId) || await Backendless.Data.of(ORDER_TABLE).findById(objectId);
   if (!order) {
-    alert("Ordine non trovato nella cache.");
+    alert("Ordine non trovato.");
     return;
   }
 
@@ -878,9 +882,13 @@ async function openOrderModal(objectId) {
 
   const container = $("order-modal-fields");
   container.innerHTML = "";
+  
+  // Campi modificabili solo per i worker con permessi
+  const editableFields = isWorker ? parseJsonField(currentUser.editableFields) : ORDER_FIELDS.map(f => f.key);
 
   ORDER_FIELDS.forEach((f) => {
     const val = order[f.key] || "";
+    const isEditable = editableFields.includes(f.key);
 
     const wrapper = document.createElement("div");
     wrapper.className = "flex flex-col gap-1";
@@ -892,13 +900,18 @@ async function openOrderModal(objectId) {
 
     let control;
 
-    if (f.type === "textarea") {
+    if (f.key === 'status') {
+      control = document.createElement("input");
+      control.type = "text";
+      control.value = val;
+      control.disabled = true; // Lo stato si cambia solo con il bottone 'Avanza'
+    } else if (f.type === "textarea") {
       control = document.createElement("textarea");
       control.rows = 3;
+      control.value = val;
     } else if (f.type === "date-string") {
       control = document.createElement("input");
       control.type = "date";
-      // se valore è tipo "2025-11-14" lo mettiamo, altrimenti lasciamo
       if (val && /^\d{4}-\d{2}-\d{2}/.test(val)) {
         control.value = val.substring(0, 10);
       }
@@ -906,6 +919,12 @@ async function openOrderModal(objectId) {
       control = document.createElement("input");
       control.type = "text";
       control.value = val;
+    }
+    
+    // Disabilita se non è l'admin e il campo non è modificabile
+    if (isWorker && !isEditable && f.key !== 'status') {
+        control.disabled = true;
+        control.classList.add('bg-slate-100', 'text-slate-500');
     }
 
     control.id = `order-field-${f.key}`;
@@ -916,6 +935,15 @@ async function openOrderModal(objectId) {
     container.appendChild(wrapper);
   });
 
+  // Mostra il pulsante di salvataggio solo se l'admin o se ci sono campi editabili per il worker
+  const saveBtn = $("order-modal-save-btn");
+  if (isWorker && editableFields.length === 0) {
+      hide(saveBtn);
+  } else {
+      show(saveBtn);
+  }
+  
+
   $("order-modal-status").classList.add("hidden");
   show($("order-modal"));
 }
@@ -925,10 +953,6 @@ function closeOrderModal() {
   hide($("order-modal"));
 }
 
-function changeOrderStatusFromModal(newStatus) {
-  const el = $("order-field-status");
-  if (el) el.value = newStatus;
-}
 
 async function saveOrderFromModal() {
   if (!currentOrderEditing) return;
@@ -939,15 +963,21 @@ async function saveOrderFromModal() {
   statusEl.textContent = "Salvataggio in corso...";
 
   const update = { objectId: currentOrderEditing.objectId };
+  const isWorker = currentRole !== ROLES.ADMIN;
+  const editableFields = isWorker ? parseJsonField(currentUser.editableFields) : ORDER_FIELDS.map(f => f.key);
+
 
   ORDER_FIELDS.forEach((f) => {
-    const input = $(`order-field-${f.key}`);
-    if (!input) return;
-
-    if (f.type === "date-string") {
-      update[f.key] = input.value || "";
-    } else {
-      update[f.key] = input.value;
+    // Solo l'admin o i campi esplicitamente editabili dal worker vengono aggiornati
+    if (currentRole === ROLES.ADMIN || editableFields.includes(f.key)) {
+        const input = $(`order-field-${f.key}`);
+        if (!input) return;
+    
+        if (f.type === "date-string") {
+          update[f.key] = input.value || "";
+        } else {
+          update[f.key] = input.value;
+        }
     }
   });
 
@@ -958,8 +988,13 @@ async function saveOrderFromModal() {
     statusEl.textContent = "Ordine aggiornato.";
     statusEl.className = "text-xs mt-2 text-emerald-600";
 
-    await loadAdminOrders();
-    await loadAdminStats();
+    if (currentRole === ROLES.ADMIN) {
+        await loadAdminOrders();
+        await loadAdminStats();
+    } else {
+        await loadWorkerOrders();
+    }
+    
 
     setTimeout(() => {
       closeOrderModal();
@@ -971,22 +1006,18 @@ async function saveOrderFromModal() {
   }
 }
 
-
-
-
-
 // =====================================================
 // AVANZA ORDINE NELLA PIPELINE AUTOMATICA
 // =====================================================
 async function advanceOrder(orderId) {
   try {
-    const order = await Backendless.Data.of("Orders").findById(orderId);
-    if (!order) return alert("Ordine non trovato");
+    const order = await Backendless.Data.of(ORDER_TABLE).findById(orderId);
+    if (!order) return toast("Ordine non trovato", "error");
 
     const role = currentUser.role;
     const step = PIPELINE_FLOW[role];
 
-    if (!step) return alert("Questo ruolo non può avanzare ordini.");
+    if (!step) return toast(`Il tuo ruolo (${role}) non può avanzare ordini.`, "error");
 
     // Aggiorna stato
     order.status = step.nextState;
@@ -995,8 +1026,8 @@ async function advanceOrder(orderId) {
     order.assignedToRole = step.assignToRole;
 
     // Assegna all'utente corretto SOLO se non è Admin
-    if (step.assignToRole !== "Admin") {
-      // Troviamo il primo utente con quel ruolo
+    if (step.assignToRole !== ROLES.ADMIN) {
+      // Troviamo il primo utente con quel ruolo (Logica semplice: primo trovato)
       const qb = Backendless.DataQueryBuilder.create()
         .setWhereClause(`role = '${step.assignToRole}'`)
         .setPageSize(1);
@@ -1005,23 +1036,32 @@ async function advanceOrder(orderId) {
 
       if (users.length > 0) {
         order.assignedToEmail = users[0].email;
+      } else {
+         order.assignedToEmail = ""; // Nessun utente assegnabile, resta non assegnato
+         toast(`Attenzione: Nessun utente trovato per il ruolo ${step.assignToRole}. Ordine non assegnato.`, "error");
       }
+    } else {
+        // Se è l'Admin la validazione finale, l'email assegnataria è l'Admin stesso
+        order.assignedToEmail = currentUser.email; 
     }
 
-    await Backendless.Data.of("Orders").save(order);
+    await Backendless.Data.of(ORDER_TABLE).save(order);
 
-    alert("Ordine avanzato correttamente!");
+    toast(`Ordine avanzato a "${order.status}" e assegnato a ${order.assignedToRole}.`, "success");
 
     // Ricarica tabella
-   if (currentUser.role === "Admin") loadAdminOrders();
-else loadWorkerOrders();
+    if (currentUser.role === ROLES.ADMIN) {
+        loadAdminOrders();
+        loadAdminStats();
+    } else {
+        loadWorkerOrders();
+    }
 
   } catch (e) {
     console.error("Errore advanceOrder:", e);
-    alert("Errore durante l'avanzamento dell'ordine.");
+    toast("Errore durante l'avanzamento dell'ordine.", "error");
   }
 }
-
 
 
 // =====================================================
@@ -1032,26 +1072,43 @@ async function loadAdminStats() {
   const container = $("stats-summary");
   container.innerHTML = "";
 
+  let allOrders = [];
+  let offset = 0;
+  let ordersChunk;
+
   try {
-    const qb = Backendless.DataQueryBuilder.create()
-      .setPageSize(100)
-      .setSortBy(["status"]);
+    // Paginazione per caricare tutte le stats
+    do {
+        const qb = Backendless.DataQueryBuilder.create()
+          .setPageSize(MAX_PAGE_SIZE)
+          .setOffset(offset)
+          .setSortBy(["status"]);
+        
+        ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
+        allOrders.push(...ordersChunk);
+        offset += MAX_PAGE_SIZE;
 
-    const orders = await Backendless.Data.of(ORDER_TABLE).find(qb);
+    } while (ordersChunk.length === MAX_PAGE_SIZE);
 
+    const orders = allOrders;
     const counts = {};
     orders.forEach((o) => {
       const st = o.status || "Senza stato";
       counts[st] = (counts[st] || 0) + 1;
     });
 
-    Object.entries(counts).forEach(([status, count]) => {
+    // Ordina gli stati in base alla pipeline per visualizzazione logica
+    const sortedStates = Object.values(ORDER_STATES).filter(s => counts[s]);
+    const otherStates = Object.keys(counts).filter(s => !Object.values(ORDER_STATES).includes(s));
+    
+    [...sortedStates, ...otherStates].forEach((status) => {
+      const count = counts[status];
       const colorClass = STATUS_COLORS[status] || "bg-slate-50 text-slate-700 border-slate-200";
 
       const div = document.createElement("div");
       div.className = `rounded-xl border px-4 py-3 ${colorClass}`;
       div.innerHTML = `
-        <p class="text-xs font-semibold mb-1">${status}</p>
+        <p class="text-xs font-semibold mb-1">${status.replace('_', ' ').toUpperCase()}</p>
         <p class="text-2xl font-bold">${count}</p>
       `;
       container.appendChild(div);
@@ -1059,8 +1116,8 @@ async function loadAdminStats() {
 
     // Chart
     const ctx = $("stats-chart").getContext("2d");
-    const labels = Object.keys(counts);
-    const data = Object.values(counts);
+    const labels = [...sortedStates, ...otherStates];
+    const data = labels.map(l => counts[l]);
 
     if (statsChartInstance) statsChartInstance.destroy();
 
@@ -1090,7 +1147,7 @@ async function loadAdminStats() {
 }
 
 // =====================================================
-//  WORKER VIEW (bozza)
+//  WORKER VIEW (FINALE CON PAGINAZIONE)
 // =====================================================
 
 async function loadWorkerOrders() {
@@ -1101,41 +1158,57 @@ async function loadWorkerOrders() {
   loading.textContent = "Caricamento…";
   header.innerHTML = "";
   body.innerHTML = "";
+  
+  const workerRole = currentUser.role;
+  let allOrders = []; // Array per accumulare tutti i risultati
+  let offset = 0;
+  let ordersChunk;
 
   try {
-    // Mostra solo ordini assegnati a questo utente
-    const qb = Backendless.DataQueryBuilder.create()
-      .setWhereClause(buildWhereEquals("assignedToEmail", currentUser.email))
-      .setPageSize(100)
-      .setSortBy(["lastUpdated DESC"]);
+    // Implementazione della paginazione
+    do {
+      // Mostra solo ordini assegnati a questo utente
+      const qb = Backendless.DataQueryBuilder.create()
+        .setWhereClause(buildWhereEquals("assignedToEmail", currentUser.email))
+        .setPageSize(MAX_PAGE_SIZE) // 100
+        .setOffset(offset)          // 0, 100, 200...
+        .setSortBy(["lastUpdated DESC"]);
 
-    const orders = await Backendless.Data.of(ORDER_TABLE).find(qb);
+      ordersChunk = await Backendless.Data.of(ORDER_TABLE).find(qb);
+
+      allOrders.push(...ordersChunk); // Aggiunge i risultati
+      offset += MAX_PAGE_SIZE;      // Incrementa l'offset per la prossima pagina
+
+    } while (ordersChunk.length === MAX_PAGE_SIZE); // Continua finché la pagina è piena
+
+
+    const orders = allOrders; // 'orders' contiene TUTTI i record
+
 
     // Determina i campi visibili per questo ruolo
+    // Fallback: se visibleFields è vuoto, mostra solo productCode, status, eanCode
+    const defaultVisible = ["productCode", "eanCode", "status"];
     const visibleFields = parseJsonField(currentUser.visibleFields);
-    const fields = ORDER_FIELDS.filter((f) =>
-      visibleFields.length > 0 ? visibleFields.includes(f.key) : true
+    
+    // Filtra i campi da mostrare
+    const fieldsToShow = ORDER_FIELDS.filter((f) =>
+      visibleFields.length > 0 ? visibleFields.includes(f.key) : defaultVisible.includes(f.key)
     );
 
     // ==========================
     // HEADER TABELLA
     // ==========================
-    fields.forEach((f) => {
+    fieldsToShow.forEach((f) => {
       const th = document.createElement("th");
       th.className = "th";
       th.textContent = f.label;
       header.appendChild(th);
     });
 
-    const thStatus = document.createElement("th");
-    thStatus.className = "th";
-    thStatus.textContent = "Stato";
-    header.appendChild(thStatus);
-
-    const thAdvance = document.createElement("th");
-    thAdvance.className = "th";
-    thAdvance.textContent = "Avanza";
-    header.appendChild(thAdvance);
+    const thActions = document.createElement("th");
+    thActions.className = "th";
+    thActions.textContent = "Azioni";
+    header.appendChild(thActions);
 
     // ==========================
     // RIGHE ORDINI
@@ -1145,31 +1218,49 @@ async function loadWorkerOrders() {
       tr.className = "hover:bg-slate-50 text-[11px]";
 
       // colonne dei campi
-      fields.forEach((f) => {
+      fieldsToShow.forEach((f) => {
         const td = document.createElement("td");
         td.className = "px-3 py-2";
-        td.textContent = o[f.key] || "";
+        
+        if (f.key === 'status') {
+             const colorClass = STATUS_COLORS[o.status] ? STATUS_COLORS[o.status].replace('bg-', 'bg-').replace('text-', 'text-') : 'text-slate-600';
+             td.innerHTML = `<span class="inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}">${o.status || ''}</span>`;
+        } else {
+             td.textContent = o[f.key] || "";
+        }
         tr.appendChild(td);
       });
 
-      // stato
-      const tdSt = document.createElement("td");
-      tdSt.className = "px-3 py-2";
-      tdSt.textContent = o.status || "";
-      tr.appendChild(tdSt);
+      // BOTTONI AZIONI
+      const tdAct = document.createElement("td");
+      tdAct.className = "px-3 py-2 space-x-1 whitespace-nowrap";
 
-      // BOTTONE AVANZA
-      const tdBtn = document.createElement("td");
-      tdBtn.className = "px-3 py-2";
+      // Bottone Modifica (se ha permessi di modifica)
+      const editableFields = parseJsonField(currentUser.editableFields);
+      if (editableFields.length > 0) {
+        const btnEdit = document.createElement("button");
+        btnEdit.className = "btn-secondary text-[10px]";
+        btnEdit.textContent = "Modifica";
+        btnEdit.onclick = () => openOrderModal(o.objectId);
+        tdAct.appendChild(btnEdit);
+      }
+      
+      // Bottone Avanza (se l'ordine è nello stato atteso per il suo ruolo)
+      const expectedStatus = Object.keys(PIPELINE_FLOW).find(r => PIPELINE_FLOW[r].assignToRole === workerRole);
 
-      const btn = document.createElement("button");
-      btn.className = "btn-primary text-[10px]";
-      btn.textContent = "Avanza";
-      btn.onclick = () => advanceOrder(o.objectId);
+      // Avanza è sempre il bottone principale per il worker
+      const btnAdvance = document.createElement("button");
+      btnAdvance.className = "btn-primary text-[10px]";
+      btnAdvance.textContent = `Avanza a ${PIPELINE_FLOW[workerRole]?.nextState.replace('_', ' ').toUpperCase() || 'FINALE'}`;
+      btnAdvance.onclick = () => advanceOrder(o.objectId);
+      
+      // Logica: mostrare Avanza solo se l'ordine è assegnato a lui E non è già Admin Validation/Completed
+      if (o.assignedToRole === workerRole && o.status !== ORDER_STATES.ADMIN_VALIDATION && o.status !== ORDER_STATES.COMPLETED) {
+          tdAct.appendChild(btnAdvance);
+      }
 
-      tdBtn.appendChild(btn);
-      tr.appendChild(tdBtn);
 
+      tr.appendChild(tdAct);
       body.appendChild(tr);
     });
 
@@ -1180,153 +1271,20 @@ async function loadWorkerOrders() {
     loading.textContent = "Errore caricamento ordini.";
   }
 }
-// =====================================================
-//  MODALE CAMBIO RUOLO UTENTE (NUOVO BLOCCO)
-// =====================================================
-
-let roleChangeUserId = null;
-
-// Apre la modale
-function openChangeRoleModal(userId, currentRole) {
-  roleChangeUserId = userId;
-
-  const modal = document.getElementById("role-change-modal");
-  const select = document.getElementById("role-change-select");
-
-  select.value = currentRole || "";
-
-  modal.classList.remove("hidden");
-}
-
-// Chiude
-function closeChangeRoleModal() {
-  roleChangeUserId = null;
-  document.getElementById("role-change-modal").classList.add("hidden");
-}
-
-// Salva il nuovo ruolo
-async function confirmRoleChange() {
-  if (!roleChangeUserId) return;
-
-  const newRole = document.getElementById("role-change-select").value;
-  if (!newRole) {
-    alert("Seleziona un ruolo valido!");
-    return;
-  }
-
-  try {
-    const user = await Backendless.Data.of("Users").findById(roleChangeUserId);
-    user.role = newRole;
-
-    await Backendless.Data.of("Users").save(user);
-
-    closeChangeRoleModal();
-
-    alert("Ruolo aggiornato con successo.");
-    loadUsersList(); // refresh tabella utenti
-
-  } catch (err) {
-    console.error("Errore cambio ruolo", err);
-    alert("Errore durante il salvataggio.");
-  }
-}
-
-async function loadUsersList() {
-  const tbody = document.getElementById("users-table-body");
-  const loading = document.getElementById("users-loading");
-
-  tbody.innerHTML = "";
-  loading.textContent = "Caricamento…";
-
-  try {
-    const qb = Backendless.DataQueryBuilder.create()
-      .setWhereClause("email != null")
-      .setSortBy(["email ASC"])
-      .setPageSize(100);
-
-    const users = await Backendless.Data.of("Users").find(qb);
-
-    loading.textContent = "";
-
-    users.forEach((u) => {
-      const tr = document.createElement("tr");
-      tr.className = "hover:bg-slate-50";
-
-      // ---- EMAIL ----
-      const tdEmail = document.createElement("td");
-      tdEmail.className = "px-3 py-2";
-      tdEmail.textContent = u.email;
-      tr.appendChild(tdEmail);
-
-      // ---- RUOLO (SELECT) ----
-      const tdRole = document.createElement("td");
-      tdRole.className = "px-3 py-2";
-
-      const select = document.createElement("select");
-      select.className = "form-input text-xs";
-
-      const roles = [
-        "Admin",
-        "Warehouse",
-        "Photographer",
-        "PostProducer",
-        "Partner",
-        "Customer"
-      ];
-
-      roles.forEach((r) => {
-        const opt = document.createElement("option");
-        opt.value = r;
-        opt.textContent = r;
-        if (u.role === r) opt.selected = true;
-        select.appendChild(opt);
-      });
-
-      select.addEventListener("change", () => changeUserRole(u.objectId, select.value));
-
-      tdRole.appendChild(select);
-      tr.appendChild(tdRole);
-
-      // ---- AZIONI ----
-      const tdActions = document.createElement("td");
-      tdActions.className = "px-3 py-2";
-
-      const btn = document.createElement("button");
-      btn.className = "btn-secondary text-xs";
-      btn.textContent = "Permessi";
-      btn.onclick = () => openPermissionsModal(u);
-
-      tdActions.appendChild(btn);
-      tr.appendChild(tdActions);
-
-      tbody.appendChild(tr);
-    });
-
-  } catch (err) {
-    console.error("Errore loadUsersList", err);
-    loading.textContent = "Errore caricamento utenti";
-  }
-}
-
-async function changeUserRole(userId, newRole) {
-  try {
-    const user = await Backendless.Data.of("Users").findById(userId);
-    user.role = newRole;
-
-    await Backendless.Data.of("Users").save(user);
-
-    showToast("Ruolo aggiornato");
-  } catch (err) {
-    console.error("Errore cambio ruolo", err);
-    showToast("Errore aggiornamento ruolo", "error");
-  }
-}
 
 // =====================================================
 //  INIT
 // =====================================================
 
 window.addEventListener("DOMContentLoaded", async () => {
+  // Aggiunto un elemento vuoto per il toast (opzionale)
+  if (!$("toast-container")) {
+    const toastDiv = document.createElement('div');
+    toastDiv.id = 'toast-container';
+    toastDiv.classList.add('hidden');
+    document.body.appendChild(toastDiv);
+  }
+  
   initAdminToggles();
 
   // prova sessione esistente
@@ -1335,8 +1293,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (isValid) {
       const user = await Backendless.UserService.getCurrentUser();
       if (user) {
-        currentUser = user;
-        currentRole = user.role || ROLES.CUSTOMER;
+        // Recupera l'utente completo, inclusi i campi permessi
+        const qb = Backendless.DataQueryBuilder.create().setWhereClause(`objectId = '${user.objectId}'`);
+        const fullUser = await Backendless.Data.of(USER_TABLE).find(qb);
+        
+        currentUser = fullUser[0] || user;
+        currentRole = currentUser.role || ROLES.CUSTOMER;
         await afterLogin();
         return;
       }
@@ -1350,5 +1312,3 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
-
-
