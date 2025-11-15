@@ -27,42 +27,55 @@
 
     <!-- SIDEBAR -->
     <aside id="sidebar"
-           class="hidden md:flex flex-col w-64 bg-slate-900 text-slate-100 py-6 px-4 shadow-lg">
+       class="fixed md:static -left-64 md:left-0 top-0 h-screen w-64 bg-slate-900 text-slate-100
+              py-6 px-4 shadow-lg z-50 transition-all duration-300">
 
-      <div class="px-3 mb-8">
-        <h1 class="text-2xl font-extrabold tracking-tight">Quiet Propaganda</h1>
-        <p class="text-xs text-slate-400">Workflow prodotti – Konsequenz</p>
-      </div>
+  <div class="px-3 mb-8">
+    <h1 class="text-2xl font-extrabold tracking-tight">Quiet Propaganda</h1>
+    <p class="text-xs text-slate-400">Workflow prodotti – Konsequenz</p>
+  </div>
 
-      <div id="sidebar-user"
-           class="px-3 py-3 mb-6 bg-slate-800/80 rounded-xl border border-slate-700">
-        <p class="text-xs text-slate-400 mb-1">Utente corrente</p>
-        <p id="sidebar-username" class="text-sm font-semibold">Ospite</p>
-        <p id="sidebar-role" class="text-xs text-emerald-300 font-medium">Non loggato</p>
-      </div>
+  <div id="sidebar-user"
+       class="px-3 py-3 mb-6 bg-slate-800/80 rounded-xl border border-slate-700">
+    <p class="text-xs text-slate-400 mb-1">Utente corrente</p>
+    <p id="sidebar-username" class="text-sm font-semibold">Ospite</p>
+    <p id="sidebar-role" class="text-xs text-emerald-300 font-medium">Non loggato</p>
+  </div>
 
-      <nav class="flex-1 space-y-2 text-sm">
-        <button id="nav-admin"
-                class="sidebar-btn hidden"
-                onclick="showSection('admin')">
-          Pannello Admin
-        </button>
-        <button id="nav-worker"
-                class="sidebar-btn hidden"
-                onclick="showSection('worker')">
-          Area Lavoratori
-        </button>
-      </nav>
+  <nav class="flex-1 space-y-2 text-sm">
+    <button id="nav-admin"
+            class="sidebar-btn hidden"
+            onclick="showSection('admin')">
+      Pannello Admin
+    </button>
+    <button id="nav-worker"
+            class="sidebar-btn hidden"
+            onclick="showSection('worker')">
+      Area Lavoratori
+    </button>
+  </nav>
 
-      <button id="logout-btn"
-              class="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-700 px-3 py-2 text-sm font-semibold shadow-md hidden"
-              onclick="handleLogout()">
-        <span>Logout</span>
-      </button>
-    </aside>
+  <button id="logout-btn"
+          class="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-700 px-3 py-2 text-sm font-semibold shadow-md hidden"
+          onclick="handleLogout()">
+    <span>Logout</span>
+  </button>
+
+</aside>
+
+<!-- OVERLAY MOBILE (necessario!) -->
+<div id="sidebar-overlay"
+     class="fixed inset-0 bg-black/40 z-40 hidden md:hidden"
+     onclick="closeSidebar()"></div>
 
     <!-- CONTENUTO PRINCIPALE -->
     <main class="flex-1 p-4 md:p-8 overflow-x-hidden">
+
+      <!-- Pulsante apertura sidebar mobile -->
+<button class="md:hidden mb-4 p-2 bg-slate-900 text-white rounded"
+        onclick="openSidebar()">
+  ☰ Menu
+</button>
 
       <!-- LOGIN VIEW -->
       <section id="login-view"
@@ -410,5 +423,17 @@
 <div id="toast-container" class="fixed bottom-4 right-4 z-50 p-2 rounded-md text-xs text-white bg-slate-700 hidden"></div>
   <!-- SCRIPT PRINCIPALE -->
   <script src="app.js"></script>
+<script>
+function openSidebar() {
+  document.getElementById("sidebar").style.left = "0";
+  document.getElementById("sidebar-overlay").classList.remove("hidden");
+}
+
+function closeSidebar() {
+  document.getElementById("sidebar").style.left = "-16rem";
+  document.getElementById("sidebar-overlay").classList.add("hidden");
+}
+</script>
+
 </body>
 </html>
