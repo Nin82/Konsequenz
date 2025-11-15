@@ -1,68 +1,46 @@
-const CACHE_NAME = 'photo-workflow-cache-v1';
-
-// Lista dei file da mettere in cache all'installazione. 
-// Assicurati che questi percorsi siano corretti!
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/manifest.json',
-  '/lib/Backendless.js',
-  '/lib/xlsx.min.js',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+const CACHE_NAME = "konsequenz-cache-v1";
+const ASSETS = [
+  "/",
+  "/index.html",
+  "/styles.css",
+  "/app.js",
+  "/manifest.json",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "https://cdn.tailwindcss.com",
+  "https://cdn.jsdelivr.net/npm/backendless",
+  "https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js",
+  "https://cdn.jsdelivr.net/npm/chart.js"
 ];
 
-// Evento: Installazione del Service Worker
-self.addEventListener('install', event => {
+// Install
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Service Worker: Cache aperta e file pre-caricati.');
-        return cache.addAll(urlsToCache);
-      })
-      .catch(err => {
-        console.error('Service Worker: Errore durante il pre-caching', err);
-      })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
   );
 });
 
-// Evento: Fetch (Gestisce le richieste di rete)
-self.addEventListener('fetch', event => {
-  // Ignora le richieste alle API di Backendless (devono sempre essere fatte in tempo reale)
-  if (event.request.url.includes('backendless.com') || event.request.url.includes('googleapis.com')) {
-    // Prova a usare la rete, e in caso di fallimento della rete, non serve un fallback
-    return fetch(event.request);
-  }
-  
-  // Per tutti gli altri file (HTML, CSS, JS, Assets), usa "Cache First, then Network"
+// Serve from cache
+self.addEventListener("fetch", event => {
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Se il file è in cache, lo restituisce immediatamente
-        if (response) {
-          return response;
-        }
-        // Altrimenti, va sulla rete
-        return fetch(event.request);
-      })
-  );
-});
-
-// Evento: Attivazione (Pulisce le vecchie cache)
-self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log(`Service Worker: Eliminazione vecchia cache: ${cacheName}`);
-            return caches.delete(cacheName);
-          }
-        })
+    caches.match(event.request).then(response => {
+      return (
+        response ||
+        fetch(event.request).catch(() =>
+          new Response("Offline", { status: 503 })
+        )
       );
     })
+  );
+});
+
+// Cleanup vecchi cache
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      )
+    )
   );
 });
