@@ -847,7 +847,7 @@ async function loadAdminOrders() {
 
         // 2. FETCH DEGLI ORDINI (Query Backendless)
         // Includi objectId e status per la logica interna
-        const properties = visFields.concat(["objectId", "status"]); 
+        const properties = Array.from(new Set(visFields.concat(["objectId"])));
         const queryBuilder = Backendless.DataQueryBuilder.create()
             .setProperties(properties)
             .setSortBy(["lastUpdated DESC"]);
@@ -1449,5 +1449,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
+
 
 
