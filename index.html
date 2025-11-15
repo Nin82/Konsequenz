@@ -257,6 +257,14 @@
             <span id="orders-loading" class="text-xs text-slate-400">Caricamento…</span>
           </div>
 
+          <!-- ⭐ RIASSEGNA TUTTI – DROPDOWN + PULSANTE -->
+        <div class="flex items-center gap-2 mb-3">
+           <select id="bulk-worker-select" class="form-input text-xs w-48"></select>
+             <button onclick="doBulkAssign()" class="btn-primary text-xs">
+              Riassegna selezionati
+             </button>
+        </div>
+
           <div class="overflow-x-auto border rounded-xl bg-white text-xs">
             <table class="min-w-full" id="admin-orders-table">
               <thead class="bg-slate-100 text-slate-600">

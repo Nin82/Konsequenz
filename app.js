@@ -63,6 +63,14 @@ const STATUS_COLORS = {
   [ORDER_STATES.COMPLETED]: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
+const ROLE_ALLOWED_STATUSES = {
+  Warehouse: [ORDER_STATES.WAREHOUSE_PENDING],
+  Photographer: [ORDER_STATES.PHOTO_PENDING],
+  PostProducer: [ORDER_STATES.POST_PENDING],
+  Partner: [ORDER_STATES.ADMIN_VALIDATION, ORDER_STATES.COMPLETED],
+  Customer: []
+};
+
 // Config campi ordine (per tabella & modale)
 const ORDER_FIELDS = [
   { key: "productCode", label: "Codice Articolo", type: "text" },
@@ -428,31 +436,30 @@ async function handleCreateUser() {
 
 // Carica tutti i lavoratori (non Admin e non Customer) in una cache globale
 async function loadAllWorkers() {
-    let allWorkers = []; // Array per accumulare tutti i lavoratori
+    let allWorkers = [];
     let offset = 0;
-    const MAX_PAGE_SIZE = 100; // Limite fisso di Backendless
-    let workersChunk;
+    const MAX_PAGE_SIZE = 100;
+    let chunk;
 
     try {
-        // Implementazione della paginazione ricorsiva per gli utenti
         do {
             const qb = Backendless.DataQueryBuilder.create()
-                .setWhereClause("role != 'Admin' AND role != 'Customer' AND email != null")
+                .setWhereClause("role != 'Admin' AND role != 'Customer' AND email IS NOT NULL")
                 .setPageSize(MAX_PAGE_SIZE)
                 .setOffset(offset);
 
-            workersChunk = await Backendless.Data.of("Users").find(qb);
-            
-            allWorkers.push(...workersChunk);
+            chunk = await Backendless.Data.of("Users").find(qb);
+
+            allWorkers.push(...chunk);
             offset += MAX_PAGE_SIZE;
 
-        } while (workersChunk.length === MAX_PAGE_SIZE);
+        } while (chunk.length === MAX_PAGE_SIZE);
 
-        allWorkersCache = allWorkers; // Popola la cache globale
-        
+        allWorkersCache = allWorkers;
+        console.log("Lavoratori caricati:", allWorkersCache);
+
     } catch (err) {
-        console.error("Errore caricamento lavoratori", err);
-        // È utile sapere se c'è un errore, ma non deve bloccare l'intera app
+        console.error("Errore loadAllWorkers", err);
     }
 }
 
@@ -506,6 +513,156 @@ async function assignOrderManually(orderId, newEmail) {
         console.error("Errore assegnazione manuale", err);
         toast("Errore durante l'assegnazione manuale.", "error");
     }
+}
+
+async function bulkAssignOrders(workerEmail) {
+  if (!workerEmail) {
+    toast("Seleziona un lavoratore dalla tendina.", "error");
+    return;
+  }
+
+  const checked = Array.from(
+    document.querySelectorAll("#orders-table-body .order-checkbox:checked")
+  );
+
+  if (checked.length === 0) {
+    toast("Nessun ordine selezionato.", "error");
+    return;
+  }
+
+  // conferma
+  if (
+    !confirm(
+      `Vuoi riassegnare ${checked.length} ordini a ${workerEmail}?`
+    )
+  ) {
+    return;
+  }
+
+  try {
+    for (const cb of checked) {
+      const orderId = cb.dataset.objectId;
+      const updateObj = {
+        objectId: orderId,
+        assignedToEmail: workerEmail,
+        lastUpdated: new Date(),
+      };
+      await Backendless.Data.of(ORDER_TABLE).save(updateObj);
+    }
+
+    toast("Riassegnazione completata.", "success");
+    await loadAdminOrders();
+    await loadAdminStats();
+  } catch (err) {
+    console.error("Errore bulkAssignOrders", err);
+    toast("Errore durante la riassegnazione massiva.", "error");
+  }
+}
+
+async function bulkAssignOrders(workerEmail) {
+    const checkboxes = document.querySelectorAll(".order-checkbox:checked");
+    if (checkboxes.length === 0) {
+        toast("Nessun ordine selezionato", "error");
+        return;
+    }
+
+    const updates = [];
+
+    for (let cb of checkboxes) {
+        updates.push({
+            objectId: cb.dataset.objectId,
+            assignedToEmail: workerEmail,
+            lastUpdated: new Date()
+        });
+    }
+
+    try {
+        // Bulk Update manuale: uno per uno
+        for (let u of updates) {
+            await Backendless.Data.of(ORDER_TABLE).save(u);
+        }
+
+        toast(`Assegnati ${updates.length} ordini a ${workerEmail}`, "success");
+        loadAdminOrders();
+
+    } catch (err) {
+        console.error("Errore bulkAssignOrders", err);
+        toast("Errore nella riassegnazione multipla", "error");
+    }
+}
+
+function populateBulkAssignDropdown() {
+    const sel = $("bulk-worker-select");
+    if (!sel) return;
+
+    sel.innerHTML = "";
+
+    allWorkersCache.forEach(w => {
+        const opt = document.createElement("option");
+        opt.value = w.email;
+        opt.textContent = `${w.email} — ${w.role}`;
+        sel.appendChild(opt);
+    });
+}
+
+async function doBulkAssign() {
+  const workerEmail = $("bulk-worker-select").value;
+  if (!workerEmail) {
+    alert("Seleziona prima il lavoratore.");
+    return;
+  }
+
+  // Prendo il role del worker selezionato
+  const worker = allWorkersCache.find(w => w.email === workerEmail);
+  if (!worker) {
+    alert("Lavoratore non trovato.");
+    return;
+  }
+
+  const allowedStatuses = ROLE_ALLOWED_STATUSES[worker.role] || [];
+
+  // Raccogli ordini selezionati
+  const selectedCheckboxes = document.querySelectorAll(".order-checkbox:checked");
+  const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.objectId);
+
+  if (selectedIds.length === 0) {
+    alert("Nessun ordine selezionato.");
+    return;
+  }
+
+  // Filtra ordini compatibili con il ruolo
+  const compatible = adminOrdersCache.filter(
+    o => selectedIds.includes(o.objectId) && allowedStatuses.includes(o.status)
+  );
+
+  const incompatible = adminOrdersCache.filter(
+    o => selectedIds.includes(o.objectId) && !allowedStatuses.includes(o.status)
+  );
+
+  // Messaggio di conferma
+  let msg = `Vuoi davvero assegnare:\n\n`;
+  msg += `• ${compatible.length} ordini COMPATIBILI a ${workerEmail}\n`;
+  msg += `• ${incompatible.length} ordini saranno IGNORATI perché lo stato non è compatibile (${allowedStatuses.join(", ")})\n\n`;
+  msg += `Procedere?`;
+
+  if (!confirm(msg)) return;
+
+  // Aggiorna SOLO gli ordini compatibili
+  const promises = compatible.map(o =>
+    Backendless.Data.of(ORDER_TABLE).save({
+      objectId: o.objectId,
+      assignedToEmail: workerEmail,
+      assignedToRole: worker.role,
+      lastUpdated: Date.now()
+    })
+  );
+
+  await Promise.all(promises);
+
+  alert(`Assegnati ${compatible.length} ordini a ${workerEmail}.\nIgnorati ${incompatible.length} non compatibili.`);
+
+  // Ricarica tabella
+  await loadAdminOrders();
 }
 
 /**
@@ -823,151 +980,259 @@ async function handleImportClick() {
 //  ORDINI ADMIN – TABELLONE + MODALE (CON PAGINAZIONE)
 // =====================================================
 
-// Assicurati che le costanti ORDER_TABLE, ORDER_FIELDS e STATUS_COLORS
-// e le funzioni $, show, hide, applyOrdersFilters, saveDateStamp siano dichiarate altrove.
-
 async function loadAdminOrders() {
-    const tableBody = $("orders-table-body");
-    const headerRow = $("orders-header-row");
-    const filterRow = $("orders-filter-row");
-    const loadingStatus = $("orders-loading");
+  const tableBody = $("orders-table-body");
+  const headerRow = $("orders-header-row");
+  const filterRow = $("orders-filter-row");
+  const loadingStatus = $("orders-loading");
 
-    // Pulizia e stato di caricamento
-    tableBody.innerHTML = "";
-    headerRow.innerHTML = "";
-    filterRow.innerHTML = "";
-    show(loadingStatus);
+  const PAGE_SIZE = MAX_PAGE_SIZE; // 100
 
-    try {
-        // 1. Configurazione dei campi visibili
-        const visFields = getVisibleFieldsForAdminTable();
-        const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
+  // pulizia
+  tableBody.innerHTML = "";
+  headerRow.innerHTML = "";
+  filterRow.innerHTML = "";
+  show(loadingStatus);
+  loadingStatus.textContent = "Caricamento…";
 
-        // 2. FETCH DEGLI ORDINI (Query Backendless)
-        // Usa Set per garantire l'unicità dei nomi delle colonne richieste
-        const properties = Array.from(new Set(visFields.concat(["objectId"]))); 
-        
-        const queryBuilder = Backendless.DataQueryBuilder.create()
-            .setProperties(properties)
-            .setSortBy(["lastUpdated DESC"]);
+  try {
+    // 1) campi visibili
+    const visFields = getVisibleFieldsForAdminTable();
+    const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
+    const properties = Array.from(new Set(visFields.concat(["objectId", "assignedToRole", "assignedToEmail", "status", "lastUpdated"])));
 
-        const orders = await Backendless.Data.of(ORDER_TABLE).find(queryBuilder);
-        adminOrdersCache = orders; // Aggiorna la cache
+    // 2) fetch con paginazione
+    let offset = 0;
+    let ordersPage = [];
+    let allOrders = [];
 
-        hide(loadingStatus);
+    do {
+      const queryBuilder = Backendless.DataQueryBuilder.create()
+        .setProperties(properties)
+        .setSortBy(["lastUpdated DESC"])
+        .setPageSize(PAGE_SIZE)
+        .setOffset(offset);
 
-        // 3. CREAZIONE HEADERS E FILTRI
-        fieldConfig.forEach((f) => {
-            // Header
-            const th = document.createElement("th");
-            th.className = "th";
-            th.textContent = f.label;
-            headerRow.appendChild(th);
+      ordersPage = await Backendless.Data.of(ORDER_TABLE).find(queryBuilder);
+      allOrders = allOrders.concat(ordersPage);
+      offset += PAGE_SIZE;
+    } while (ordersPage && ordersPage.length === PAGE_SIZE);
 
-            // Filter
-            const td = document.createElement("td");
-            td.className = "px-3 py-1";
-            const input = document.createElement("input");
-            input.type = "text";
-            input.className = "form-input-filter"; 
-            input.placeholder = "Filtro";
-            input.dataset.fieldKey = f.key;
-            input.addEventListener("input", applyOrdersFilters);
-            td.appendChild(input);
-            filterRow.appendChild(td);
+    const orders = allOrders;
+    adminOrdersCache = orders;
+
+    hide(loadingStatus);
+
+    // 3) HEADER + FILTRI
+    // colonna checkbox "select all"
+    const thSelect = document.createElement("th");
+    thSelect.className = "th w-10 text-center";
+    thSelect.innerHTML = `<input type="checkbox" id="select-all-orders" />`;
+    headerRow.appendChild(thSelect);
+
+    const tdFilterSelect = document.createElement("td");
+    tdFilterSelect.className = "px-3 py-1";
+    filterRow.appendChild(tdFilterSelect);
+
+    // colonne dati
+    fieldConfig.forEach((f) => {
+      const th = document.createElement("th");
+      th.className = "th";
+      th.textContent = f.label;
+      headerRow.appendChild(th);
+
+      const td = document.createElement("td");
+      td.className = "px-3 py-1";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "form-input-filter";
+      input.placeholder = "Filtro";
+      input.dataset.fieldKey = f.key;
+      input.addEventListener("input", applyOrdersFilters);
+
+      td.appendChild(input);
+      filterRow.appendChild(td);
+    });
+
+    // colonna Azioni
+    const thActions = document.createElement("th");
+    thActions.className = "th";
+    thActions.textContent = "Azioni";
+    headerRow.appendChild(thActions);
+
+    const tdFilterActions = document.createElement("td");
+    tdFilterActions.className = "px-3 py-1";
+    filterRow.appendChild(tdFilterActions);
+
+    // 4) RIGHE
+    orders.forEach((o) => {
+      const tr = document.createElement("tr");
+      tr.dataset.objectId = o.objectId;
+      tr.className = "hover:bg-slate-50";
+
+      // checkbox singola riga
+      const tdSelect = document.createElement("td");
+      tdSelect.className = "px-3 py-2 text-center";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "order-checkbox";
+      cb.dataset.objectId = o.objectId;
+      tdSelect.appendChild(cb);
+      tr.appendChild(tdSelect);
+
+      // celle dati
+      fieldConfig.forEach((f) => {
+        const td = document.createElement("td");
+        td.className = "px-3 py-2";
+
+        const val = o[f.key];
+
+        if (f.key === "status") {
+          const statusValue = val || "";
+          const colorClass =
+            STATUS_COLORS[statusValue] ||
+            "bg-slate-50 text-slate-700 border-slate-200";
+
+          const span = document.createElement("span");
+          span.className = `inline-block px-2 py-0.5 rounded-full text-[10px] border ${colorClass}`;
+          span.textContent = statusValue
+            ? statusValue.replace("_", " ").toUpperCase()
+            : "N/A";
+
+          td.appendChild(span);
+        } else if (f.type === "date-string" && f.key !== "lastUpdated") {
+          td.className = td.className + " relative";
+
+          const dateSpan = document.createElement("span");
+          dateSpan.textContent = val
+            ? new Date(val).toLocaleDateString("it-IT")
+            : "\u00a0";
+          dateSpan.className = "overflow-hidden pr-6";
+
+          const btnTime = document.createElement("button");
+          btnTime.className =
+            "absolute right-1 top-1/2 -translate-y-1/2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
+          btnTime.textContent = "⏱";
+          btnTime.onclick = () =>
+            saveDateStamp(o.objectId, f.key, dateSpan);
+
+          td.appendChild(dateSpan);
+          td.appendChild(btnTime);
+        } else if (f.key === "lastUpdated") {
+          td.textContent = val
+            ? new Date(val).toLocaleDateString("it-IT")
+            : "";
+        } else {
+          td.textContent = val || "";
+        }
+
+        tr.appendChild(td);
+      });
+
+      // COLONNA AZIONI (dinamica per ogni record)
+      const tdActions = document.createElement("td");
+      tdActions.className =
+        "px-3 py-2 flex items-center gap-2 whitespace-nowrap";
+
+      // bottone Modifica (apre modale)
+      const btnEdit = document.createElement("button");
+      btnEdit.className = "btn-secondary text-[10px]";
+      btnEdit.textContent = "Modifica";
+      btnEdit.onclick = () => openOrderModal(o.objectId);
+      tdActions.appendChild(btnEdit);
+
+      // bottone Avanza (usa pipeline)
+      const btnAdvance = document.createElement("button");
+      btnAdvance.className = "btn-primary text-[10px]";
+      btnAdvance.textContent = "Avanza";
+      btnAdvance.onclick = () => advanceOrder(o.objectId);
+      tdActions.appendChild(btnAdvance);
+
+      // SELECT ASSEGNAZIONE SINGOLO ORDINE (dinamica per record)
+      const selectAssign = document.createElement("select");
+      selectAssign.className =
+        "form-input text-[10px] max-w-[220px]";
+
+      const optPlaceholder = document.createElement("option");
+      optPlaceholder.value = "";
+      optPlaceholder.textContent = "Riassegna a…";
+      selectAssign.appendChild(optPlaceholder);
+
+      // se esiste assignedToRole, filtro per quel ruolo, altrimenti tutti i worker
+      let workersForThisOrder = allWorkersCache || [];
+      if (o.assignedToRole) {
+        const role = o.assignedToRole;
+        workersForThisOrder = workersForThisOrder.filter(
+          (w) => w.role === role
+        );
+        if (workersForThisOrder.length === 0) {
+          // fallback: usa tutti
+          workersForThisOrder = allWorkersCache || [];
+        }
+      }
+
+      workersForThisOrder.forEach((w) => {
+        const opt = document.createElement("option");
+        opt.value = w.email;
+        opt.textContent = `${w.email} (${w.role})`;
+        if (o.assignedToEmail === w.email) opt.selected = true;
+        selectAssign.appendChild(opt);
+      });
+
+      selectAssign.onchange = () => {
+        if (!selectAssign.value) return;
+        assignOrderManually(o.objectId, selectAssign.value);
+      };
+
+      tdActions.appendChild(selectAssign);
+
+      tr.appendChild(tdActions);
+
+      tableBody.appendChild(tr);
+    });
+
+    // 5) GESTIONE "SELECT ALL"
+    const selectAllCb = $("select-all-orders");
+    if (selectAllCb) {
+      selectAllCb.onchange = (e) => {
+        const checked = e.target.checked;
+        const allRowCbs = document.querySelectorAll(
+          "#orders-table-body .order-checkbox"
+        );
+        allRowCbs.forEach((cb) => {
+          // opzionale: rispetta i filtri (non seleziona le righe nascoste)
+          const row = cb.closest("tr");
+          if (row && row.style.display === "none") return;
+          cb.checked = checked;
         });
-
-        // Aggiungi header e filtro per la colonna Azioni
-        headerRow.insertAdjacentHTML("beforeend", '<th class="th">Azioni</th>');
-        filterRow.insertAdjacentHTML("beforeend", '<td class="px-3 py-1"></td>'); 
-
-        // 4. CREAZIONE CORPO DELLA TABELLA
-        orders.forEach((o) => {
-            const tr = document.createElement("tr");
-            tr.dataset.objectId = o.objectId;
-            
-            // Loop per le colonne dei dati
-            fieldConfig.forEach((f) => {
-                const td = document.createElement("td");
-                td.className = "px-3 py-2";
-                let val = o[f.key];
-
-                // 1. --- LOGICA BADGE DI STATO ---
-                if (f.key === "status") {
-                    const statusValue = val || ''; 
-                    const colorClass = STATUS_COLORS[statusValue] || 'bg-slate-50 text-slate-600 border-slate-200';
-                    const span = document.createElement("span");
-                    
-                    span.className = `inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}`;
-                    // Resiliente a null: formatta solo se c'è valore
-                    span.textContent = statusValue ? statusValue.replace('_', ' ').toUpperCase() : 'N/A';
-                    
-                    td.appendChild(span);
-                }
-                // 2. --- LOGICA PULSANTE DATETIME E FORMATTAZIONE ---
-                else if (f.type === "date-string" && f.key !== "lastUpdated") {
-    
-    // Rimuovi il padding destro del TD per dare spazio al pulsante
-    td.className = td.className.replace("px-3", "pl-3 pr-1"); 
-    
-    // Aggiungi relative al TD per posizionare il pulsante in modo assoluto
-    td.className += " relative"; 
-    
-    // Contenitore del testo della data
-    const dateSpan = document.createElement("span");
-    // Se il valore è vuoto, usa uno spazio non divisibile per mantenere l'altezza della riga
-    dateSpan.textContent = val ? new Date(val).toLocaleDateString('it-IT') : '\u00a0'; 
-    // Aggiungiamo overflow-hidden per evitare che il testo fuoriesca
-    dateSpan.className = "overflow-hidden pr-6"; 
-    
-    // Pulsante "Time"
-    const btnTime = document.createElement("button");
-    
-    // Posizionamento Assoluto: sempre in alto a destra all'interno del TD (relativo)
-    btnTime.className = "absolute right-1 top-1/2 -translate-y-1/2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
-    btnTime.textContent = "⏱";
-
-    btnTime.onclick = () => saveDateStamp(o.objectId, f.key, dateSpan);
-    
-    // Inserisce gli elementi nel TD
-    td.appendChild(dateSpan);
-    td.appendChild(btnTime);
-}
-                // 3. --- LOGICA STANDARD PER ALTRI CAMPI DATA/TESTO ---
-                else if (f.key === "lastUpdated") {
-                    td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
-                } else {
-                    td.textContent = val || "";
-                }
-                // --------------------------------------------------
-
-                tr.appendChild(td);
-            });
-
-            // Colonna Azioni
-            const tdAct2 = document.createElement("td");
-            tdAct2.className = "px-3 py-2 space-x-1 flex items-center gap-2 whitespace-nowrap";
-            
-            // Bottone Modifica
-            const btnEdit = document.createElement("button");
-            btnEdit.className = "btn-secondary text-[10px]";
-            btnEdit.textContent = "Modifica";
-            // btnEdit.onclick = () => openOrderModal(o.objectId); 
-
-            tdAct2.appendChild(btnEdit);
-            
-            tr.appendChild(tdAct2);
-
-            tableBody.appendChild(tr);
-        });
-
-    } catch (err) {
-        // Messaggio di errore più dettagliato
-        console.error("ERRORE CRITICO NEL CARICAMENTO ORDINI ADMIN:", err);
-        loadingStatus.textContent = "Errore: Impossibile caricare gli ordini. Controlla la console del browser per i dettagli.";
-        show(loadingStatus);
+      };
     }
-				}
+
+    // 6) POPOLA LA TENDINA "RIASSEGNA SELEZIONATI"
+    const bulkSelect = $("bulk-worker-select");
+    if (bulkSelect) {
+      bulkSelect.innerHTML = "";
+      const opt0 = document.createElement("option");
+      opt0.value = "";
+      opt0.textContent = "Riassegna selezionati a…";
+      bulkSelect.appendChild(opt0);
+
+      (allWorkersCache || []).forEach((w) => {
+        const opt = document.createElement("option");
+        opt.value = w.email;
+        opt.textContent = `${w.email} (${w.role})`;
+        bulkSelect.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.error("ERRORE CRITICO NEL CARICAMENTO ORDINI ADMIN:", err);
+    loadingStatus.textContent =
+      "Errore: impossibile caricare gli ordini. Controlla la console.";
+    show(loadingStatus);
+  }
+}
+
 
 		
 // filtro client-side
