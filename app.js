@@ -824,9 +824,8 @@ async function handleImportClick() {
 //  ORDINI ADMIN – TABELLONE + MODALE (CON PAGINAZIONE)
 // =====================================================
 
-// app.js (Sostituisci la funzione esistente con questa)
-
-// app.js (Sostituisci la funzione esistente con questa)
+// Assicurati che le costanti ORDER_TABLE, ORDER_FIELDS e STATUS_COLORS
+// e le funzioni $, show, hide, applyOrdersFilters, saveDateStamp siano dichiarate altrove.
 
 async function loadAdminOrders() {
     const tableBody = $("orders-table-body");
@@ -846,14 +845,15 @@ async function loadAdminOrders() {
         const fieldConfig = ORDER_FIELDS.filter((f) => visFields.includes(f.key));
 
         // 2. FETCH DEGLI ORDINI (Query Backendless)
-        // Includi objectId e status per la logica interna
-        const properties = Array.from(new Set(visFields.concat(["objectId"])));
+        // Usa Set per garantire l'unicità dei nomi delle colonne richieste
+        const properties = Array.from(new Set(visFields.concat(["objectId"]))); 
+        
         const queryBuilder = Backendless.DataQueryBuilder.create()
             .setProperties(properties)
             .setSortBy(["lastUpdated DESC"]);
 
         const orders = await Backendless.Data.of(ORDER_TABLE).find(queryBuilder);
-        adminOrdersCache = orders; 
+        adminOrdersCache = orders; // Aggiorna la cache
 
         hide(loadingStatus);
 
@@ -893,49 +893,42 @@ async function loadAdminOrders() {
                 td.className = "px-3 py-2";
                 let val = o[f.key];
 
-                // 1. --- LOGICA BADGE DI STATO (USA STATUS_COLORS) ---
+                // 1. --- LOGICA BADGE DI STATO ---
                 if (f.key === "status") {
-                    // Recupera la classe dal tuo STATUS_COLORS, altrimenti usa un default
-                    const colorClass = STATUS_COLORS[val] || 'bg-slate-50 text-slate-600 border-slate-200';
+                    const statusValue = val || ''; 
+                    const colorClass = STATUS_COLORS[statusValue] || 'bg-slate-50 text-slate-600 border-slate-200';
                     const span = document.createElement("span");
                     
                     span.className = `inline-block px-2 py-0.5 rounded-full text-[10px] ${colorClass}`;
-                    span.textContent = val.replace('_', ' ').toUpperCase() || '';
+                    // Resiliente a null: formatta solo se c'è valore
+                    span.textContent = statusValue ? statusValue.replace('_', ' ').toUpperCase() : 'N/A';
                     
                     td.appendChild(span);
                 }
                 // 2. --- LOGICA PULSANTE DATETIME E FORMATTAZIONE ---
                 else if (f.type === "date-string" && f.key !== "lastUpdated") {
                     
-                    // Applica il layout flex per allineare data e pulsante
                     td.className += " flex items-center justify-between";
                     
-                    // Contenitore del testo della data
                     const dateSpan = document.createElement("span");
-                    // Formatta la data se presente
                     dateSpan.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
                     
-                    // Pulsante "Time"
                     const btnTime = document.createElement("button");
                     // Rimuovi parte del padding per dare spazio al pulsante
                     td.className = td.className.replace("px-3", "pr-1 pl-3"); 
                     btnTime.className = "ml-2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
                     btnTime.textContent = "⏱";
 
-                    // Collega il click alla funzione
                     btnTime.onclick = () => saveDateStamp(o.objectId, f.key, dateSpan);
                     
-                    // Inserisce gli elementi nel TD
                     td.appendChild(dateSpan);
                     td.appendChild(btnTime);
                     
                 } 
                 // 3. --- LOGICA STANDARD PER ALTRI CAMPI DATA/TESTO ---
                 else if (f.key === "lastUpdated") {
-                    // Formattazione per lastUpdated (senza pulsante)
                     td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
                 } else {
-                    // Campo testo/numerico standard
                     td.textContent = val || "";
                 }
                 // --------------------------------------------------
@@ -945,15 +938,12 @@ async function loadAdminOrders() {
 
             // Colonna Azioni
             const tdAct2 = document.createElement("td");
-            // Nota: Rimuovo qui la logica di assegnazione manuale complessa per non appesantire il codice
-            // Ma ho lasciato il posto per il bottone Modifica
             tdAct2.className = "px-3 py-2 space-x-1 flex items-center gap-2 whitespace-nowrap";
             
             // Bottone Modifica
             const btnEdit = document.createElement("button");
             btnEdit.className = "btn-secondary text-[10px]";
             btnEdit.textContent = "Modifica";
-            // Ricorda che 'openOrderModal' deve esistere
             // btnEdit.onclick = () => openOrderModal(o.objectId); 
 
             tdAct2.appendChild(btnEdit);
@@ -964,13 +954,14 @@ async function loadAdminOrders() {
         });
 
     } catch (err) {
-        console.error("Errore nel caricamento ordini Admin:", err);
-        loadingStatus.textContent = "Errore: Impossibile caricare gli ordini.";
+        // Messaggio di errore più dettagliato
+        console.error("ERRORE CRITICO NEL CARICAMENTO ORDINI ADMIN:", err);
+        loadingStatus.textContent = "Errore: Impossibile caricare gli ordini. Controlla la console del browser per i dettagli.";
         show(loadingStatus);
     }
-}
+				}
 
-
+		
 // filtro client-side
 function applyOrdersFilters() {
   const filterInputs = Array.from(
@@ -1449,6 +1440,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
+
 
 
 
