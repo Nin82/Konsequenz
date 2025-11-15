@@ -13,6 +13,12 @@ const MAX_PAGE_SIZE = 100;
 
 Backendless.initApp(APP_ID, API_KEY);
 
+// 🔥 FIX EMERGENZA TOKEN BACKENDLESS
+Backendless.UserService.logout().catch(() => {});
+localStorage.removeItem("backendless_user_token");
+localStorage.removeItem("Backendless");
+sessionStorage.clear();
+
 // =====================================================
 //  COSTANTI RUOLI E STATI
 // =====================================================
