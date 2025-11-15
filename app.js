@@ -826,6 +826,8 @@ async function handleImportClick() {
 
 // app.js (Sostituisci la funzione esistente con questa)
 
+// app.js (Sostituisci la funzione esistente con questa)
+
 async function loadAdminOrders() {
     const tableBody = $("orders-table-body");
     const headerRow = $("orders-header-row");
@@ -1447,4 +1449,5 @@ window.addEventListener("DOMContentLoaded", async () => {
   hide($("admin-view"));
   hide($("worker-view"));
 });
+
 
