@@ -62,7 +62,7 @@
     </aside>
 
     <!-- CONTENUTO PRINCIPALE -->
-    <main class="flex-1 p-4 md:p-8">
+    <main class="flex-1 p-4 md:p-8 overflow-x-hidden">
 
       <!-- LOGIN VIEW -->
       <section id="login-view"
@@ -250,31 +250,40 @@
                class="text-[10px] bg-slate-900 text-slate-100 rounded-lg p-3 max-h-48 overflow-auto hidden"></pre>
         </div>
 
-        <!-- CARD: Tabella ordini -->
-        <div id="card-orders" class="card">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="card-title mb-0">Ordini (vista Admin)</h3>
-            <span id="orders-loading" class="text-xs text-slate-400">Caricamento…</span>
-          </div>
+        
+<div id="card-orders" class="card overflow-x-hidden">
 
-          <!-- ⭐ RIASSEGNA TUTTI – DROPDOWN + PULSANTE -->
-        <div class="flex items-center gap-2 mb-3">
-           <select id="bulk-worker-select" class="form-input text-xs w-48"></select>
-             <button onclick="doBulkAssign()" class="btn-primary text-xs">
-              Riassegna selezionati
-             </button>
-        </div>
+  <!-- Header card -->
+  <div class="flex items-center justify-between mb-2">
+    <h3 class="card-title mb-0">Ordini (vista Admin)</h3>
+    <span id="orders-loading" class="text-xs text-slate-400">Caricamento…</span>
+  </div>
 
-          <div class="overflow-x-auto border rounded-xl bg-white text-xs">
-            <table class="min-w-full" id="admin-orders-table">
-              <thead class="bg-slate-100 text-slate-600">
-                <tr id="orders-header-row"></tr>
-                <tr id="orders-filter-row" class="border-t border-slate-200"></tr>
-              </thead>
-              <tbody id="orders-table-body" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
-        </div>
+  <!-- Bulk assign -->
+  <div class="flex items-center gap-2 mb-3">
+    <select id="bulk-worker-select" class="form-input text-xs w-48"></select>
+    <button onclick="doBulkAssign()" class="btn-primary text-xs">
+      Riassegna selezionati
+    </button>
+  </div>
+
+  <!-- Scroll wrapper -->
+  <div class="border rounded-xl bg-white text-xs w-full overflow-x-auto">
+
+    <!-- Vertical scroll -->
+    <div class="max-h-[500px] overflow-y-auto">
+
+      <table class="min-w-max" id="admin-orders-table">
+        <thead class="bg-slate-100 text-slate-600 sticky top-0 z-20">
+          <tr id="orders-header-row"></tr>
+          <tr id="orders-filter-row" class="border-t border-slate-200 bg-slate-100"></tr>
+        </thead>
+
+        <tbody id="orders-table-body" class="divide-y divide-slate-100"></tbody>
+      </table>
+
+    </div>
+  </div>
 
         <!-- MODALE MODIFICA ORDINE -->
         <div id="order-modal" class="modal hidden">
