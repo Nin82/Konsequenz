@@ -477,7 +477,6 @@ function getVisibleFieldsForAdminTable() {
 	"photoStoragePath",
         "assignedToRole",
         "assignedToEmail", // Campo cruciale ora per l'assegnazione
-        "noteAdmin",
         "lastUpdated" // Utile per l'ordinamento
     ];
 }
@@ -907,24 +906,33 @@ async function loadAdminOrders() {
                 }
                 // 2. --- LOGICA PULSANTE DATETIME E FORMATTAZIONE ---
                 else if (f.type === "date-string" && f.key !== "lastUpdated") {
-                    
-                    td.className += " flex items-center justify-between";
-                    
-                    const dateSpan = document.createElement("span");
-                    dateSpan.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
-                    
-                    const btnTime = document.createElement("button");
-                    // Rimuovi parte del padding per dare spazio al pulsante
-                    td.className = td.className.replace("px-3", "pr-1 pl-3"); 
-                    btnTime.className = "ml-2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
-                    btnTime.textContent = "⏱";
+    
+    // Rimuovi il padding destro del TD per dare spazio al pulsante
+    td.className = td.className.replace("px-3", "pl-3 pr-1"); 
+    
+    // Aggiungi relative al TD per posizionare il pulsante in modo assoluto
+    td.className += " relative"; 
+    
+    // Contenitore del testo della data
+    const dateSpan = document.createElement("span");
+    // Se il valore è vuoto, usa uno spazio non divisibile per mantenere l'altezza della riga
+    dateSpan.textContent = val ? new Date(val).toLocaleDateString('it-IT') : '\u00a0'; 
+    // Aggiungiamo overflow-hidden per evitare che il testo fuoriesca
+    dateSpan.className = "overflow-hidden pr-6"; 
+    
+    // Pulsante "Time"
+    const btnTime = document.createElement("button");
+    
+    // Posizionamento Assoluto: sempre in alto a destra all'interno del TD (relativo)
+    btnTime.className = "absolute right-1 top-1/2 -translate-y-1/2 px-1 py-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-[8px] leading-none";
+    btnTime.textContent = "⏱";
 
-                    btnTime.onclick = () => saveDateStamp(o.objectId, f.key, dateSpan);
-                    
-                    td.appendChild(dateSpan);
-                    td.appendChild(btnTime);
-                    
-                } 
+    btnTime.onclick = () => saveDateStamp(o.objectId, f.key, dateSpan);
+    
+    // Inserisce gli elementi nel TD
+    td.appendChild(dateSpan);
+    td.appendChild(btnTime);
+}
                 // 3. --- LOGICA STANDARD PER ALTRI CAMPI DATA/TESTO ---
                 else if (f.key === "lastUpdated") {
                     td.textContent = val ? new Date(val).toLocaleDateString('it-IT') : "";
