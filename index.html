@@ -263,7 +263,17 @@
                class="text-[10px] bg-slate-900 text-slate-100 rounded-lg p-3 max-h-48 overflow-auto hidden"></pre>
         </div>
 
-        
+        <!-- QUI INCOLLI LA CARD STATISTICHE -->
+<div id="card-stats" class="card">
+  <h3 class="card-title">Statistiche</h3>
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="stats-summary"></div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-4">
+    <canvas id="stats-chart" class="w-full h-64"></canvas>
+  </div>
+</div>
+
 <div id="card-orders" class="card overflow-x-hidden">
 
   <!-- Header card -->
@@ -273,12 +283,24 @@
   </div>
 
   <!-- Bulk assign -->
-  <div class="flex items-center gap-2 mb-3">
-    <select id="bulk-worker-select" class="form-input text-xs w-48"></select>
-    <button onclick="doBulkAssign()" class="btn-primary text-xs">
-      Riassegna selezionati
-    </button>
-  </div>
+  <div class="flex items-center flex-wrap gap-2 mb-3">
+
+  <!-- Riassegna -->
+  <select id="bulk-worker-select" class="form-input text-xs w-48"></select>
+  <button onclick="doBulkAssign()" class="btn-primary text-xs">
+    Riassegna selezionati
+  </button>
+
+  <!-- Elimina -->
+  <button onclick="deleteSelectedOrders()" class="btn-secondary text-xs bg-red-600 hover:bg-red-700 text-white">
+    Elimina selezionati
+  </button>
+
+  <!-- Scarica -->
+  <button onclick="downloadSelectedOrders()" class="btn-secondary text-xs">
+    Download selezionati
+  </button>
+</div>
 
   <!-- Scroll wrapper -->
   <div class="border rounded-xl bg-white text-xs w-full overflow-x-auto">
@@ -350,17 +372,6 @@
     <p id="order-modal-status" class="text-xs mt-2 hidden"></p>
         </div>
   </div>
-
-        <!-- CARD: Statistiche -->
-        <div id="card-stats" class="card">
-          <h3 class="card-title">Statistiche</h3>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="stats-summary"></div>
-
-          <div class="bg-white rounded-xl border border-slate-200 p-4">
-            <canvas id="stats-chart" class="w-full h-64"></canvas>
-          </div>
-        </div>
 
       </section>
 

@@ -568,6 +568,97 @@ async function doBulkAssign() {
   await loadAdminOrders();
 }
 
+async function deleteSelectedOrders() {
+
+  const selectedCheckboxes = document.querySelectorAll(".order-checkbox:checked");
+  const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.objectId);
+
+  if (selectedIds.length === 0) {
+    alert("Nessun ordine selezionato.");
+    return;
+  }
+
+  if (!confirm(`Vuoi davvero eliminare definitivamente ${selectedIds.length} ordini?`)) {
+    return;
+  }
+
+  try {
+    const promises = selectedIds.map(id =>
+      Backendless.Data.of(ORDER_TABLE).remove(id)
+    );
+
+    await Promise.all(promises);
+
+    alert(`Eliminati ${selectedIds.length} ordini.`);
+    await loadAdminOrders(); // refresh tabella
+
+  } catch (err) {
+    console.error("Errore eliminazione:", err);
+    alert("Errore durante l'eliminazione.");
+  }
+}
+
+async function downloadSelectedOrdersExcel() {
+  const selectedCheckboxes = document.querySelectorAll(".order-checkbox:checked");
+  const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.objectId);
+
+  if (selectedIds.length === 0) {
+    alert("Nessun ordine selezionato.");
+    return;
+  }
+
+  const selectedOrders = adminOrdersCache.filter(o => selectedIds.includes(o.objectId));
+
+  if (selectedOrders.length === 0) {
+    alert("Nessun ordine trovato.");
+    return;
+  }
+
+  // ★ NORMALIZZAZIONE SICURA ★
+  const sanitizedOrders = selectedOrders.map(order => {
+    const clean = {};
+    for (const key in order) {
+      let val = order[key];
+
+      // Evita undefined (Excel non lo gestisce)
+      if (val === undefined || val === null) {
+        val = "";
+      }
+
+      // Converte oggetti/array in stringa
+      if (typeof val === "object") {
+        val = JSON.stringify(val);
+      }
+
+      // Converte date in stringa leggibile
+      if (typeof val === "number" && key.toLowerCase().includes("date")) {
+        try {
+          const d = new Date(val);
+          if (!isNaN(d)) val = d.toISOString().slice(0, 19).replace("T", " ");
+        } catch (e) {}
+      }
+
+      clean[key] = val;
+    }
+    return clean;
+  });
+
+  // Crea worksheet
+  const ws = XLSX.utils.json_to_sheet(sanitizedOrders);
+
+  // Crea workbook
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Ordini");
+
+  // Salva Excel valido
+  XLSX.writeFile(wb, "Ordini_Selezionati.xlsx");
+}
+
+// Wrapper per compatibilità con il bottone HTML
+function downloadSelectedOrders() {
+  downloadSelectedOrdersExcel();
+}
+
 /**
  * Salva la data e ora corrente (timestamp) per un campo specifico dell'ordine.
  * @param {string} orderId L'ID dell'oggetto ordine.
