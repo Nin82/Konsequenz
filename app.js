@@ -515,96 +515,6 @@ async function assignOrderManually(orderId, newEmail) {
     }
 }
 
-async function bulkAssignOrders(workerEmail) {
-  if (!workerEmail) {
-    toast("Seleziona un lavoratore dalla tendina.", "error");
-    return;
-  }
-
-  const checked = Array.from(
-    document.querySelectorAll("#orders-table-body .order-checkbox:checked")
-  );
-
-  if (checked.length === 0) {
-    toast("Nessun ordine selezionato.", "error");
-    return;
-  }
-
-  // conferma
-  if (
-    !confirm(
-      `Vuoi riassegnare ${checked.length} ordini a ${workerEmail}?`
-    )
-  ) {
-    return;
-  }
-
-  try {
-    for (const cb of checked) {
-      const orderId = cb.dataset.objectId;
-      const updateObj = {
-        objectId: orderId,
-        assignedToEmail: workerEmail,
-        lastUpdated: new Date(),
-      };
-      await Backendless.Data.of(ORDER_TABLE).save(updateObj);
-    }
-
-    toast("Riassegnazione completata.", "success");
-    await loadAdminOrders();
-    await loadAdminStats();
-  } catch (err) {
-    console.error("Errore bulkAssignOrders", err);
-    toast("Errore durante la riassegnazione massiva.", "error");
-  }
-}
-
-async function bulkAssignOrders(workerEmail) {
-    const checkboxes = document.querySelectorAll(".order-checkbox:checked");
-    if (checkboxes.length === 0) {
-        toast("Nessun ordine selezionato", "error");
-        return;
-    }
-
-    const updates = [];
-
-    for (let cb of checkboxes) {
-        updates.push({
-            objectId: cb.dataset.objectId,
-            assignedToEmail: workerEmail,
-            lastUpdated: new Date()
-        });
-    }
-
-    try {
-        // Bulk Update manuale: uno per uno
-        for (let u of updates) {
-            await Backendless.Data.of(ORDER_TABLE).save(u);
-        }
-
-        toast(`Assegnati ${updates.length} ordini a ${workerEmail}`, "success");
-        loadAdminOrders();
-
-    } catch (err) {
-        console.error("Errore bulkAssignOrders", err);
-        toast("Errore nella riassegnazione multipla", "error");
-    }
-}
-
-function populateBulkAssignDropdown() {
-    const sel = $("bulk-worker-select");
-    if (!sel) return;
-
-    sel.innerHTML = "";
-
-    allWorkersCache.forEach(w => {
-        const opt = document.createElement("option");
-        opt.value = w.email;
-        opt.textContent = `${w.email} — ${w.role}`;
-        sel.appendChild(opt);
-    });
-}
-
 async function doBulkAssign() {
   const workerEmail = $("bulk-worker-select").value;
   if (!workerEmail) {
@@ -612,7 +522,6 @@ async function doBulkAssign() {
     return;
   }
 
-  // Prendo il role del worker selezionato
   const worker = allWorkersCache.find(w => w.email === workerEmail);
   if (!worker) {
     alert("Lavoratore non trovato.");
@@ -621,7 +530,6 @@ async function doBulkAssign() {
 
   const allowedStatuses = ROLE_ALLOWED_STATUSES[worker.role] || [];
 
-  // Raccogli ordini selezionati
   const selectedCheckboxes = document.querySelectorAll(".order-checkbox:checked");
   const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.objectId);
 
@@ -630,7 +538,6 @@ async function doBulkAssign() {
     return;
   }
 
-  // Filtra ordini compatibili con il ruolo
   const compatible = adminOrdersCache.filter(
     o => selectedIds.includes(o.objectId) && allowedStatuses.includes(o.status)
   );
@@ -639,7 +546,6 @@ async function doBulkAssign() {
     o => selectedIds.includes(o.objectId) && !allowedStatuses.includes(o.status)
   );
 
-  // Messaggio di conferma
   let msg = `Vuoi davvero assegnare:\n\n`;
   msg += `• ${compatible.length} ordini COMPATIBILI a ${workerEmail}\n`;
   msg += `• ${incompatible.length} ordini saranno IGNORATI perché lo stato non è compatibile (${allowedStatuses.join(", ")})\n\n`;
@@ -647,7 +553,6 @@ async function doBulkAssign() {
 
   if (!confirm(msg)) return;
 
-  // Aggiorna SOLO gli ordini compatibili
   const promises = compatible.map(o =>
     Backendless.Data.of(ORDER_TABLE).save({
       objectId: o.objectId,
@@ -660,8 +565,6 @@ async function doBulkAssign() {
   await Promise.all(promises);
 
   alert(`Assegnati ${compatible.length} ordini a ${workerEmail}.\nIgnorati ${incompatible.length} non compatibili.`);
-
-  // Ricarica tabella
   await loadAdminOrders();
 }
 
